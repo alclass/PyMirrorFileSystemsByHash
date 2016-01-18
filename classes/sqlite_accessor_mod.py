@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 '''
-batchWalkHashingFilesToRootFolderSqliteDB.py
-Explanation:
-  This script walks all files and folders up the directory tree.
-  As it encounters files it sha1-hashes them and store sha1hex on a database.
-  As for now, this database is a SQLite file staged on the device's root folder.
+sqlite_accessor_mod.py
 
-  In a nutshell, it keeps a database of hashes so that it can be used
-    for external back-up programs that need to know
-    whether or not a file exists and, if so, where it is located.
+  This script contains class DBAccessor
+    which is the class that does the actual reads and writes
+    to the sqlite database that stores a meta representation and files and folders
+    mapping to files their sha1hex hash word.
+
+  Some refactoring will occur in the future
+    to improve db-functionality and code readability, for example:
+    the table creation script may be ported to a different script,
+    to better organize code and functionalities.
 
   Written on 2015-01-13 Luiz Lewis
 '''
@@ -40,7 +42,7 @@ def get_sqlite_connection():
   return conn
 
 
-class Sha1FileSystemComplementer(object):
+class DBAccessor(object):
 
   def __init__(self, DEVICE_PREFIX_ABSPATH):
     '''
@@ -273,37 +275,6 @@ class Sha1FileSystemComplementer(object):
         conn.commit()
       conn.close()
 
-
-def walk_on_up_tree_to_grab_sha1hex():
-  '''
-
-  :return:
-  '''
-  global device_root_abspath
-  device_root_abspath = os.path.abspath('.')
-  fs_complementer = Sha1FileSystemComplementer(device_root_abspath)
-  if not os.path.isfile(SQLITE_ROOTDIR_FILENAME_DEFAULT):
-    create_sqlite_db_file_on_root_folder()
-  sqlite3.connect(SQLITE_ROOTDIR_FILENAME_DEFAULT)
-  walk_counter = 0
-  for dirpath, dirnames, filenames in os.walk(device_root_abspath):
-    fs_complementer.db_insert_dirnames(dirnames, dirpath)
-    complement_path = dirpath
-    if complement_path.startswith('./'):
-      complement_path = complement_path[2:]
-    current_abs_dirpath = os.path.join(device_root_abspath, complement_path)
-    walk_counter += 1
-    print walk_counter, 'current path:', current_abs_dirpath
-    print 'Files found @', complement_path
-    for filename in filenames:
-      print filename
-    os.chdir(current_abs_dirpath)
-    process_folder(current_abs_dirpath, filenames)
-    os.chdir(device_root_abspath)
-    print '-'*40
-    print 'Voltei!', time.ctime(), dirpath, dirnames, current_abs_dirpath
-    print '='*40
-
 def get_biggest_entry_id():
   sql = 'SELECT max(entry_id) FROM %(tablename)s' \
         %{'tablename': SQLITE_DB_TABLENAME_DEFAULT}
@@ -318,13 +289,6 @@ def get_biggest_entry_id():
     create_sqlite_db_file_on_root_folder()
     return get_biggest_entry_id()
   return max_entry_id
-
-next_entry_id = 0
-def main():
-  global next_entry_id
-  next_entry_id = get_biggest_entry_id() + 1
-  walk_on_up_tree_to_grab_sha1hex()
-
 
 def is_there_the_root_record():
   sql = '''SELECT entry_id, parent_dir_id, entryname FROM %(tablename)s WHERE
@@ -416,6 +380,13 @@ def create_sqlite_db_file_on_root_folder():
 def test():
   #create_sqlite_db_file_on_root_folder()
   insert_root_record_on_db_table()
+
+next_entry_id = 0
+def main():
+  global next_entry_id
+  next_entry_id = get_biggest_entry_id() + 1
+  # walk_on_up_tree_to_grab_sha1hex()
+
 
 if __name__ == '__main__':
   # main()
