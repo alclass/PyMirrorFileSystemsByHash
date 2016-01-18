@@ -75,7 +75,7 @@ class Sha1FileSystemOnFolderComplementer(object):
       if dirname in dirnames_on_db:
         continue
       dirnames_needing_inclusion.append(dirname)
-    self.db_acessor.insert_dirnames_on_parent_dir_id(dirnames_needing_inclusion, self.parent_dir_id)
+    self.db_acessor.insert_dirnames_with_parent_dir_id(dirnames_needing_inclusion, self.parent_dir_id)
 
   def verify_add_or_update_folders_on_parent(self, dirnames):
     '''

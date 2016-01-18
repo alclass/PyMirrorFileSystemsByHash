@@ -51,7 +51,8 @@ class DBAccessor(object):
     :return:
     '''
     if not os.path.isdir(DEVICE_PREFIX_ABSPATH):
-      raise Exception, 'DEVICE_PREFIX_ABSPATH [%s] is not valid.' %DEVICE_PREFIX_ABSPATH
+      error_msg = 'DEVICE_PREFIX_ABSPATH [%s] is not valid.' %DEVICE_PREFIX_ABSPATH
+      raise Exception(error_msg)
     self.DEVICE_PREFIX_ABSPATH = DEVICE_PREFIX_ABSPATH
     self.init_entry_ids_for_files_and_dirs()
 
@@ -75,6 +76,45 @@ class DBAccessor(object):
     if record:
       self.entry_id_for_files = record[0]
     conn.close()
+
+  def get_positive_max_entry_id_for_dirs(self):
+    '''
+
+    :return:
+    '''
+    max_entry_id = None
+    sql = 'SELECT max(entry_id) FROM %(tablename)s' \
+          %{'tablename': SQLITE_DB_TABLENAME_DEFAULT}
+    try:
+      conn = get_sqlite_connection()
+      curr = conn.execute(sql)
+      result = curr.fetchone()
+      if result:
+        max_entry_id = int(result[0])
+      conn.close()
+    except sqlite3.OperationalError:
+      return None
+    return max_entry_id
+
+  def get_negative_min_entry_id_for_files(self):
+    '''
+
+    :return:
+    '''
+    min_entry_id = 0 # the first file to be db-inserted will have entry_id -1
+    sql = 'SELECT min(entry_id) FROM %(tablename)s' \
+          %{'tablename': SQLITE_DB_TABLENAME_DEFAULT}
+    try:
+      conn = get_sqlite_connection()
+      curr = conn.execute(sql)
+      result = curr.fetchone()
+      if result:
+        min_entry_id = int(result[0])
+      conn.close()
+    except sqlite3.OperationalError:
+      return None
+    return min_entry_id
+
 
   def get_dirnames_on_db_with_same_parent_id(self, parent_dir_id):
     '''
@@ -114,18 +154,17 @@ class DBAccessor(object):
     self.entry_id_for_files += 1
     return self.entry_id_for_files
 
-  def db_insert_dirnames(self, dirnames, dirpath):
+  def insert_dirnames_with_parent_dir_id(self, dirnames, parent_dir_id):
     '''
 
     :param dirnames:
-    :param dirpath:
+    :param parent_dir_id:
     :return:
     '''
-    global next_entry_id
-    parent_dir_id = self.find_entry_id_for_dirpath(dirpath)
+    if dirnames == None or len(dirnames) == 0:
+      return
+    conn = get_sqlite_connection()
     dirnames_on_db = self.get_dirnames_on_db_with_same_parent_id(parent_dir_id)
-    if len(dirnames) > 0:
-      conn = get_sqlite_connection()
     for dirname in dirnames:
       if dirname in dirnames_on_db:
         continue
@@ -148,21 +187,77 @@ class DBAccessor(object):
     conn.commit()
     conn.close()
 
-  def find_entry_id_for_dirpath(self, current_abs_path):
+
+  def db_insert_dirnames_with_dirpath(self, dirnames, dirpath):
+    '''
+
+    :param dirnames:
+    :param dirpath:
+    :return:
+    '''
+    global next_entry_id
+    parent_dir_id = self.find_entry_id_for_dirpath(dirpath)
+    return self.insert_dirnames_with_parent_dir_id(dirnames, parent_dir_id)
+
+  def is_path_good_in_relation_to_device_prefix_abspath(self, current_abspath):
+    '''
+    The logic is this: the device prefix path should start the current_abs_path
+    If it's not so, current_abs_path is not good and an exception should be raised.
+
+    :return:
+    '''
+    # 1st check: is it an OS path?
+    if not os.path.isdir(current_abspath):
+      error_msg = "Path [%s] does not exist or it's a file." %current_abspath
+      raise Exception(error_msg)
+    # 2nd check: does the device prefix path start it?
+    if self.DEVICE_PREFIX_ABSPATH != current_abspath[ : len( self.DEVICE_PREFIX_ABSPATH ) ]
+      error_msg = "Abspath [%s] does not start with the device prefix path [%s]" %(current_abspath, self.DEVICE_PREFIX_ABSPATH)
+      raise Exception(error_msg)
+
+  def extract_current_abspath_minus_device_prefix(self, current_abspath):
+    current_abspath_minus_device_prefix = current_abspath[ len( self.DEVICE_PREFIX_ABSPATH ) : ]
+    if not current_abspath_minus_device_prefix.startswith('/'):
+      current_abspath_minus_device_prefix = '/' + current_abspath_minus_device_prefix
+    return current_abspath_minus_device_prefix
+
+  def are_split_pieces_good_in_relation_to_minus_path(self, pp):
+    '''
+
+    :param pp:
+    :return:
+    '''
+    if len(pp) < 2:
+      error_msg = '''Inconsistency in internal program list manipulation
+      for finding root abs dir.  The process of finding the id of a directory
+      is a recursive one, starting on ROOT, the / symbolized first folder.
+      Somehow, this ROOT was lost. It may be a logical error.
+      To help find further:
+        1) '/'.split('/') is ['',''] AND
+        2) '/a'.split('/') is ['','a']
+      The condition that triggered this error is that list is smaller than 2 items.'''
+      raise Exception(error_msg)
+
+
+  def find_entry_id_for_dirpath(self, current_abspath):
     '''
     :param current_abs_path:
     :return:
     '''
-    if not os.path.isdir(current_abs_path):
-      raise Exception, 'path does not exist : ' + current_abs_path
-    minus_device_abspath = current_abs_path[ len( self.DEVICE_PREFIX_ABSPATH ) : ]
-    if minus_device_abspath.startswith('/'):
-      raise Exception, 'abs path not starting with / : '+ minus_device_abspath
-    pp = minus_device_abspath.split('/')
+    self.is_path_good_in_relation_to_device_prefix_abspath(current_abspath)
+    current_abspath_minus_device_prefix = self.extract_current_abspath_minus_device_prefix(current_abspath)
+    pp = current_abspath_minus_device_prefix.split('/')
+    self.are_split_pieces_good_in_relation_to_minus_path(pp)
     if pp == ['','']:
       return CONVENTIONED_ROOT_ENTRY_ID
-    if len(pp) < 2:
-      raise Exception, 'inconsistency in internal list manipulation for finding root abs dir'
+    return self.loop_on_to_find_entry_id_for_dirpath(pp)
+
+  def loop_on_to_find_entry_id_for_dirpath(self, pp):
+    '''
+
+    :param pp:
+    :return:
+    '''
     conn = get_sqlite_connection()
     parent_dir_id = CONVENTIONED_ROOT_ENTRY_ID  # it starts its traversal at 'root'
     pp = pp[1:] # shift left 1 position
@@ -181,12 +276,12 @@ class DBAccessor(object):
         entry_id = record[0] #['entry_id']
         parent_dir_id = entry_id # in case it loops on from here
       else: # must record it!
-        self.db_insert_a_dirname_on_parent_dir(dirname, parent_dir_id)
+        self.db_insert_a_dirname_with_parent_dir(dirname, parent_dir_id)
         entry_id = self.entry_id_for_dirs
     conn.close()
     return entry_id
 
-  def db_insert_a_dirname_on_parent_dir(self, dirname, parent_dir_id):
+  def db_insert_a_dirname_with_parent_dir(self, dirname, parent_dir_id):
     '''
 
     :param dirname:
@@ -207,88 +302,95 @@ class DBAccessor(object):
     conn.commit()
     conn.close()
 
-  def process_filenames_on_folder(self, current_abs_dirpath, filenames):
+  def delete_file_entry(self, next_entry_id_to_delete):
     '''
 
-    :param current_abs_dirpath:
-    :param filenames:
+    :param next_entry_id_to_delete:
     :return:
     '''
-    print 'process_filenames_on_folder:', current_abs_dirpath
-    parent_dir_id = self.find_entry_id_for_dirpath(current_abs_dirpath)
-    if parent_dir_id == None:
+    pass
 
+  def delete_a_dir_entry_removing_everything_belonging_to_it(self, parent_dir_id_to_delete):
+    '''
+
+    :return:
+    '''
+    sql = '''
+
+    SELECT entry_id FROM table
+     WHERE
+     parent_dir_id = "%(parent_dir_id_to_delete)d"
+    '''
+
+    entry_ids_to_delete = []
+    if len(entry_ids_to_delete) == 0:
+      # delete itself and return
+      sql = '''DELETE FROM table
+      where entry_id =
+      '''
+    for next_entry_id_to_delete in entry_ids_to_delete:
+      if next_entry_id_to_delete < 0:
+        self.delete_file_entry(next_entry_id_to_delete)
+      return self.delete_a_dir_entry_removing_everything_belonging_to_it()
+
+
+  def rename_or_move_entry_to_a_different_folder(self, entry_id, target_entryname, target_parent_dir_id, sha1hex=None):
+    '''
+
+    :param target_entryname:
+    :param target_parent_dir_id:
+    :param sha1hex:
+    :return:
+    '''
+    sql = '''UPDATE %(tablename)s
+          entryname     = "%(target_entryname)s"
+          parent_dir_id = "%(target_parent_dir_id)d"
+            WHERE
+          entry_id = "%(entry_id)d" '''
+    interpolate_dict = { \
+            'tablename'     : SQLITE_DB_TABLENAME_DEFAULT, \
+            'entryname'     : target_entryname, \
+            'parent_dir_id' : target_parent_dir_id, \
+            'entry_id'      : entry_id, \
+    }
+    if sha1hex != None:
+      sql += ''' AND sha1hex = "%(sha1hex)s" '''
+      interpolate_dict['sha1hex'] = sha1hex
+    sql = sql %interpolate_dict
     conn = sqlite3.connect()
-    for filename in filenames:
-      file_abspath = os.path.join(current_abs_dirpath, filename)
-      sha1obj = hashlib.sha1()
-      try:
-        f = open(file_abspath, 'r')
-        sha1obj.update(f.read())
-        sha1hex = sha1obj.hexdigest()
-      except Exception:
-        raise SHA1_NOT_OBTAINED, 'SHA1_NOT_OBTAINED'
-      # verify previous record existence and check equality
-      sql = 'SELECT entryname, parent_dir_id FROM %(tablename)s WHERE ' \
-            'sha1hex = "%(sha1hex)s"'      \
-            %{ \
-              'tablename': SQLITE_DB_TABLENAME_DEFAULT, \
-              'sha1hex'  : sha1hex, \
-            }
-      curr = conn.execute(sql)
-      record = curr.fetchone()
-      if record:
-        other_entryname = record[0] #['entryname']
-        other_parent_id = record[1] #['parent_dir_id']
-        if other_parent_id == parent_dir_id and other_entryname == filename:
-          # nothing needs be done
-          continue
-        else: # well, the file exists either having a different name or it's somewhere else having or not the same name
-          sql = '''UPDATE %(tablename)s
-                entryname     = "%(entryname)s"
-                parent_dir_id = "%(parent_dir_id)d"
-                  WHERE
-                sha1hex =  %(sha1hex)s ''' \
-                %{
-                  'tablename'     : SQLITE_DB_TABLENAME_DEFAULT, \
-                  'entryname'     : filename,
-                  'parent_dir_id' : parent_dir_id,
-                  'sha1hex'       : sha1hex,
-                  }
-
-      else: # ie, above SELECT did not find an equal SHA1 record, it's time to insert it
-        sql = 'INSERT INTO %(tablename)s ' \
-              '(entry_id, entryname, parent_dir_id, sha1hex) VALUES ' \
-              '(%(entry_id)d, %(entryname)s, %(parent_dir_id)d, %(sha1hex)s)' \
-              %{
-                'tablename'     : SQLITE_DB_TABLENAME_DEFAULT, \
-                'entry_id'      : self.next_entry_id_for_files(),
-                'entryname'     : filename,
-                'parent_dir_id' : parent_dir_id,
-                'sha1hex'       : sha1hex,
-                }
-        retVal = conn.execute(sql)
-        '''
-        if retVal <> 0:
-          print 'retVal NOT ZERO', retVal, 'for', sql
-        '''
-        conn.commit()
-      conn.close()
-
-def get_biggest_entry_id():
-  sql = 'SELECT max(entry_id) FROM %(tablename)s' \
-        %{'tablename': SQLITE_DB_TABLENAME_DEFAULT}
-  try:
-    conn = get_sqlite_connection()
-    curr = conn.execute(sql)
-    result = curr.fetchone()
-    print result[0], result
-    max_entry_id = int(result[0])
+    retVal = conn.execute(sql)
+    '''
+    if retVal <> 0:
+      print 'retVal NOT ZERO', retVal, 'for', sql
+    '''
+    conn.commit()
     conn.close()
-  except sqlite3.OperationalError:
-    create_sqlite_db_file_on_root_folder()
-    return get_biggest_entry_id()
-  return max_entry_id
+
+  def db_insert_filename_and_its_sha1hex_with_parent_dir_id(self, filename, parent_dir_id, sha1hex):
+    '''
+
+    :param filename:
+    :param parent_dir_id:
+    :return:
+    '''
+    conn = sqlite3.connect()
+    sql = 'INSERT INTO %(tablename)s ' \
+          '(entry_id, entryname, parent_dir_id, sha1hex) VALUES ' \
+          '(%(entry_id)d, %(entryname)s, %(parent_dir_id)d, %(sha1hex)s)' \
+          %{
+            'tablename'     : SQLITE_DB_TABLENAME_DEFAULT, \
+            'entry_id'      : self.next_entry_id_for_files(),
+            'entryname'     : filename,
+            'parent_dir_id' : parent_dir_id,
+            'sha1hex'       : sha1hex,
+            }
+    retVal = conn.execute(sql)
+    '''
+    if retVal <> 0:
+      print 'retVal NOT ZERO', retVal, 'for', sql
+    '''
+    conn.commit()
+    conn.close()
 
 def is_there_the_root_record():
   sql = '''SELECT entry_id, parent_dir_id, entryname FROM %(tablename)s WHERE
@@ -310,7 +412,8 @@ def delete_root_record_on_db_table():
   conn = get_sqlite_connection()
   conn.execute(sql)
   if is_there_the_root_record():
-    raise Exception, 'could not delete the root record'
+    error_msg = 'Could not delete the root record'
+    raise Exception(error_msg)
 
 def insert_root_record_on_db_table():
   '''
