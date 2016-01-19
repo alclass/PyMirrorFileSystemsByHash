@@ -39,7 +39,8 @@ class Sha1FileSystemOnFolderComplementer(object):
     :return:
     '''
     if not os.path.isdir(DEVICE_PREFIX_ABSPATH):
-      raise Exception, 'DEVICE_PREFIX_ABSPATH [%s] is not valid.' %DEVICE_PREFIX_ABSPATH
+      error_msg = 'DEVICE_PREFIX_ABSPATH [%s] is not valid.' %DEVICE_PREFIX_ABSPATH
+      raise Exception(error_msg)
     self.DEVICE_PREFIX_ABSPATH = DEVICE_PREFIX_ABSPATH
     self.db_accessor = db_accessor_mod.DBAccessor(self.DEVICE_PREFIX_ABSPATH)
 
@@ -101,7 +102,7 @@ class Sha1FileSystemOnFolderComplementer(object):
       sha1obj.update(f.read())
       sha1hex = sha1obj.hexdigest()
     except Exception:
-      raise SHA1_NOT_OBTAINED, 'SHA1_NOT_OBTAINED'
+      raise SHA1_NOT_OBTAINED('SHA1_NOT_OBTAINED')
     # verify previous record existence and check equality
     return sha1hex
 
@@ -133,8 +134,8 @@ class Sha1FileSystemOnFolderComplementer(object):
     if self.parent_dir_id != parent_dir_id_found:
       self.db_accessor.move_file_to_folder_by_entry_id(entry_id, self.parent_dir_id, filename)
       return
-
-    raise Exception, "Inconsistency. One of the 3 hypotheses in process_filename_on_folder() was not logically caught. It may be a program error."
+    error_msg = "Inconsistency. One of the 3 hypotheses in process_filename_on_folder() was not logically caught. It may be a program error."
+    raise Exception(error_msg)
 
   def verify_add_or_update_files_on_parent(self, filenames):
     '''
@@ -149,7 +150,8 @@ class Sha1FileSystemOnFolderComplementer(object):
     self.current_abs_dirpath = current_abs_dirpath
     parent_dir_id = self.find_entry_id_for_dirpath(current_abs_dirpath)
     if parent_dir_id == None:
-      raise Exception, 'Inconsistency: failed to retrieve parent_dir_id in Sha1FileSystemCompleter. Please check database is online.'
+      error_msg = 'Inconsistency: failed to retrieve parent_dir_id in Sha1FileSystemCompleter. Please check database is online.'
+      raise Exception(error_msg)
     self.parent_dir_id = parent_dir_id
     self.verify_add_or_update_files_on_parent(filenames)
     self.verify_add_or_update_folders_on_parent(dirnames)
