@@ -4,6 +4,20 @@ import string
 
 from classes import sqlite_accessor_mod as sqlite_mod
 PYMIRROR_CONSTANTS = sqlite_mod.PYMIRROR_CONSTANTS
+import random
+
+hexadecimal_str_seq = '0123456789ABCDEF'
+def take_random_sha1hex():
+  '''
+
+  :return:
+  '''
+  zero_to_15 = random.randint(0, 15)
+  random_sha1hex = ''
+  for i in range(40):
+    zero_to_15 = random.randint(0, 15)
+    random_sha1hex += hexadecimal_str_seq[zero_to_15]
+  return random_sha1hex
 
 class SomeTests1(sqlite_mod.DBAccessorBase):
 
@@ -115,6 +129,19 @@ class SomeTests1(sqlite_mod.DBAccessorBase):
     '''
     conn.close()
 
+
+  def insert_multiple_files_and_folders_on_db_table(self):
+    '''
+
+    :return:
+    '''
+    db_accessor = sqlite_mod.DBAccessor(self.DEVICE_PREFIX_ABSPATH)
+    dir1 = os.path.join(self.DEVICE_PREFIX_ABSPATH, 'testdir/')
+    db_accessor.db_insert_filename_and_its_sha1hex_with_its_folder_abspath('test2.txt', dir1, take_random_sha1hex())
+    db_accessor.db_insert_filename_and_its_sha1hex_with_its_folder_abspath('test3.txt', dir1, take_random_sha1hex())
+    dir2 = os.path.join(self.DEVICE_PREFIX_ABSPATH, 'test2dir/')
+    db_accessor.db_insert_filename_and_its_sha1hex_with_its_folder_abspath('test4.txt', dir2, take_random_sha1hex())
+
   def list_files_and_folders_contents(self):
     db_acessor = sqlite_mod.DBAccessor(self.DEVICE_PREFIX_ABSPATH)
     print db_acessor.get_up_tree_contents_as_text()
@@ -124,6 +151,7 @@ def test1():
   test1 = SomeTests1(DEVICE_PREFIX_ABSPATH)
   test1.insert_root_record_on_db_table()
   test1.insert_a_sample_file_on_db_table()
+  test1.insert_multiple_files_and_folders_on_db_table()
   test1.list_files_and_folders_contents()
 
 def main():

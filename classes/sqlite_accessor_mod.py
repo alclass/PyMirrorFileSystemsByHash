@@ -76,7 +76,14 @@ class DBAccessor(DBAccessorBase):
     '''
     super(DBAccessor, self).__init__(DEVICE_PREFIX_ABSPATH)
     # in Python 3, it's just: super().__init__()
+    self.verify_dbsqlitefile_existence()
     self.init_entry_ids_for_files_and_dirs()
+
+  def verify_dbsqlitefile_existence(self):
+    dbsqlitefile_abspath = os.path.join(self.DEVICE_PREFIX_ABSPATH, PYMIRROR_CONSTANTS.SQLITE_DB_TABLENAME_DEFAULT)
+    if not os.path.isfile(dbsqlitefile_abspath):
+      dbinit = DBInit(self.DEVICE_PREFIX_ABSPATH)
+      dbinit.verify_and_create_fs_entries_sqlite_db_table()
 
   def init_entry_ids_for_files_and_dirs(self):
     '''
@@ -264,6 +271,59 @@ class DBAccessor(DBAccessorBase):
       self.entry_id_for_dirs = entry_id_for_dirs_position_to_undo_to_if_needed
     conn.close()
 
+  def db_insert_filename_and_its_sha1hex_with_parent_dir_id(self, filename, parent_dir_id, sha1hex):
+    '''
+
+    :param filename:
+    :param parent_dir_id:
+    :return:
+    '''
+    entry_id_for_files_position_to_undo_to_if_needed = self.entry_id_for_files
+    sql = '''
+      INSERT INTO %(tablename)s
+        (entry_id, entryname, parent_dir_id, sha1hex)
+      VALUES
+        ("%(entry_id)d", "%(entryname)s", "%(parent_dir_id)d", "%(sha1hex)s") ''' \
+      %{
+        'tablename'     : self.get_dbtable_name(), \
+        'entry_id'      : self.increment_and_get_entry_id_for_files(),
+        'entryname'     : filename,
+        'parent_dir_id' : parent_dir_id,
+        'sha1hex'       : sha1hex,
+        }
+    conn = self.get_db_connection_handle()
+    try:
+      retVal = conn.execute(sql)
+      conn.commit()
+    except sqlite3.Error:
+      self.entry_id_for_files = entry_id_for_files_position_to_undo_to_if_needed
+    '''
+    if retVal <> 0:
+      print 'retVal NOT ZERO', retVal, 'for', sql
+    '''
+    conn.close()
+
+  def db_insert_filename_and_its_sha1hex_with_its_folder_abspath(self, filename, its_folder_abspath, sha1hex):
+    '''
+
+    :param filename:
+    :param folder_abspath:
+    :param sha1hex:
+    :return:
+    '''
+    parent_dir_id = self.find_entry_id_for_dirpath(its_folder_abspath)
+    self.db_insert_filename_and_its_sha1hex_with_parent_dir_id(filename, parent_dir_id, sha1hex)
+
+  def db_insert_filename_and_its_sha1hex_with_file_abspath(self, file_abspath, sha1hex):
+    '''
+
+    :param file_abspath:
+    :param sha1hex:
+    :return:
+    '''
+    its_folder_abspath, filename = os.path.split(file_abspath)
+    self.db_insert_dirname_with_parent_dir(filename, its_folder_abspath, sha1hex)
+
   def is_path_good_in_relation_to_device_prefix_abspath(self, current_abspath):
     '''
     The logic is this: the device prefix path should start the current_abs_path
@@ -348,7 +408,7 @@ class DBAccessor(DBAccessorBase):
         entry_id = record[0] #['entry_id']
         parent_dir_id = entry_id # in case it loops on from here
       else: # must record it!
-        self.db_insert_a_dirname_with_parent_dir(dirname, parent_dir_id)
+        self.db_insert_dirname_with_parent_dir(dirname, parent_dir_id)
         entry_id = self.entry_id_for_dirs
     conn.close()
     return entry_id
@@ -416,38 +476,6 @@ class DBAccessor(DBAccessorBase):
       print 'retVal NOT ZERO', retVal, 'for', sql
     '''
     conn.commit()
-    conn.close()
-
-  def db_insert_filename_and_its_sha1hex_with_parent_dir_id(self, filename, parent_dir_id, sha1hex):
-    '''
-
-    :param filename:
-    :param parent_dir_id:
-    :return:
-    '''
-    entry_id_for_files_position_to_undo_to_if_needed = self.entry_id_for_files
-    sql = '''
-      INSERT INTO %(tablename)s
-        (entry_id, entryname, parent_dir_id, sha1hex)
-      VALUES
-        ("%(entry_id)d", "%(entryname)s", "%(parent_dir_id)d", "%(sha1hex)s") ''' \
-      %{
-        'tablename'     : self.get_dbtable_name(), \
-        'entry_id'      : self.increment_and_get_entry_id_for_files(),
-        'entryname'     : filename,
-        'parent_dir_id' : parent_dir_id,
-        'sha1hex'       : sha1hex,
-        }
-    conn = self.get_db_connection_handle()
-    try:
-      retVal = conn.execute(sql)
-      conn.commit()
-    except sqlite3.Error:
-      self.entry_id_for_files = entry_id_for_files_position_to_undo_to_if_needed
-    '''
-    if retVal <> 0:
-      print 'retVal NOT ZERO', retVal, 'for', sql
-    '''
     conn.close()
 
   def transform_dir_ids_to_fullpath(self, trailed_dir_ids):
@@ -530,7 +558,7 @@ class DBAccessor(DBAccessorBase):
       return entryname
     return None
 
-  def get_up_tree_contents_as_text(self, up_tree_contents_text='', parent_dir_id=None, parent_entryname=None):
+  def list_up_tree_contents_as_text(self, up_tree_contents_text='', parent_dir_id=None, parent_entryname=None):
     '''
 
     :return:

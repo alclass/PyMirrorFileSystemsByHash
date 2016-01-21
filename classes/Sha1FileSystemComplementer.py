@@ -29,6 +29,22 @@ import sqlite_accessor_mod as db_accessor_mod
 class SHA1_NOT_OBTAINED(Exception):
   pass
 
+def calculate_sha1hex_from_file(file_abspath):
+  '''
+
+  :param file_abspath:
+  :return:
+  '''
+  sha1obj = hashlib.sha1()
+  try:
+    f = open(file_abspath, 'r')
+    sha1obj.update(f.read())
+    sha1hex = sha1obj.hexdigest()
+  except Exception:
+    error_msg = 'Could not calculate the SHA1 hash for file: [%s]' %file_abspath
+    raise SHA1_NOT_OBTAINED(error_msg)
+  return sha1hex
+
 
 class Sha1FileSystemOnFolderComplementer(object):
 
@@ -88,7 +104,7 @@ class Sha1FileSystemOnFolderComplementer(object):
     self.verify_folder_exclusion_from_db(dirnames)
 
 
-  def get_sha1hex_from_file(self, current_abs_dirpath, filename):
+  def calculate_sha1hex_from_file(self, current_abs_dirpath, filename):
     '''
 
     :param current_abs_dirpath:
@@ -96,14 +112,7 @@ class Sha1FileSystemOnFolderComplementer(object):
     :return:
     '''
     file_abspath = os.path.join(current_abs_dirpath, filename)
-    sha1obj = hashlib.sha1()
-    try:
-      f = open(file_abspath, 'r')
-      sha1obj.update(f.read())
-      sha1hex = sha1obj.hexdigest()
-    except Exception:
-      raise SHA1_NOT_OBTAINED('SHA1_NOT_OBTAINED')
-    # verify previous record existence and check equality
+    sha1hex = calculate_sha1hex_from_file(file_abspath)
     return sha1hex
 
   def verify_add_or_update_file_on_parent(self, filename):
@@ -112,7 +121,7 @@ class Sha1FileSystemOnFolderComplementer(object):
     :param filename:
     :return:
     '''
-    sha1hex = self.get_sha1hex_from_file(filename)  # current_abs_dirpath is local to the class
+    sha1hex = self.calculate_sha1hex_from_file(filename)  # current_abs_dirpath is local to the class
     entry_id, entryname_found, parent_dir_id_found = self.db_accessor.fetch_record_if_sha1hex_exists(sha1hex)
 
     # 1st hypothesis: file is already there, nothing to be done
