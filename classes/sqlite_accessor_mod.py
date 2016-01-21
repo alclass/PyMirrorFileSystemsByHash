@@ -243,33 +243,61 @@ class DBAccessor(DBAccessorBase):
     :return:
     '''
     parent_dir_id = self.find_entry_id_for_dirpath(dirpath)
-    return self.insert_dirnames_bulk_with_parent_dir_id(dirnames, parent_dir_id)
+    for dirname in dirnames:
+      self.db_insert_dirname_with_parent_dir_id(dirname, parent_dir_id)
 
-  def db_insert_dirname_with_parent_dir(self, dirname, parent_dir_id):
+  def db_insert_all_subfolders_within_root_minus_path(self, root_minus_path):
+    '''
+
+    :param root_minus_path:
+    :return:
+    '''
+    pp = root_minus_path.split('/')
+    parent_dir_id = PYMIRROR_CONSTANTS.CONVENTIONED_ROOT_ENTRY_ID
+    for foldername in pp:
+      if foldername == '':
+        continue
+      entry_id = self.db_insert_dirname_with_parent_dir_id(foldername, parent_dir_id)
+      if entry_id == None:
+        error_msg = 'Could not db_insert_dirname_with_parent_dir_id in root_minus_path = [%s]' %root_minus_path
+        raise Exception(error_msg)
+      parent_dir_id = entry_id
+
+  def db_insert_dirname_with_parent_dir_id(self, dirname, parent_dir_id):
     '''
 
     :param dirname:
     :param parent_dir_id:
     :return:
     '''
+    if parent_dir_id == None:
+      error_msg = 'parent_dir_id is None in db_insert_dirname_with_parent_dir_id()'
+      raise Exception(error_msg)
+    ok_dir_id_to_return = None
     entry_id_for_dirs_position_to_undo_to_if_needed = self.entry_id_for_dirs
-    sql = '''INSERT INTO %(tablename)s
-        (entry_id, entryname, parent_dir_id)
-      VALUES
-        (%(entry_id)d, %(entryname)s, %(parent_dir_id)d) ''' \
-      %{
+    dir_id = self.increment_and_get_entry_id_for_dirs()
+    data_dict = { \
         'tablename'     : self.get_dbtable_name(), \
-        'entry_id'      : self.increment_and_get_entry_id_for_dirs(),
+        'entry_id'      : dir_id,
         'entryname'     : dirname,
         'parent_dir_id' : parent_dir_id,
         }
+    sql = '''INSERT INTO %(tablename)s
+        (entry_id, entryname, parent_dir_id)
+      VALUES
+        ("%(entry_id)d", "%(entryname)s", "%(parent_dir_id)d") ''' %data_dict
+    print 'db_insert_dirname_with_parent_dir_id %s' %data_dict
     conn = self.get_db_connection_handle()
     try:
       retVal = conn.execute(sql)
       conn.commit()
+      ok_dir_id_to_return = dir_id
     except sqlite3.Error:
-      self.entry_id_for_dirs = entry_id_for_dirs_position_to_undo_to_if_needed
+      pass
     conn.close()
+    if ok_dir_id_to_return == None:
+      self.entry_id_for_dirs = entry_id_for_dirs_position_to_undo_to_if_needed
+    return ok_dir_id_to_return
 
   def db_insert_filename_and_its_sha1hex_with_parent_dir_id(self, filename, parent_dir_id, sha1hex):
     '''
@@ -311,6 +339,7 @@ class DBAccessor(DBAccessorBase):
     :param sha1hex:
     :return:
     '''
+    #root_minus_path = self.prepare_root_minus_path(its_folder_abspath)
     parent_dir_id = self.find_entry_id_for_dirpath(its_folder_abspath)
     self.db_insert_filename_and_its_sha1hex_with_parent_dir_id(filename, parent_dir_id, sha1hex)
 
@@ -322,7 +351,7 @@ class DBAccessor(DBAccessorBase):
     :return:
     '''
     its_folder_abspath, filename = os.path.split(file_abspath)
-    self.db_insert_dirname_with_parent_dir(filename, its_folder_abspath, sha1hex)
+    self.db_insert_filename_and_its_sha1hex_with_its_folder_abspath(filename, its_folder_abspath, sha1hex)
 
   def is_path_good_in_relation_to_device_prefix_abspath(self, current_abspath):
     '''
@@ -368,30 +397,51 @@ class DBAccessor(DBAccessorBase):
       The condition that triggered this error is that list is smaller than 2 items.'''
       raise Exception(error_msg)
 
+  def prepare_root_minus_path(self, target_abspath):
+    '''
 
-  def find_entry_id_for_dirpath(self, current_abspath):
+    :param target_abspath:
+    :return:
+    '''
+    root_minus_path = self.extract_current_abspath_minus_device_prefix(target_abspath)
+    if not root_minus_path.startswith('/'):
+      root_minus_path = '/' + root_minus_path
+    return root_minus_path
+
+  def find_entry_id_for_root_minus_path(self, root_minus_path):
+    pp = root_minus_path.split('/')
+    self.are_split_pieces_good_in_relation_to_minus_path(pp)
+    if pp == ['','']:
+      return PYMIRROR_CONSTANTS.CONVENTIONED_ROOT_ENTRY_ID
+    return self.loop_on_to_find_entry_id_for_dirpath(pp, root_minus_path)
+
+  def find_entry_id_for_dirpath(self, target_abspath):
     '''
     :param current_abs_path:
     :return:
     '''
-    self.is_path_good_in_relation_to_device_prefix_abspath(current_abspath)
-    current_abspath_minus_device_prefix = self.extract_current_abspath_minus_device_prefix(current_abspath)
-    pp = current_abspath_minus_device_prefix.split('/')
-    self.are_split_pieces_good_in_relation_to_minus_path(pp)
-    if pp == ['','']:
-      return PYMIRROR_CONSTANTS.CONVENTIONED_ROOT_ENTRY_ID
-    return self.loop_on_to_find_entry_id_for_dirpath(pp)
+    root_minus_path = self.prepare_root_minus_path(target_abspath)
+    return self.find_entry_id_for_root_minus_path(root_minus_path)
 
-  def loop_on_to_find_entry_id_for_dirpath(self, pp):
+  def loop_on_to_find_entry_id_for_dirpath(self, pp, root_minus_path, second_pass=False):
     '''
-
+    PRIVATE METHOD! Only find_entry_id_for_dirpath() can call this.
     :param pp:
     :return:
     '''
     conn = self.get_db_connection_handle()
     parent_dir_id = PYMIRROR_CONSTANTS.CONVENTIONED_ROOT_ENTRY_ID  # it starts its traversal at 'root'
     pp = pp[1:] # shift left 1 position
+    run_insert_dirs = False
+    entry_id = PYMIRROR_CONSTANTS.CONVENTIONED_ROOT_ENTRY_ID
     for dirname in pp[1:]:
+      if dirname == '':
+        continue
+      datadict =         { \
+        'tablename'     : self.get_dbtable_name(), \
+        'dirname'       : dirname,
+        'parent_dir_id' : parent_dir_id,
+      }
       sql = '''
       SELECT entry_id FROM %(tablename)s
         WHERE
@@ -401,16 +451,22 @@ class DBAccessor(DBAccessorBase):
           'tablename'     : self.get_dbtable_name(), \
           'dirname'       : dirname,
           'parent_dir_id' : parent_dir_id,
-        }
+        } %datadict
       curr = conn.execute(sql)
       record = curr.fetchone()
+      print datadict
       if record:
         entry_id = record[0] #['entry_id']
         parent_dir_id = entry_id # in case it loops on from here
       else: # must record it!
-        self.db_insert_dirname_with_parent_dir(dirname, parent_dir_id)
-        entry_id = self.entry_id_for_dirs
+        run_insert_dirs = True
     conn.close()
+    if run_insert_dirs:
+      if second_pass:
+        error_msg = 'Could not find and/or record the abspath to file or folder. root_minus_path = [%s]' %root_minus_path
+        raise Exception(error_msg)
+      self.db_insert_all_subfolders_within_root_minus_path(root_minus_path)
+      return self.loop_on_to_find_entry_id_for_dirpath(pp, root_minus_path, True)
     return entry_id
 
   def delete_file_entry(self, next_entry_id_to_delete):
@@ -599,7 +655,7 @@ class DBAccessor(DBAccessorBase):
         tuple_list_dir_id_and_name.append((entry_id, entryname))
     for tuple_dir_id_and_name in tuple_list_dir_id_and_name:
       entry_id, entryname = tuple_dir_id_and_name
-      dir_context_text += self.get_up_tree_contents_as_text('', entry_id, entryname)
+      dir_context_text += self.list_up_tree_contents_as_text('', entry_id, entryname)
     up_tree_contents_text = up_tree_contents_text + dir_context_text
     return up_tree_contents_text
 

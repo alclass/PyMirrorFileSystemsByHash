@@ -23,6 +23,7 @@ import sqlite3
 import sys
 import time
 import string
+import __init__
 
 import sqlite_accessor_mod as db_accessor_mod
 
