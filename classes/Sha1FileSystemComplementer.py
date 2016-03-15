@@ -19,13 +19,9 @@ Explanation:
 '''
 import hashlib
 import os
-import sqlite3
-import sys
-import time
-import string
-import __init__
 
-import sqlite_accessor_mod as db_accessor_mod
+from db import sqlite_accessor_mod as db_accessor_mod
+
 
 class SHA1_NOT_OBTAINED(Exception):
   pass

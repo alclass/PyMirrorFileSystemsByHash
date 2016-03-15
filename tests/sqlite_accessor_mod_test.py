@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 import os
-import string
 import shutil
 
-import __init__
 '''
 import sys
 sys.path.insert(0, '..')
 '''
-from classes.sqlite_accessor_mod import DBAccessor
+from db.sqlite_accessor_mod import DBAccessor
 from classes.Sha1FileSystemComplementer import calculate_sha1hex_from_file
 
 def test1():

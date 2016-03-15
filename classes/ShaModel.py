@@ -17,12 +17,35 @@ def is_sha1hex_consistent(sha1hex):
   return True
 
 class ShaItem(object):
+  '''
+  This class does the moving and copying of files between TWO filesystems trees,
+    in order to keep a mirror copy of one (the origin) to the other (the target).
 
-  def __init__(self, sha1hex, filename, relative_parent_path, device_and_middle_path, modified_datetime, mockmode=False):
+  To do that, the ShaItem class models an object with the following attributes:
+    sha1hex
+    filename
+    relative_parent_path
+    device_and_middle_path
+    filesize
+    modified_datetime
+    + mockmode
+
+  From these, only 4 are stored on the corresponding sqlite (or other) database.
+  These 4 are:
+    sha1hex
+    filename
+    relative_parent_path
+    & modified_datetime
+
+
+  '''
+
+  def __init__(self, sha1hex, filename, relative_parent_path, device_and_middle_path, filesize, modified_datetime, mockmode=False):
     self.sha1hex  = sha1hex
     self.filename = filename
     self.relative_parent_path = relative_parent_path
     self.device_and_middle_path = device_and_middle_path
+    self.filesize = filesize
     self.modified_datetime = modified_datetime
     self.mockmode = mockmode
     if not self.mockmode:
@@ -37,6 +60,8 @@ class ShaItem(object):
       raise OSError('OSError: relative_parent_path given (%s) does not exist or is not mounted.' %self.relative_parent_path)
     if not os.path.isfile(self.file_abspath):
       raise OSError('OSError: file_abspath given (%s) does not exist.' %self.file_abspath)
+    if type(self.filesize) != int:
+      raise TypeError('TypeError: filesize given (%s) is not typed int.' %self.filesize)
     if type(self.modified_datetime) != datetime.datetime:
       raise TypeError('TypeError: modified_datetime given (%s) is not typed datetime.' %self.modified_datetime)
 
@@ -157,6 +182,7 @@ class ShaItem(object):
     FILES_ARE_EQUAL = False
     NAMES_ARE_EQUAL = False
     RELATIVE_FOLDER_POSITIONS_ARE_EQUAL = False
+    FILESIZES_ARE_EQUAL = False
     MODIFIED_DATETIMES_ARE_EQUAL = False
     if self.sha1hex == otherShaItem.sha1hex:
       FILES_ARE_EQUAL = True
@@ -164,27 +190,36 @@ class ShaItem(object):
       NAMES_ARE_EQUAL = True
     if self.relative_parent_path == otherShaItem.relative_parent_path:
       RELATIVE_FOLDER_POSITIONS_ARE_EQUAL = True
+    if self.filesize == otherShaItem.filesize:
+      FILESIZES_ARE_EQUAL = True
     if self.modified_datetime == otherShaItem.modified_datetime:
       MODIFIED_DATETIMES_ARE_EQUAL = True
     # 1st case: sha1 is the same
     if FILES_ARE_EQUAL:
       if NAMES_ARE_EQUAL:
         if RELATIVE_FOLDER_POSITIONS_ARE_EQUAL:
-          if MODIFIED_DATETIMES_ARE_EQUAL:
-            # nothing to do! Files, bak and orig, are equal
-            if self.mockmode:
-              self.nothing_to_do_mock()
-            return
+          if FILESIZES_ARE_EQUAL:
+            if MODIFIED_DATETIMES_ARE_EQUAL:
+              # nothing to do! Files, bak and orig, are equal
+              if self.mockmode:
+                self.nothing_to_do_mock()
+              return
+            else:
+              # bak and orig, are equal, mdates are different, equalize them
+              self.equalize_dates(otherShaItem)
+              return
           else:
-            # bak and orig, are equal, mdates are different, equalize them
-            self.equalize_dates(otherShaItem)
-            return
+            # bak and orig differ in size, though they have the same SHA1, raise exception!
+            error_msg = 'bak and orig differ in size, though they have the same SHA1, raise exception!'
+            error_msg += '\n ===>>> Sha1 Item is:\n'
+            error_msg += str(self)
+            raise OSError(error_msg)
         else:
-          # bak and orig, are equal, positions are different, move target
+          # bak and orig are sha1-equal, positions are different, move target
           self.move_target_file(otherShaItem)
           return
       else:
-        # bak and orig, are equal by sha-hash; name and/or positions are different, move-rename target
+        # bak and orig are sha1-equal; name and/or positions are different, move-rename target
         self.move_rename_target_file(otherShaItem)
         return
     else:

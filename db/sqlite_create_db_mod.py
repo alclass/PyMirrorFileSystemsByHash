@@ -1,19 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 '''
-sqlite_accessor_mod.py
+sqlite_create_db_mod.py
 
-  This script contains class DBAccessor
-    which is the class that does the actual reads and writes
-    to the sqlite database that stores a meta representation and files and folders
-    mapping to files their sha1hex hash word.
 
-  Some refactoring will occur in the future
-    to improve db-functionality and code readability, for example:
-    the table creation script may be ported to a different script,
-    to better organize code and functionalities.
-
-  Written on 2015-01-13 Luiz Lewis
+  Written on 2016-03-15 Luiz Lewis
 '''
 import os
 import sqlite3
@@ -683,8 +674,10 @@ class DBInit(DBAccessorBase):
     CREATE TABLE "%(tablename)s" (
       entry_id      INT  PRIMARY KEY NOT NULL,
       entryname     TEXT,
+      filesize      INT,
       parent_dir_id INT,
-      sha1hex       CHAR(40)
+      sha1hex       CHAR(40),
+      FOREIGN KEY (parent_dir_id) on "%(tablename)s".entry_id
     );
     INSERT INTO "%(tablename)s"
       (entry_id, entryname, parent_dir_id)

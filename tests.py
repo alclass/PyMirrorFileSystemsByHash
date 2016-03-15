@@ -2,7 +2,8 @@
 import os
 import string
 
-from classes import sqlite_accessor_mod as sqlite_mod
+from db import sqlite_accessor_mod as sqlite_mod
+
 PYMIRROR_CONSTANTS = sqlite_mod.PYMIRROR_CONSTANTS
 import random
 

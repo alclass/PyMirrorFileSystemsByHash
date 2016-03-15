@@ -87,8 +87,10 @@ def populate_tables():
 def show_data():
   conn = get_connection()
   sql = '''
-  SELECT e.name, salary, c.name FROM employee e, company c
-    WHERE e.company_code = c.company_code
+  SELECT e.name, salary, co.name, c.country_name FROM employee e, company co, apps_countries c
+    WHERE
+      e.company_code = co.company_code AND
+      c.country_code = co.origin_country_code
     ORDER by e.name;
   '''
   cursor = conn.cursor()
