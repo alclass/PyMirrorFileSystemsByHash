@@ -18,33 +18,85 @@ sqlite_accessor_mod.py
 import os
 import sqlite3
 import sys
+
+ = os.path.isdir()
+
+
 class SHA1_NOT_OBTAINED(Exception):
   pass
 
-class PYMIRROR_CONSTANTS:
-  SQLITE_DB_TABLENAME_DEFAULT     = 'hashes_of_uptree_files'
-  SQLITE_ROOTDIR_FILENAME_DEFAULT = 'hashed_files_thru_dir_tree.sqlite'
-  CONVENTIONED_ROOT_ENTRY_ID      =  0
-  CONVENTIONED_ROOT_DIR_NAME      =  'ROOT'
-  FIRST_ENTRY_ID_FOR_FILES_WHEN_DB_EMPTY = 0
+
 # the first entry_id for dirs must exist and be the ROOT conventioned "0".
 #   This setting belongs to the creation scripts. If it's not there, an exception must be raised.
 # the dir that is 0 is the ROOT dir; the first next_entry_id_for_dirs will +1 and it increases one by one
 # these is the staging point; the first next_entry_id_for_dirs will -1 and it decreases one by one
 
-def get_sqlite_connection(DEVICE_PREFIX_ABSPATH):
+def get_mysql_connection():
+  pass
+
+import settings
+def get_sqlite_connection(p_sqlite_db_filepath):
   '''
 
   :return:
   '''
-  sqlite_dbfile_abspath = os.path.join(DEVICE_PREFIX_ABSPATH, PYMIRROR_CONSTANTS.SQLITE_ROOTDIR_FILENAME_DEFAULT)
-  '''
-  if not os.path.isfile(sqlite_dbfile_abspath):
-    error_msg = 'sqlite_dbfile_abspath [%] does not exist.' %sqlite_dbfile_abspath
-    raise Exception()
-  '''
-  conn = sqlite3.connect(sqlite_dbfile_abspath)
+  sqlite_db_filepath = None
+  if p_sqlite_db_filepath!=None:
+    if os.path.isdir(p_sqlite_db_filepath):
+      sqlite_db_filepath = p_sqlite_db_filepath
+  if sqlite_db_filepath == None:
+    sqlite_db_filepath = os.path.join(settings.PYMIRROR_SYSTEM_DATA_PATH, PYMIRROR_CONSTANTS.SQLITE_ROOTDIR_FILENAME_DEFAULT)
+  conn = sqlite3.connect(sqlite_db_filepath)
   return conn
+
+
+
+class DBFactoryToConnection(object):
+
+  def __init__(self, dbms_to_use=None):
+    if dbms_to_use not in [DBMS_ID_CONSTANTS.MYSQL, DBMS_ID_CONSTANTS.SQLITE]:
+      self.dbms_in_use = DBMS_ID_CONSTANTS.SQLITE # DEFAULT if None given
+    else:
+      self.dbms_in_use = dbms_to_use
+    self.sqlite_db_filename = PYMIRROR_CONSTANTS.SQLITE_DB_TABLENAME_DEFAULT
+
+  def set_sqlite_dbfilename(self, sqlite_db_filename):
+    if sqlite_db_filename == None:
+      self.sqlite_db_filename = PYMIRROR_CONSTANTS.SQLITE_DB_TABLENAME_DEFAULT
+    else
+      self.sqlite_db_filename = sqlite_db_filename
+
+  def set_sqlite_db_file_absfolder(self, sqlite_db_file_absfolder=None):
+    self.sqlite_db_file_absfolder = os.path.abspath('.')
+    if sqlite_db_file_absfolder != None:
+      if os.path.isdir(sqlite_db_file_absfolder):
+        self.sqlite_db_file_absfolder = sqlite_db_file_absfolder
+
+  def make_n_retrieve_default_sqlite_db_filepath(self):
+    p_sqlite_db_file_absfolder = settings.USER_HOME_DATA_DIR
+    if os.path.isdir(self.sqlite_db_file_absfolder):
+      p_sqlite_dbfile_absfolder = self.sqlite_db_file_absfolder
+    p_sqlite_db_filename = PYMIRROR_CONSTANTS.
+
+  @property
+  def sqlite_db_filepath(self):
+    p_filepath = os.path.join(self.sqlite_dbfile_absfolder, self.sqlite_db_filename)
+    if os.path.isfile(p_filepath):
+      return p_filepath
+    p_filepath = self.make_n_retrieve_default_sqlite_db_filepath()
+    return None
+
+  def set_sqlite_db_filepath(self, sqlite_db_filepath):
+    self.sqlite_db_filepath =
+
+
+  def get_db_connection(self):
+    if self.dbms_in_use == DBMS_ID_CONSTANTS.SQLITE:
+      return get_sqlite_connection(self.sqlite_dbfilename, self.sqlite_dbfile_absfolder)
+    elif self.dbms_in_use == DBMS_ID_CONSTANTS.MYSQL:
+      return get_mysql_connection()
+    return None
+
 
 class DBAccessorBase(object):
 
