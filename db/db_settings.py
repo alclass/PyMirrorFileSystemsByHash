@@ -1,17 +1,29 @@
 #!/usr/bin/env python
 #-*-encoding:utf8-*-
-import os
+#import os
 
+class DBMS_CONSTANTS:
+  MYSQL      = 1
+  SQLITE     = 2
+  POSTGRESQL = 3
+
+DATABASE_NAME = 'PYMIRROR_file_hashes_down_dir_tree'
 class PYMIRROR_DB_PARAMS:
-  SQLITE_ROOTDIR_FILENAME_DEFAULT = 'hashed_files_thru_dir_tree.sqlite'
-  CONVENTIONED_ROOT_ENTRY_ID      =  0
-  CONVENTIONED_ROOT_DIR_NAME      =  'TOP_ROOT_FOLDER'
-  FIRST_ENTRY_ID_FOR_FILES_WHEN_DB_EMPTY = 0
-class DB_TABLE_NAMES:
-  FILE_ENTRIES        = 'file_entries'
-  DIR_ENTRIES         = 'dir_entries'
-  ENTRIES_LINKED_LIST = 'entries_linked_list'
-class DBMS_ID_CONSTANTS:
-  MYSQL  = 1
-  SQLITE = 2
 
+  DATABASE_NAME = DATABASE_NAME
+  CONVENTIONED_ROOT_ENTRY_ID = 0 # it's convencioned here that root's parent is itself (the only exception to parent-child pointing is 'root')
+  CONVENTIONED_ROOT_DIR_NAME = 'TOP_ROOT_FOLDER'
+
+  class TABLE_NAMES:
+    FILE_ENTRIES        = 'file_entries'
+    DIR_ENTRIES         = 'dir_entries'
+    ENTRIES_LINKED_LIST = 'parent_dir_linked_list_table'
+
+  class SQLITE:
+    HASHES_ETC_DATA_FILENAME = DATABASE_NAME + '.sqlite'
+
+  class MYSQL:
+    pass
+
+  class POSTGRESQL:
+    pass
