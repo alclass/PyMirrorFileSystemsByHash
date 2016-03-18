@@ -18,7 +18,46 @@ sqlite_accessor_mod.py
 import os
 import sqlite3
 import sys
+PYMIRROR_DB_PARAMS = db_settings.PYMIRROR_DB_PARAMS
 
+
+def get_traversal_ids_from_db(_id):
+  sql = '''SELECT id FROM %(tablename_for_entries_linked_list)s WHERE parent_dir_id=%d ORDER BY id;''' %_id
+  # n_of_selects += 1 # global module var
+  conn = get_sqlite_connection_by_folderpath_n_filename()
+  cursor = conn.cursor()
+  result = cursor.execute(sql)
+  traversal_ids = []
+  for row in result.fetchall():
+    traversal_ids.append(row[0])
+  return traversal_ids
+
+folder_ids_paths_list = []; n_of_found_path = 0
+def fetch_folder_paths_via_recursive_traversal(prefix_list=[], traversal_ids=[PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_ENTRY_ID]):
+  global n_of_found_path
+  for current_id in traversal_ids:
+    current_prefix_list = prefix_list + [current_id]
+    current_traversal_ids = get_traversal_ids_from_db(current_id)
+    if len(current_traversal_ids) > 0:
+      # print 'current_prefix_list, current_traversal_ids', current_prefix_list, current_traversal_ids
+      fetch_folder_paths_via_recursive_traversal(current_prefix_list, current_traversal_ids)
+    else:
+      # nó folha, imprima-o
+      n_of_found_path += 1
+      # print n_of_found_path, 'º caminho encontrado (ocorrência de nó folha):', current_prefix_list
+      folder_ids_paths_list.append(current_prefix_list)
+
+def bootstrap_folder_paths():
+  '''
+  The idea here is to pre-fetch all folder paths at the application's boot time.
+  This pre-fetch demands ONE select per node, each node a directory.
+  A 100-directory structure will call for 100 selects.
+
+  The fetched paths are a list of lists of integers.  Each list is a path to a leaf folder, ie, a folder without children (subdirectories).
+
+  :return:
+  '''
+  fetch_folder_paths_via_recursive_traversal()
 
 
 class SHA1_NOT_OBTAINED(Exception):

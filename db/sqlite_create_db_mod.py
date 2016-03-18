@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS "%(tablename_for_file_entries)s" (
 
 sql_create_table_for_entries_linked_list = '''
 CREATE TABLE IF NOT EXISTS "%(tablename_for_entries_linked_list)s" (
-  id INT,
+  id INT PRIMARY KEY,
   parent_dir_id INT,
   FOREIGN KEY(parent_dir_id) REFERENCES %(tablename_for_entries_linked_list)s(id)
 );
@@ -81,8 +81,8 @@ INSERT INTO %(tablename_for_entries_linked_list)s (id, parent_dir_id)
 ''' %{ 'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST }
 
 root_record_tuple_list_in_linked_list_table = [( \
-  PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_ENTRY_ID, \
-  PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_ENTRY_ID, \
+  PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID, \
+  PYMIRROR_DB_PARAMS.CONVENTIONED_DUMMY_PARENT_OF_TOP_ROOT_FOLDER_ID, \
 )]
 
 
