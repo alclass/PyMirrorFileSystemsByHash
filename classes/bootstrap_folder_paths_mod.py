@@ -40,14 +40,21 @@ import db.sqlite_accessor_mod as sqlaccessor
 PYMIRROR_DB_PARAMS = dbsetts.PYMIRROR_DB_PARAMS
 
 
-def get_traversal_ids_from_db(_id):
+def get_traversal_ids_from_db(_id, db_params_dict):
+  '''
+  This is an encapsulated function that is called from the recursive function
+    that is used by a bootstrap class to get all tree fs paths at the application's init time
+  :param _id:
+  :return:
+  '''
   sql = '''SELECT id FROM %(tablename_for_entries_linked_list)s WHERE parent_dir_id=%(_id)d ORDER BY id;
   ''' %{ \
     'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST, \
     '_id' : _id, \
   }
   # n_of_selects += 1 # global module var
-  conn = sqlaccessor.get_sqlite_connection_by_folderpath_n_filename()
+  db_obj = sqlaccessor.DBFactoryToConnection(db_params_dict)
+  conn = db_obj.get_db_connection()
   cursor = conn.cursor()
   result = cursor.execute(sql)
   traversal_ids = []
@@ -55,7 +62,7 @@ def get_traversal_ids_from_db(_id):
     traversal_ids.append(row[0])
   return traversal_ids
 
-def get_id_dirname_tuple_list_from_db():
+def get_id_dirname_tuple_list_from_db(db_params_dict):
   '''
 
   :param _id:
@@ -63,7 +70,8 @@ def get_id_dirname_tuple_list_from_db():
   '''
   sql = '''SELECT id, name FROM %(tablename_for_dir_entries);
   ''' %{'tablename_for_dir_entries':PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES}
-  conn = sqlaccessor.get_sqlite_connection_by_folderpath_n_filename()
+  db_obj = sqlaccessor.DBFactoryToConnection(db_params_dict)
+  conn = db_obj.get_db_connection()
   cursor = conn.cursor()
   cursor.execute(sql)
   return cursor.fetchall()
@@ -75,6 +83,9 @@ class FolderPathsBootStrapper(object):
     self.folder_ids_paths_list = []
     self.n_of_found_paths = 0
     self.bootstrap_folder_paths()
+
+  def set_db_params_dict(self, db_params_dict):
+    self.db_params_dict = db_params_dict
 
   def fetch_folder_paths_via_recursive_traversal(self, prefix_list=[], traversal_ids=[PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_ENTRY_ID]):
     '''
@@ -88,7 +99,7 @@ class FolderPathsBootStrapper(object):
     '''
     for current_id in traversal_ids:
       current_prefix_list = prefix_list + [current_id]
-      current_traversal_ids = get_traversal_ids_from_db(current_id)
+      current_traversal_ids = get_traversal_ids_from_db(current_id, self.db_params_dict)
       if len(current_traversal_ids) > 0:
         # print 'current_prefix_list, current_traversal_ids', current_prefix_list, current_traversal_ids
         self.fetch_folder_paths_via_recursive_traversal(current_prefix_list, current_traversal_ids)
@@ -116,7 +127,7 @@ class FolderPathsBootStrapper(object):
 
     :return:
     '''
-    fetchall_tuple_list = get_id_dirname_tuple_list_from_db()
+    fetchall_tuple_list = get_id_dirname_tuple_list_from_db(self.db_params_dict)
     for row in fetchall_tuple_list:
       _id  = row[0]
       name = row[1]
@@ -126,6 +137,16 @@ class FolderPathsBootStrapper(object):
     for _id in ids:
       print _id, self.folder_names_dict[_id]
     #return self.folder_names_dict
+
+  def find__ids_paths_starting_with(self, ids_starting_path_trace):
+    '''
+
+    :param ids_starting_path_trace:
+    :return:
+    '''
+    str_trace = str(ids_starting_path_trace)
+    # text = get_str_crescent_ordered_paths()
+
 
   def fetch_all_folder_paths(self):
     ospaths = []
@@ -144,6 +165,8 @@ class FolderPathsBootStrapper(object):
 
 def test1():
   bootstrapper = FolderPathsBootStrapper()
+  # db_params_dict = ...
+  # bootstrapper.set_db_params_dict(db_params_dict)
   bootstrapper.print_all_folder_paths()
 
 def main():

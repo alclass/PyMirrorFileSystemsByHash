@@ -18,198 +18,64 @@ sqlite_accessor_mod.py
 import os
 import sqlite3
 import sys
-PYMIRROR_DB_PARAMS = db_settings.PYMIRROR_DB_PARAMS
+
+import db_settings as dbsetts
+PYMIRROR_DB_PARAMS = dbsetts.PYMIRROR_DB_PARAMS
+
+import db_connection_factory_mod as dbfact
 
 
-def get_traversal_ids_from_db(_id):
-  sql = '''SELECT id FROM %(tablename_for_entries_linked_list)s WHERE parent_dir_id=%d ORDER BY id;''' %_id
-  # n_of_selects += 1 # global module var
-  conn = get_sqlite_connection_by_folderpath_n_filename()
-  cursor = conn.cursor()
-  result = cursor.execute(sql)
-  traversal_ids = []
-  for row in result.fetchall():
-    traversal_ids.append(row[0])
-  return traversal_ids
-
-folder_ids_paths_list = []; n_of_found_path = 0
-def fetch_folder_paths_via_recursive_traversal(prefix_list=[], traversal_ids=[PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_ENTRY_ID]):
-  global n_of_found_path
-  for current_id in traversal_ids:
-    current_prefix_list = prefix_list + [current_id]
-    current_traversal_ids = get_traversal_ids_from_db(current_id)
-    if len(current_traversal_ids) > 0:
-      # print 'current_prefix_list, current_traversal_ids', current_prefix_list, current_traversal_ids
-      fetch_folder_paths_via_recursive_traversal(current_prefix_list, current_traversal_ids)
-    else:
-      # nó folha, imprima-o
-      n_of_found_path += 1
-      # print n_of_found_path, 'º caminho encontrado (ocorrência de nó folha):', current_prefix_list
-      folder_ids_paths_list.append(current_prefix_list)
-
-def bootstrap_folder_paths():
-  '''
-  The idea here is to pre-fetch all folder paths at the application's boot time.
-  This pre-fetch demands ONE select per node, each node a directory.
-  A 100-directory structure will call for 100 selects.
-
-  The fetched paths are a list of lists of integers.  Each list is a path to a leaf folder, ie, a folder without children (subdirectories).
-
-  :return:
-  '''
-  fetch_folder_paths_via_recursive_traversal()
+class DBActionPerformer(object):
 
 
-class SHA1_NOT_OBTAINED(Exception):
-  pass
+  def __init__(self, device_and_middle_abspath=None, sqlite_db_filename=None):
+    '''
 
+    :param device_and_middle_abspath:
+    :param sqlite_db_filename:
+    :return:
+    '''
+    # super(DBAccessor, self).__init__(device_and_middle_abspath)
+    # in Python 3, it's just: super().__init__()
 
-# the first entry_id for dirs must exist and be the ROOT conventioned "0".
-#   This setting belongs to the creation scripts. If it's not there, an exception must be raised.
-# the dir that is 0 is the ROOT dir; the first next_entry_id_for_dirs will +1 and it increases one by one
-# these is the staging point; the first next_entry_id_for_dirs will -1 and it decreases one by one
+    self.set_device_and_middle_abspath(device_and_middle_abspath)
+    self.set_sqlite_db_filename(sqlite_db_filename)
+    self.set_sqlite_db_filepath()
 
-def get_mysql_connection():
-  pass
+    #self.verify_dbsqlitefile_existence()
+    self.init_entry_ids_for_files_and_dirs()
 
-import settings
-import db_settings
-
-PYMIRROR_DB_PARAMS = db_settings.PYMIRROR_DB_PARAMS
-DBMS_CONSTANTS = db_settings.DBMS_CONSTANTS
-
-def get_sqlite_connection_by_folderpath_n_filename(p_sqlite_db_folderpath=None, p_sqlite_db_filename=None):
-  if p_sqlite_db_filename <> None:
-    sqlite_db_filename = p_sqlite_db_filename
-  else:
-    sqlite_db_filename = PYMIRROR_DB_PARAMS.SQLITE.HASHES_ETC_DATA_FILENAME
-  if p_sqlite_db_folderpath <> None and os.path.isdir(p_sqlite_db_folderpath):
-    sqlite_db_folderpath = p_sqlite_db_folderpath
-  else:
-    sqlite_db_folderpath = os.path.abspath('.')
-  # if it does not exist, it will be created
-  sqlite_db_filepath = os.path.join(sqlite_db_folderpath, sqlite_db_filename)
-  conn = sqlite3.connect(sqlite_db_filepath)
-  return conn
-
-def get_sqlite_connection_by_filepath(p_sqlite_db_filepath=None):
-  '''
-  Here the function derives the file's folder and check whether or not it exists.
-  The filepath itself may not exist. Sqlite will create it.
-  :return:
-  '''
-  if p_sqlite_db_filepath == None:
-    return get_sqlite_connection_by_folderpath_n_filename(None, None)
-  split_path, split_sqlite_filename = os.path.plit(p_sqlite_db_filepath)
-
-  if split_path <> None and os.path.isfile(split_path):
-    return get_sqlite_connection_by_folderpath_n_filename(split_path, split_sqlite_filename)
-  return get_sqlite_connection_by_folderpath_n_filename(None, None)
-
-
-class DBFactoryToConnection(object):
-
-  def __init__(self, dbms_to_use=None):
-    if dbms_to_use not in [DBMS_CONSTANTS.MYSQL, DBMS_CONSTANTS.SQLITE]:
-      self.dbms_in_use = DBMS_CONSTANTS.SQLITE # DEFAULT if None given
-    else:
-      self.dbms_in_use = dbms_to_use
+  def set_default_sqlite_db_filename(self):
     self.sqlite_db_filename = PYMIRROR_DB_PARAMS.SQLITE.HASHES_ETC_DATA_FILENAME
 
-  def set_sqlite_db_filename(self, p_sqlite_db_filename=None):
-    if p_sqlite_db_filename <> None and type(p_sqlite_db_filename) in ['str', 'unicode']:
-      self.sqlite_db_filename = p_sqlite_db_filename
-    else:
-      self.sqlite_db_filename = PYMIRROR_DB_PARAMS.SQLITE.HASHES_ETC_DATA_FILENAME
-
-  def set_sqlite_db_file_absfolder(self, p_sqlite_db_file_absfolder=None):
-    if p_sqlite_db_file_absfolder != None and os.path.isdir(p_sqlite_db_file_absfolder):
-        self.sqlite_db_file_absfolder = p_sqlite_db_file_absfolder
-    else:
-      self.sqlite_db_file_absfolder = os.path.abspath('.')
-
-  def make_n_retrieve_default_sqlite_db_filepath(self):
-    pass
-    return
-    '''
-    p_sqlite_db_file_absfolder = settings.USER_HOME_DATA_DIR
-    if os.path.isdir(self.sqlite_db_file_absfolder):
-      p_sqlite_dbfile_absfolder = self.sqlite_db_file_absfolder
-    p_sqlite_db_filename = PYMIRROR_DB_PARAMS.SQLITE.HASHES_ETC_DATA_FILENAME
-    '''
-
-  @property
-  def sqlite_db_filepath(self):
-    if not os.path.isdir(self.sqlite_db_file_absfolder):
-      self.set_sqlite_db_file_absfolder()
-    if self.sqlite_db_filename == None:
-      self.set_sqlite_db_filename()
-    return os.path.join(self.sqlite_db_file_absfolder, self.sqlite_db_filename)
-
-  def set_file_n_folder_thru_sqlite_db_filepath(self, p_sqlite_db_filepath=None):
-    '''
-    Important: this setting will be done in a 'split' way
-    :param p_sqlite_db_filepath: 
-    :return: 
-    '''
-    if p_sqlite_db_filepath == None:
-      self.set_sqlite_db_file_absfolder()
-      self.set_sqlite_db_filename()
+  def set_sqlite_db_filename(self, sqlite_db_filename=None):
+    if sqlite_db_filename == None or sqlite_db_filename not in [str, unicode]:
+      self.set_default_sqlite_db_filename()
       return
-    if os.path.isfile(p_sqlite_db_filepath):
-      sqlite_db_file_absfolder, sqlite_db_filename = os.path.split(p_sqlite_db_filepath)
-      self.set_sqlite_db_file_absfolder(sqlite_db_file_absfolder)
-      self.set_sqlite_db_filename(sqlite_db_filename)
-      return
-    db_file_absfolder, db_filename = os.path.split(p_sqlite_db_filepath)
-    if os.path.isdir(db_file_absfolder):
-      self.set_sqlite_db_file_absfolder(db_file_absfolder)
-      if db_filename <> None and db_filename <> '':
-        self.set_sqlite_db_filename(db_filename)
-      else:
-        self.set_sqlite_db_filename()
+    self.sqlite_db_filename = sqlite_db_filename
 
-
-  def get_db_connection(self):
-    if self.dbms_in_use == DBMS_CONSTANTS.SQLITE:
-      return get_sqlite_connection_by_folderpath_n_filename(self.sqlite_db_file_absfolder, self.sqlite_db_filename)
-    elif self.dbms_in_use == DBMS_CONSTANTS.MYSQL:
-      return get_mysql_connection()
-    return None
-
-
-class DBAccessorBase(object):
-
-  def __init__(self, DEVICE_PREFIX_ABSPATH):
+  def set_default_device_and_middle_abspath(self):
     '''
 
-    :param DEVICE_PREFIX_ABSPATH:
     :return:
     '''
-    if not os.path.isdir(DEVICE_PREFIX_ABSPATH):
-      error_msg = 'DEVICE_PREFIX_ABSPATH [%s] is not valid.' %DEVICE_PREFIX_ABSPATH
-      raise Exception(error_msg)
-    self.DEVICE_PREFIX_ABSPATH = DEVICE_PREFIX_ABSPATH
+    self.device_and_middle_abspath = os.path.abspath('.')
+    if not os.path.isdir(self.device_and_middle_abspath):
+      raise OSError('Cannot establish DEFAULT device_and_middle_abspath as %s' %self.device_and_middle_abspath)
 
-  def get_db_connection_handle(self):
-    return get_sqlite_connection(self.DEVICE_PREFIX_ABSPATH)
+  def set_device_and_middle_abspath(self, device_and_middle_abspath=None):
+    if device_and_middle_abspath == None or not os.path.isdir(device_and_middle_abspath):
+      self.set_default_device_and_middle_abspath()
+      return
+    self.device_and_middle_abspath = device_and_middle_abspath
 
-  def get_dbtable_name(self):
-    return PYMIRROR_DB_PARAMS.SQLITE.HASHES_ETC_DATA_FILENAME
+  def get_device_and_middle_abspath(self):
+    if not os.path.isdir(self.device_and_middle_abspath):
+      self.set_default_device_and_middle_abspath()
+    return self.device_and_middle_abspath
 
-
-class DBAccessor(DBAccessorBase):
-
-  def __init__(self, DEVICE_PREFIX_ABSPATH):
-    '''
-
-    :param DEVICE_PREFIX_ABSPATH:
-    :return:
-    '''
-    super(DBAccessor, self).__init__(DEVICE_PREFIX_ABSPATH)
-    # in Python 3, it's just: super().__init__()
-    self.verify_dbsqlitefile_existence()
-    self.init_entry_ids_for_files_and_dirs()
+  def set_sqlite_db_filepath(self, sqlite_db_filename):
+    self.sqlite_db_filepath = os.path.join(self.get_device_and_middle_abspath, self.sqlite_db_filename)
 
   def verify_dbsqlitefile_existence(self):
     dbsqlitefile_abspath = os.path.join(self.DEVICE_PREFIX_ABSPATH, PYMIRROR_DB_PARAMS.SQLITE.HASHES_ETC_DATA_FILENAME)
@@ -222,96 +88,11 @@ class DBAccessor(DBAccessorBase):
 
     :return:
     '''
-    self.entry_id_for_dirs  = 0
-    self.entry_id_for_files = 0
-    conn = self.get_db_connection_handle()
-    sql = 'SELECT max(entry_id) FROM "%(tablename)s";' \
-      %{'tablename': self.get_dbtable_name()}
-    curr = conn.execute(sql)
-    record = curr.fetchone()
-    if record:
-      self.entry_id_for_dirs = record[0]
-    return False
-    sql = 'SELECT min(entry_id) FROM %(tablename)s'
-    curr = conn.execute(sql)
-    record = curr.fetchone()
-    if record:
-      self.entry_id_for_files = record[0]
-    conn.close()
-
-  def get_positive_max_entry_id_for_dirs(self):
-    '''
-
-    :return:
-    '''
-    max_entry_id = PYMIRROR_CONSTANTS.CONVENTIONED_ROOT_ENTRY_ID
-    sql = 'SELECT max(entry_id) FROM %(tablename)s' \
-          %{'tablename': self.get_dbtable_name()}
-    conn = self.get_db_connection_handle()
-    try:
-      curr = conn.execute(sql)
-      result = curr.fetchone()
-      if result:
-        max_entry_id = int(result[0])
-      conn.close()
-    except sqlite3.OperationalError:
-      pass
-    return max_entry_id
-
-  def get_negative_min_entry_id_for_files(self):
-    '''
-    The first file to be db-inserted will have entry_id -1
-    If no files have entered db, the entry_id_for_files will be positioned at 0
-     and decreased by one, resulting -1 when retrieved.
-
-    :return:
-    '''
-    min_entry_id = PYMIRROR_CONSTANTS.CONVENTIONED_ROOT_ENTRY_ID
-    sql = 'SELECT min(entry_id) FROM %(tablename)s' \
-          %{'tablename': self.get_dbtable_name()}
-    conn = self.get_db_connection_handle()
-    try:
-      curr = conn.execute(sql)
-      result = curr.fetchone()
-      if result:
-        min_entry_id = int(result[0])
-      conn.close()
-    except sqlite3.OperationalError:
-      pass
-    return min_entry_id
-
-  def get_dirnames_on_db_with_same_parent_id(self, parent_dir_id):
-    '''
-
-    :param parent_dir_id:
-    :return:
-    '''
-    sql = '''
-      SELECT
-        entryname FROM %(tablename)s
-      WHERE
-        parent_dir_id = "%(parent_dir_id)d" AND
-        entry_id > -1 '''  \
-      %{ \
-        'tablename'     : self.get_dbtable_name(), \
-        'parent_dir_id' : parent_dir_id,           \
-      } # files have negative entry_id's, so condition (entry_id > -1) restricts SELECT to fetch only folders
-    conn = self.get_db_connection_handle()
-    curr = conn.execute(sql)
-    dirnames = []
-    for record in curr.fetchall():
-      dirname = record[0] # ['entryname']
-      dirnames.append(dirname)
-    conn.close()
-    return dirnames
-
-  def increment_and_get_entry_id_for_dirs(self):
-    '''
-
-    :return:
-    '''
-    self.entry_id_for_dirs += 1  # dirs increment their entry_id's
-    return self.entry_id_for_dirs
+    dbms_params_dict = {}
+    dbms_params_dict['dbms'] = PYMIRROR_DB_PARAMS.DBMS.SQLITE
+    sqlite_db_filepath = self.sqlite_db_filepath
+    dbms_params_dict['sqlite_db_filepath'] = sqlite_db_filepath
+    dbfact.DBFactoryToConnection(dbms_params_dict)
 
   def increment_and_get_entry_id_for_files(self):
     '''
@@ -463,7 +244,43 @@ class DBAccessor(DBAccessorBase):
     '''
     conn.close()
 
-  def db_insert_filename_and_its_sha1hex_with_its_folder_abspath(self, filename, its_folder_abspath, sha1hex):
+  def find_foldername_in_path_traces(self, foldername, _index, ids_starting_trace_path):
+    compare_paths = get_all_paths_starting_with_trace(ids_starting_trace_path)
+    for _path in compare_paths:
+      corresponding_folder_id = _path[_index]
+      if foldername == foldername_dict[corresponding_folder_id]:
+        return corresponding_folder_id
+    return None
+
+  def fetch_folderpath_id_recursive(self, foldernames, ids_starting_trace_path):
+    '''
+
+    :return:
+    '''
+    for i, foldername in enumerate(foldernames):
+      _index = i + 1 # this index is the one corresponding in the trace path
+      corresponding_folder_id = self.find_foldername_in_path_traces(foldername, _index, ids_starting_trace_path)
+      if corresponding_folder_id == None:
+        return None
+      break
+    ids_starting_trace_path.append(corresponding_folder_id)
+    return ids_starting_trace_path[-1]
+
+  def fetch_folderpath_id(self, folderpath):
+    '''
+    The idea here is following: having a slash-separated path (or other 'sep'),
+      find the folder_id of the ending folder
+    :param folderpath:
+    :return:
+    '''
+    relative_folder = folderpath[ len(self.device_and_middle_abspath) : ]
+    foldernames = relative_folder.split(os.sep)
+    if len(foldernames) == 1:
+      return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
+    ids_starting_trace_path = [PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID]
+    return self.fetch_folderpath_id_recursive(foldernames[1:], ids_starting_trace_path)
+
+  def db_insert_a_file(self, filename, folderpath, sha1hex, modified_date=None):
     '''
 
     :param filename:
@@ -471,6 +288,8 @@ class DBAccessor(DBAccessorBase):
     :param sha1hex:
     :return:
     '''
+    # 1st retrieval: fetch the folderpath id
+    _id = self.fetch_folderpath_id(folderpath)
     #root_minus_path = self.prepare_root_minus_path(its_folder_abspath)
     parent_dir_id = self.find_entry_id_for_dirpath(its_folder_abspath)
     self.db_insert_filename_and_its_sha1hex_with_parent_dir_id(filename, parent_dir_id, sha1hex)
@@ -791,74 +610,47 @@ class DBAccessor(DBAccessorBase):
     up_tree_contents_text = up_tree_contents_text + dir_context_text
     return up_tree_contents_text
 
-class DBInit(DBAccessorBase):
+
+def get_db_connection(dbms_params_dict=None):
+  '''
+
+  :param dbms_params_dict:
+  :return:
+  '''
+  db_obj = DBFactoryToConnection(dbms_params_dict)
+  return  db_obj.get_db_connection()
+
+def get_sqlite_connection_by_filepath(sqlite_db_filepath=None):
+  '''
+  This is a wrapper function. It used the DBFactoryToConnection class
+    to get the sqlite db connection either via the
+    filepath given or by the default one
+  :return:
+  '''
+  dbms_params_dict = {}
+  dbms_params_dict['dbms'] = PYMIRROR_DB_PARAMS.DBMS.SQLITE
+  dbms_params_dict['sqlite_db_filepath'] = sqlite_db_filepath
+  return get_db_connection(dbms_params_dict)
 
 
-  def __init__(self, DEVICE_PREFIX_ABSPATH):
-    '''
+def get_sqlite_connection_by_folderpath_n_filename(sqlite_db_folderpath=None, sqlite_db_filename=None):
+  '''
+  Use this function only in tests. In the app, use rather the class DBFactoryToConnection
+  :param sqlite_db_folderpath:
+  :param sqlite_db_filename:
+  :return:
+  '''
 
-    :param DEVICE_PREFIX_ABSPATH:
-    :return:
-    '''
-    super(DBInit, self).__init__(DEVICE_PREFIX_ABSPATH)
-    # in Python 3, it's just: super().__init__()
+  if sqlite_db_folderpath == None or not os.path.isdir(sqlite_db_folderpath):
+    sqlite_db_folderpath = os.path.abspath('.')
 
+  if sqlite_db_filename == None or type(sqlite_db_filename) not in [str, unicode]:
+    sqlite_db_filename = PYMIRROR_DB_PARAMS.SQLITE.HASHES_ETC_DATA_FILENAME
 
-  def create_fs_entries_sqlite_db_table(self):
-    '''
+  # well, hopefully the if's above will avoid an os-join error below
+  sqlite_db_filepath = os.path.join(sqlite_db_folderpath, sqlite_db_filename)
+  return get_sqlite_connection_by_filepath(sqlite_db_filepath)
 
-    :return:
-    '''
-    conn = self.get_db_connection_handle()
-    curr = conn.cursor()
-    sql_script = '''
-    CREATE TABLE "%(tablename)s" (
-      entry_id      INT  PRIMARY KEY NOT NULL,
-      entryname     TEXT,
-      filesize      INT,
-      parent_dir_id INT,
-      sha1hex       CHAR(40),
-      FOREIGN KEY (parent_dir_id) on "%(tablename)s".entry_id
-    );
-    INSERT INTO "%(tablename)s"
-      (entry_id, entryname, parent_dir_id)
-    VALUES
-      ("%(entry_id)d", "%(entryname)s", "%(parent_dir_id)d");''' \
-    %{
-      'tablename'     : self.get_dbtable_name(),
-      'entry_id'      : PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_ENTRY_ID,
-      'entryname'     : PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME,
-      'parent_dir_id' : PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_ENTRY_ID,
-    }
-    retval = curr.executescript(sql_script)
-    conn.commit()
-    conn.close()
-
-  def verify_fs_entries_sqlite_db_table_exists(self):
-    '''
-    Convention:
-    Root Folder has entry_id = 0 and name is ROOT
-      if a ROOT named dir exists on ROOT, it will have the same name,
-      but not the same entry_id
-    Another special case is that ROOT's parent_id is also 0 (code will have to "see" it)
-    A file has entry_id equals to -1
-    :return:
-    '''
-    sql = '''
-      SELECT * FROM sqlite_master
-        WHERE
-          name = "%(tablename)s" AND type = "table";''' %{'tablename' : self.get_dbtable_name()}
-    conn = self.get_db_connection_handle()
-    curr = conn.execute(sql)
-    record = curr.fetchone()
-    conn.close()
-    if record == None or len(record) == 0:
-      return False
-    return True
-
-  def verify_and_create_fs_entries_sqlite_db_table(self):
-    if not self.verify_fs_entries_sqlite_db_table_exists():
-      self.create_fs_entries_sqlite_db_table()
 
 def get_args_to_dict():
   args_dict = {}

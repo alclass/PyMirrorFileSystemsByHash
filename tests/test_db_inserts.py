@@ -4,7 +4,7 @@ import os
 import string
 import random
 
-from db import sqlite_accessor_mod as sqlite_mod
+import db.sqlite_accessor_mod as sqlaccessor
 from util import util_mod as um
 # sha1hex, filename, relative_parent_path, device_and_middle_path, filesize, modified_datetime
 
@@ -69,7 +69,8 @@ def insert_folder(folder_path):
   INSERT INTO "%(tablename_for_file_entries)s" (home_dir_id, sha1hex, filename, filesize, modified_date)
                                        VALUES  (     ?     ,    ?   ,    ?    ,    ?    ,       ?      );
   '''
-  conn = get_connection()
+  db_obj = sqlaccessor.DBFactoryToConnection()
+  conn = db_obj.get_db_connection()
   cursor = conn.cursor()
   cursor.execute(sql, data_tuple_record)
 

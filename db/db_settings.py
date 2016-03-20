@@ -2,13 +2,23 @@
 #-*-encoding:utf8-*-
 #import os
 
-class DBMS_CONSTANTS:
-  MYSQL      = 1
-  SQLITE     = 2
-  POSTGRESQL = 3
-
 DATABASE_NAME = 'PYMIRROR_file_hashes_down_dir_tree'
+SQLITE     = 1
+MYSQL      = 2
+POSTGRESQL = 3
+
 class PYMIRROR_DB_PARAMS:
+
+  class DBMS:
+    SQLITE = SQLITE
+    MYSQL  = MYSQL
+    POSTGRESQL = POSTGRESQL
+    PROVIDED_DBMS_LIST = [SQLITE, MYSQL, POSTGRESQL]
+
+    SQLITE_NAME = 'SQLITE'
+    MYSQL_NAME  = 'MYSQL'
+    POSTGRESQL_NAME = 'POSTGRESQL'
+
 
   DATABASE_NAME = DATABASE_NAME
   CONVENTIONED_TOP_ROOT_FOLDER_ID = 1 # it's convencioned here that root's parent is itself (the only exception to parent-child pointing is 'root')
@@ -28,3 +38,19 @@ class PYMIRROR_DB_PARAMS:
 
   class POSTGRESQL:
     pass
+
+def is_dbms_provided(dbms):
+  if type(dbms) <> int:
+    return False
+  if dbms in PYMIRROR_DB_PARAMS.DBMS.PROVIDED_DBMS_LIST:
+    return True
+  return False
+
+def get_dbms_name(dbms):
+  if dbms == PYMIRROR_DB_PARAMS.DBMS.SQLITE:
+    return PYMIRROR_DB_PARAMS.DBMS.SQLITE_NAME
+  elif dbms == PYMIRROR_DB_PARAMS.DBMS.MYSQL:
+    return PYMIRROR_DB_PARAMS.DBMS.MYSQL_NAME
+  elif dbms == PYMIRROR_DB_PARAMS.DBMS.POSTGRESQL:
+    return PYMIRROR_DB_PARAMS.DBMS.POSTGRESQL_NAME
+  return 'Unknown'

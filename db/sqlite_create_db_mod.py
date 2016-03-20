@@ -16,24 +16,9 @@ import db_settings
 PYMIRROR_DB_PARAMS = db_settings.PYMIRROR_DB_PARAMS
 
 
-
-conn = None
-def get_connection(renew=False, dbms_to_use=None, sqlite_db_filepath=None, mysql_tuple_params=None):
-  global conn
-  if 1: # conn == None or renew:
-    conn = set_n_get_connection(dbms_to_use, sqlite_db_filepath, mysql_tuple_params)
-  return conn
-
-def set_n_get_connection(dbms_to_use=None, sqlite_db_filepath=None, mysql_tuple_params=None):
-  conn_obj = sqlaccessor.DBFactoryToConnection(dbms_to_use)
-  # SQLITE takes the current path of the executing script HERE !
-  conn_obj.set_file_n_folder_thru_sqlite_db_filepath(sqlite_db_filepath)
-  conn = conn_obj.get_db_connection()
-  return conn
-
 sql_create_table_for_file_entries = '''
 CREATE TABLE IF NOT EXISTS "%(tablename_for_file_entries)s" (
-  id INT PRIMARY KEY,
+  id INT PRIMARY KEY NOT NULL,
   home_dir_id INT NOT NULL,
   sha1hex CHAR(40),
   filename TEXT NOT NULL,
@@ -48,7 +33,7 @@ CREATE TABLE IF NOT EXISTS "%(tablename_for_file_entries)s" (
 
 sql_create_table_for_entries_linked_list = '''
 CREATE TABLE IF NOT EXISTS "%(tablename_for_entries_linked_list)s" (
-  id INT PRIMARY KEY,
+  id INT PRIMARY KEY NOT NULL,
   parent_dir_id INT,
   FOREIGN KEY(parent_dir_id) REFERENCES %(tablename_for_entries_linked_list)s(id)
 );
@@ -56,7 +41,7 @@ CREATE TABLE IF NOT EXISTS "%(tablename_for_entries_linked_list)s" (
 
 sql_create_table_for_dir_entries = '''
 CREATE TABLE IF NOT EXISTS "%(tablename_for_dir_entries)s" (
-  id INT PRIMARY KEY,
+  id INT PRIMARY KEY NOT NULL,
   foldername TEXT NOT NULL,
   FOREIGN KEY(id) REFERENCES %(tablename_for_entries_linked_list)s(id)
 );
@@ -71,7 +56,7 @@ INSERT INTO %(tablename_for_dir_entries)s (id, foldername)
 ''' %{ 'tablename_for_dir_entries' : PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES }
 
 root_record_tuple_list_in_dir_entries_table = [( \
-  PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_ENTRY_ID, \
+  PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID, \
   PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME, \
 )]
 
@@ -86,17 +71,32 @@ root_record_tuple_list_in_linked_list_table = [( \
 )]
 
 
+class DBParams:
+
+  def __init__(self):
+    dbms_to_use = None
+    sqlite_db_filepath = None
+    mysql_params = None
+
 class DBTablesCreator(object):
 
-  def __init__(self, db_params_obj=None):
-    pass
-    # sqlaccessor.get_db_connection(sqlaccessor.DBMS_CONSTANTS.SQLITE, PYMIRROR_DB_PARAMS.SQLITE.SQLITE_ROOTDIR_FILENAME_DEFAULT)
+  def __init__(self, db_params_dict=None):
+    '''
+    The sqlite_accessor_mod (or its alias sqlaccessor) shows the current keys to db_params_dict
+    :param db_params_dict:
+    :return:
+    '''
+    self.db_params_dict = db_params_dict
 
-  def get_connection(self):
-    return get_connection()
+  def get_db_connection(self):
+    '''
+    Even if db_params_obj is None, it can be used here and the calling function will find it and default it if needed
+    :return:
+    '''
+    return sqlaccessor.DBFactoryToConnection(self.db_params_dict)
 
   def create_tables(self):
-    conn = self.get_connection()
+    conn = self.get_db_connection()
     cursor = conn.cursor()
     cursor.execute(sql_create_table_for_dir_entries)
     cursor.execute(sql_create_table_for_entries_linked_list)
@@ -105,7 +105,7 @@ class DBTablesCreator(object):
     conn.close()
 
   def initialize_the_2_dir_tables_with_toproot(self):
-    conn = self.get_connection()
+    conn = self.get_db_connection()
     cursor = conn.cursor()
     try:
       cursor.executemany(sql_init_dir_entries_table_with_root, root_record_tuple_list_in_dir_entries_table)
@@ -115,15 +115,53 @@ class DBTablesCreator(object):
     conn.commit()
     conn.close()
 
+  def verify_that_tables_were_created(self):
+    '''
+
+    :return:
+    '''
+    conn = self.get_db_connection()
+    cursor = conn.cursor()
+    sql = '''
+      SELECT name FROM sqlite_master
+        WHERE type = "table";
+    '''
+    result = cursor.execute(sql)
+    records = result.fetchall()
+    found_tablenames = []
+    for record in records:
+      tablename = record[0]
+      found_tablenames.append(tablename)
+    conn.close()
+    should_be_there_tables = []
+    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ENTRIES)
+    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES)
+    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST)
+    for should_be_there_table in should_be_there_tables:
+      if should_be_there_table not in found_tablenames:
+        return False
+    return True
+
+def create_tables_and_initialize_root():
+  dbcreator = DBTablesCreator()
+  print 'dbcreator.create_tables()'
+  dbcreator.create_tables()
+  print 'dbcreator.initialize_the_2_dir_tables_with_toproot()'
+  dbcreator.initialize_the_2_dir_tables_with_toproot()
+  print 'dbcreator.verify_that_tables_were_created()',
+  bool_answer = dbcreator.verify_that_tables_were_created()
+  print 'bool_answer', bool_answer
+
 def test1():
-  conn = get_connection()
+  dbms_to_use=PYMIRROR_DB_PARAMS.SQLITE
+  sqlite_db_filepath = 'test01.sqlite'
+  conn = get_db_connection(dbms_to_use, sqlite_db_filepath)
   print conn
 
+
 def main():
-  dbcreator = DBTablesCreator()
-  dbcreator.create_tables()
-  dbcreator.initialize_the_2_dir_tables_with_toproot()
-  # test1()
+  # create_tables_and_initialize_root()
+  test1()
 
 if __name__ == '__main__':
   main()
