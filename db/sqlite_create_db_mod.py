@@ -9,7 +9,7 @@ sqlite_create_db_mod.py
 import os
 import sqlite3
 import sys
-import sqlite_accessor_mod as sqlaccessor
+import db_connection_factory_mod as dbfact
 import db_settings
 
 # equal refs for textual economy
@@ -18,7 +18,7 @@ PYMIRROR_DB_PARAMS = db_settings.PYMIRROR_DB_PARAMS
 
 sql_create_table_for_file_entries = '''
 CREATE TABLE IF NOT EXISTS "%(tablename_for_file_entries)s" (
-  id INT PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT, -- NOT NULL,
   home_dir_id INT NOT NULL,
   sha1hex CHAR(40),
   filename TEXT NOT NULL,
@@ -41,13 +41,24 @@ CREATE TABLE IF NOT EXISTS "%(tablename_for_entries_linked_list)s" (
 
 sql_create_table_for_dir_entries = '''
 CREATE TABLE IF NOT EXISTS "%(tablename_for_dir_entries)s" (
-  id INT PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT, -- NOT NULL,
   foldername TEXT NOT NULL,
   FOREIGN KEY(id) REFERENCES %(tablename_for_entries_linked_list)s(id)
 );
 ''' %{ \
   'tablename_for_dir_entries'         : PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES,
   'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
+}
+
+sql_create_table_for_auxtab_path_id_list_per_folder = '''
+CREATE TABLE IF NOT EXISTS "%(tablename_auxtab_path_id_list_per_folder)s" (
+  id INT PRIMARY KEY NOT NULL,
+  folder_path_id_list_str TEXT NOT NULL,
+  FOREIGN KEY(id) REFERENCES %(tablename_for_dir_entries)s(id)
+);
+''' % { \
+  'tablename_auxtab_path_id_list_per_folder' : PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS,
+  'tablename_for_dir_entries'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES \
 }
 
 sql_init_dir_entries_table_with_root = '''
@@ -93,7 +104,9 @@ class DBTablesCreator(object):
     Even if db_params_obj is None, it can be used here and the calling function will find it and default it if needed
     :return:
     '''
-    return sqlaccessor.DBFactoryToConnection(self.db_params_dict)
+    conn_obj = dbfact.DBFactoryToConnection(self.db_params_dict)
+    conn = conn_obj.get_db_connection()
+    return conn
 
   def create_tables(self):
     conn = self.get_db_connection()
@@ -101,6 +114,7 @@ class DBTablesCreator(object):
     cursor.execute(sql_create_table_for_dir_entries)
     cursor.execute(sql_create_table_for_entries_linked_list)
     cursor.execute(sql_create_table_for_file_entries)
+    cursor.execute(sql_create_table_for_auxtab_path_id_list_per_folder)
     conn.commit()
     conn.close()
 
@@ -155,14 +169,13 @@ def create_tables_and_initialize_root():
 def test1():
   dbms_to_use=PYMIRROR_DB_PARAMS.SQLITE
   sqlite_db_filepath = 'test01.sqlite'
-  conn = get_db_connection(dbms_to_use, sqlite_db_filepath)
+  conn_obj = dbfact.DBFactoryToConnection(dbms_params_dict)
+  conn = conn_obj.get_db_connection()
   print conn
 
-
 def main():
-  # create_tables_and_initialize_root()
-  test1()
+  create_tables_and_initialize_root()
+  # test1()
 
 if __name__ == '__main__':
   main()
-  test1()

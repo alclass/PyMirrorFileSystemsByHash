@@ -21,14 +21,118 @@ import sys
 
 import db_settings as dbsetts
 PYMIRROR_DB_PARAMS = dbsetts.PYMIRROR_DB_PARAMS
-
 import db_connection_factory_mod as dbfact
+import sqlite_create_db_mod as sqlcreate
+
+class DBProxyFetcher(object):
+
+  def __init__(self, dbms_params_dict=None):
+    self.dbfact_obj = dbfact.DBFactoryToConnection(dbms_params_dict)
+
+  def fetch_children_folder_ids_by_node_id_from_db(self, node_id):
+    '''
+    This is an encapsulated function that is called from the recursive function
+      that is used by a bootstrap class to get all tree fs paths at the application's init time
+    :param _id:
+    :return:
+    '''
+    sql = '''SELECT id FROM %(tablename_for_entries_linked_list)s WHERE parent_dir_id=%(node_id)d ORDER BY id;
+    ''' %{ \
+      'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST, \
+      'node_id' : node_id, \
+    }
+    # n_of_selects += 1 # global module var
+    conn = self.dbfact_obj.get_db_connection()
+    cursor = conn.cursor()
+    result = cursor.execute(sql)
+    traversal_ids = []
+    for row in result.fetchall():
+      traversal_ids.append(row[0])
+    conn.close()
+    return traversal_ids
+
+  def get_folder_id_to_name_tuple_list_from_db(self):
+    '''
+
+    :param _id:
+    :return:
+    '''
+    sql = '''SELECT id, foldername FROM %(tablename_for_dir_entries)s;
+    ''' %{'tablename_for_dir_entries':PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES}
+    conn = self.dbfact_obj.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql)
+    folder_id_to_name_tuple_list = cursor.fetchall()[:]
+    conn.close()
+    # folder_id_to_name_tuple_list.sort(key=lambda e:e[0])
+    return folder_id_to_name_tuple_list
+
+  def get_folder_id_to_name_dict_from_db(self):
+    '''
+
+    :return:
+    '''
+    folder_id_to_name_tuple_list = self.get_folder_id_to_name_tuple_list_from_db()
+    if folder_id_to_name_tuple_list == None or len(folder_id_to_name_tuple_list) == 0:
+      return {}
+    folder_id_to_name_dict = {}
+    for folder_id_to_name_tuple in folder_id_to_name_tuple_list:
+      folder_id_to_name_dict[folder_id_to_name_tuple[0]] = folder_id_to_name_tuple[1]
+    return folder_id_to_name_dict
+
+  def update_folder_path_list_str_for(self, folder_id, folder_path_id_list_str):
+    sql = '''
+    UPDATE %(auxtab_path_id_list_per_folder)s
+      SET folder_path_id_list_str = ?
+    WHERE
+      id = ? ;
+    ''' %{ \
+      'auxtab_path_id_list_per_folder':PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS,
+    }
+    conn = dbfact.get_db_connection()
+    cursor = conn.cursor()
+    auxtab_path_id_list_per_folder_tuple_record = (folder_id, folder_path_id_list_str)
+    cursor.execute(sql, auxtab_path_id_list_per_folder_tuple_record)
+    conn.commit()
+    conn.close()
+
+  def insert_folder_path_list_str_for(self, folder_id, folder_path_id_list_str):
+    sql = '''
+    INSERT INTO %(auxtab_path_id_list_per_folder)s
+           (id, folder_path_id_list_str)
+    VALUES ( ? ,           ?           );
+    ''' %{ \
+      'auxtab_path_id_list_per_folder':PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS,
+    }
+    bool_return = False
+    conn = dbfact.get_db_connection()
+    cursor = conn.cursor()
+    auxtab_path_id_list_per_folder_tuple_record = (folder_id, folder_path_id_list_str)
+    try:
+      cursor.execute(sql, auxtab_path_id_list_per_folder_tuple_record)
+      conn.commit()
+      bool_return = True
+    except sqlite3.IntegrityError:
+      bool_return = False
+    finally:
+      conn.close()
+    return bool_return
+
+  def insert_or_update_folder_path_list_str_for(self, folder_id, folder_path_id_list_str):
+    '''
+    If the insert method returns False, the update method will be issued
+    :param folder_id:
+    :param folder_id_path_list_str:
+    :return:
+    '''
+    if not self.insert_folder_path_list_str_for(folder_id, folder_path_id_list_str):
+      self.update_folder_path_list_str_for(folder_id, folder_path_id_list_str)
 
 
 class DBActionPerformer(object):
 
 
-  def __init__(self, device_and_middle_abspath=None, sqlite_db_filename=None):
+  def __init__(self, dbms_params_dict=None):
     '''
 
     :param device_and_middle_abspath:
@@ -38,50 +142,9 @@ class DBActionPerformer(object):
     # super(DBAccessor, self).__init__(device_and_middle_abspath)
     # in Python 3, it's just: super().__init__()
 
-    self.set_device_and_middle_abspath(device_and_middle_abspath)
-    self.set_sqlite_db_filename(sqlite_db_filename)
-    self.set_sqlite_db_filepath()
+    self.conn_obj = dbfact.DBFactoryToConnection(dbms_params_dict)
 
-    #self.verify_dbsqlitefile_existence()
-    self.init_entry_ids_for_files_and_dirs()
 
-  def set_default_sqlite_db_filename(self):
-    self.sqlite_db_filename = PYMIRROR_DB_PARAMS.SQLITE.HASHES_ETC_DATA_FILENAME
-
-  def set_sqlite_db_filename(self, sqlite_db_filename=None):
-    if sqlite_db_filename == None or sqlite_db_filename not in [str, unicode]:
-      self.set_default_sqlite_db_filename()
-      return
-    self.sqlite_db_filename = sqlite_db_filename
-
-  def set_default_device_and_middle_abspath(self):
-    '''
-
-    :return:
-    '''
-    self.device_and_middle_abspath = os.path.abspath('.')
-    if not os.path.isdir(self.device_and_middle_abspath):
-      raise OSError('Cannot establish DEFAULT device_and_middle_abspath as %s' %self.device_and_middle_abspath)
-
-  def set_device_and_middle_abspath(self, device_and_middle_abspath=None):
-    if device_and_middle_abspath == None or not os.path.isdir(device_and_middle_abspath):
-      self.set_default_device_and_middle_abspath()
-      return
-    self.device_and_middle_abspath = device_and_middle_abspath
-
-  def get_device_and_middle_abspath(self):
-    if not os.path.isdir(self.device_and_middle_abspath):
-      self.set_default_device_and_middle_abspath()
-    return self.device_and_middle_abspath
-
-  def set_sqlite_db_filepath(self, sqlite_db_filename):
-    self.sqlite_db_filepath = os.path.join(self.get_device_and_middle_abspath, self.sqlite_db_filename)
-
-  def verify_dbsqlitefile_existence(self):
-    dbsqlitefile_abspath = os.path.join(self.DEVICE_PREFIX_ABSPATH, PYMIRROR_DB_PARAMS.SQLITE.HASHES_ETC_DATA_FILENAME)
-    if not os.path.isfile(dbsqlitefile_abspath):
-      dbinit = DBInit(self.DEVICE_PREFIX_ABSPATH)
-      dbinit.verify_and_create_fs_entries_sqlite_db_table()
 
   def init_entry_ids_for_files_and_dirs(self):
     '''
@@ -102,6 +165,85 @@ class DBActionPerformer(object):
     self.entry_id_for_files -= 1  # files decrement their entry_id's
     return self.entry_id_for_files
 
+  def insert_foldername_n_get_id_with_parent_dir_id_for(self, foldername, parent_dir_id):
+    '''
+
+    :param foldername:
+    :param parent_dir_id:
+    :return:
+    '''
+    sql = '''
+    INSERT INTO "%(tablename_for_dir_entries)s"
+            (foldername)
+    VALUES  (?) ; '''  %{ \
+      'tablename_for_dir_entries'         : PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES,
+    }
+    foldername_1tuple = (foldername,)
+    conn = self.conn_obj.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql, foldername_1tuple)
+    inserted_folder_id = cursor.lastrowid
+    sql = '''
+    INSERT INTO "%(tablename_for_entries_linked_list)s"
+            (id, parent_dir_id)
+    VALUES  (?, ?) ; '''  %{ \
+      'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
+    }
+    tuple_id_to_parent_dir_id = (inserted_folder_id, parent_dir_id)
+    cursor.execute(sql, tuple_id_to_parent_dir_id)
+    conn.commit()
+    return inserted_folder_id
+
+  def retrieve_or_insert_foldername_n_get_id_with_parent_dir_id_for(self, foldername, parent_dir_id):
+    '''
+
+    :param foldername:
+    :param parent_dir_id:
+    :return:
+    '''
+    sql = '''
+    SELECT d.id FROM "%(tablename_for_dir_entries)s" d, "%(tablename_for_entries_linked_list)s" p
+      WHERE
+        d.foldername    = '%(foldername)s'   AND
+        p.parent_dir_id = %(parent_dir_id)d  AND
+        d.id = p.id ; ''' %{ \
+      'tablename_for_dir_entries'         : PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES,
+      'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
+      'foldername'                        : foldername,
+      'parent_dir_id'                     : parent_dir_id,
+    }
+    conn = self.conn_obj.get_db_connection()
+    cursor = conn.cursor()
+    result = cursor.execute(sql)
+    row = result.fetchone()
+    if row <> None and len(row) > 0:
+      folder_id_found = row[0]
+    else:
+      folder_id_found = self.insert_foldername_n_get_id_with_parent_dir_id_for(foldername, parent_dir_id)
+    return folder_id_found
+
+  def insert_n_get_folder_id_for_foldernamed_path(self, foldernamed_path):
+    '''
+
+    :param foldernamed_path:
+    :return:
+    '''
+    foldernamed_path.rstrip('/')
+    if not foldernamed_path.startswith('/'):
+      foldernamed_path = '/' + foldernamed_path
+    pp = foldernamed_path.split('/')
+    if pp == ['',''] or foldernamed_path == '/':
+      return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
+    del pp[0] # the first / produces an empty '' first element
+    parent_dir_id = PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
+    id_path_list = [parent_dir_id]
+    for foldername in pp[1:]:
+      next_parent_dir_id = self.retrieve_or_insert_foldername_n_get_id_with_parent_dir_id_for(foldername, parent_dir_id)
+      id_path_list.append(next_parent_dir_id)
+      parent_dir_id = next_parent_dir_id
+    foldernamed_path_folder_id = id_path_list[-1]
+    return foldernamed_path_folder_id
+
   def db_insert_dirnames_bulk_with_parent_dir_id(self, dirnames, parent_dir_id):
     '''
 
@@ -113,7 +255,8 @@ class DBActionPerformer(object):
       return
 
     entry_id_for_dirs_position_to_undo_to_if_needed = self.entry_id_for_dirs
-    conn = self.get_db_connection_handle()
+    # conn_obj = self.
+    conn = self.dbfact_obj.get_db_connection()
     dirnames_on_db = self.get_dirnames_on_db_with_same_parent_id(parent_dir_id)
     tuples_list_for_executemany = []
     for dirname in dirnames:
@@ -166,7 +309,7 @@ class DBActionPerformer(object):
     :return:
     '''
     pp = root_minus_path.split('/')
-    parent_dir_id = PYMIRROR_CONSTANTS.CONVENTIONED_ROOT_ENTRY_ID
+    parent_dir_id = PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
     for foldername in pp:
       if foldername == '':
         continue
@@ -651,6 +794,70 @@ def get_sqlite_connection_by_folderpath_n_filename(sqlite_db_folderpath=None, sq
   sqlite_db_filepath = os.path.join(sqlite_db_folderpath, sqlite_db_filename)
   return get_sqlite_connection_by_filepath(sqlite_db_filepath)
 
+class DeviceAndMiddlePathSetter(object):
+
+
+  def set_default_sqlite_db_filename(self):
+    self.sqlite_db_filename = PYMIRROR_DB_PARAMS.SQLITE.HASHES_ETC_DATA_FILENAME
+
+  def set_sqlite_db_filename(self, sqlite_db_filename=None):
+    if sqlite_db_filename == None or sqlite_db_filename not in [str, unicode]:
+      self.set_default_sqlite_db_filename()
+      return
+    self.sqlite_db_filename = sqlite_db_filename
+
+  def set_default_device_and_middle_abspath(self):
+    '''
+
+    :return:
+    '''
+    self.device_and_middle_abspath = os.path.abspath('.')
+    if not os.path.isdir(self.device_and_middle_abspath):
+      raise OSError('Cannot establish DEFAULT device_and_middle_abspath as %s' %self.device_and_middle_abspath)
+
+  def set_device_and_middle_abspath(self, device_and_middle_abspath=None):
+    if device_and_middle_abspath == None or not os.path.isdir(device_and_middle_abspath):
+      self.set_default_device_and_middle_abspath()
+      return
+    self.device_and_middle_abspath = device_and_middle_abspath
+
+  def get_device_and_middle_abspath(self):
+    if not os.path.isdir(self.device_and_middle_abspath):
+      self.set_default_device_and_middle_abspath()
+    return self.device_and_middle_abspath
+
+  def set_sqlite_db_filepath(self, sqlite_db_filename):
+    self.sqlite_db_filepath = os.path.join(self.get_device_and_middle_abspath, self.sqlite_db_filename)
+
+  def verify_dbsqlitefile_existence(self):
+    dbsqlitefile_abspath = os.path.join(self.DEVICE_PREFIX_ABSPATH, PYMIRROR_DB_PARAMS.SQLITE.HASHES_ETC_DATA_FILENAME)
+    if not os.path.isfile(dbsqlitefile_abspath):
+      dbinit = DBInit(self.DEVICE_PREFIX_ABSPATH)
+      dbinit.verify_and_create_fs_entries_sqlite_db_table()
+
+class DBSearch(object):
+
+  def __init__(self, dbms_params_dict=None):
+    self.dbfact_obj = dbfact.DBFactoryToConnection(dbms_params_dict)
+
+  def find_in_auxdb_the_folder_path_id_list_for(self, folder_id):
+    '''
+
+    :param folder_id:
+    :return:
+    '''
+    sql = '''SELECT folder_path_id_list_str
+    FROM %(tablename_for_auxtab_path_id_list_per_folder)s
+    WHERE id = %(folder_id)d ;
+    ''' %{ \
+      'tablename_for_auxtab_path_id_list_per_folder':PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS, \
+      'folder_id':folder_id, \
+    }
+    conn = self.dbfact_obj.get_db_connection()
+
+
+
+
 
 def get_args_to_dict():
   args_dict = {}
@@ -672,8 +879,16 @@ def test1():
   except IndexError:
     print ('Parameter -p for device root abspath is missing.')
 
+def test2():
+  db_performer = DBActionPerformer()
+  print "db_performer.insert_foldername_n_get_id_with_parent_dir_id_for('testinsertdir', 1)'"
+  inserted_folder_id = db_performer.retrieve_or_insert_foldername_n_get_id_with_parent_dir_id_for('testinsertdir', 1)
+  print 'inserted_folder_id', inserted_folder_id
+
 def main():
-  test1()
+  # test1()
+  sqlcreate.create_tables_and_initialize_root()
+  test2()
 
 if __name__ == '__main__':
   main()

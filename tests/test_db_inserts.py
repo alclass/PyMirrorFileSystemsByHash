@@ -4,10 +4,12 @@ import os
 import string
 import random
 
-import db.sqlite_accessor_mod as sqlaccessor
+import db.db_connection_factory_mod as dbfact
 from util import util_mod as um
 # sha1hex, filename, relative_parent_path, device_and_middle_path, filesize, modified_datetime
 
+FOLDER = 1
+FILE = 2
 
 sha1hexes=[];filesizes=[];modified_datimes=[]
 for i in xrange(4):
@@ -15,72 +17,85 @@ for i in xrange(4):
   filesizes.append(random.randint(100000))
   modified_datimes.append(um.take_random_datetime())
 
+def make_tuple_list_data_for_dbinsert():
+  entries=[]
+  FOLDER = 1
+  FILE   = 2
+  e=(FOLDER,'/abc')
+  entries.append(e)
+  e=(FOLDER,'/abc/ab')
+  entries.append(e)
+  e=(FOLDER,'/ab')
+  entries.append(e)
+  e=(FOLDER,'/abc/abc')
+  entries.append(e)
+  seq=0
+  e=(FILE,'/abc/abc/file1',sha1hexes[seq],filesizes[seq],modified_datimes[seq])
+  entries.append(e)
+  seq+=1
+  e=(FOLDER,'/abc/abc/file2',sha1hexes[seq],filesizes[seq],modified_datimes[seq])
+  entries.append(e)
+  e=(FOLDER,'/z')
+  entries.append(e)
+  e=(FOLDER,'/z/z')
+  entries.append(e)
+  seq+=1
+  e=(FILE,'/z/z/filez',sha1hexes[seq],filesizes[seq],modified_datimes[seq])
+  entries.append(e)
 
-entries=[]
-FOLDER = 1
-FILE   = 2
-e=(FOLDER,'/abc')
-entries.append(e)
-e=(FOLDER,'/abc/ab')
-entries.append(e)
-e=(FOLDER,'/ab')
-entries.append(e)
-e=(FOLDER,'/abc/abc')
-entries.append(e)
-seq=0
-e=(FILE,'/abc/abc/file1',sha1hexes[seq],filesizes[seq],modified_datimes[seq])
-entries.append(e)
-seq+=1
-e=(FOLDER,'/abc/abc/file2',sha1hexes[seq],filesizes[seq],modified_datimes[seq])
-entries.append(e)
-e=(FOLDER,'/z')
-entries.append(e)
-e=(FOLDER,'/z/z')
-entries.append(e)
-seq+=1
-e=(FILE,'/z/z/filez',sha1hexes[seq],filesizes[seq],modified_datimes[seq])
-entries.append(e)
+class TestDataFiller(object):
 
-
-def insert_file(tuple_file_values):
-  filepath = tuple_file_values[0]
-  sha1hex  = tuple_file_values[1]
-  filesize = tuple_file_values[2]
-  modified_datime = tuple_file_values[3]
-  parent_path, filename = os.path.split(filepath)
-  home_dir_id = find_folder_path_id_on_db_or_enter_it(parent_path)
-  data_tuple_record = (home_dir_id, sha1hex, filename, filesize, modified_datime)
-  sql = '''
-  INSERT INTO "%(tablename_for_file_entries)s" (home_dir_id, sha1hex, filename, filesize, modified_date)
-                                       VALUES  (     ?     ,    ?   ,    ?    ,    ?    ,       ?      );
-  '''
-  conn = get_connection()
-  cursor = conn.cursor()
-  cursor.execute(sql, data_tuple_record)
+  def __init__(self, dbms_params_dict):
+    self.conn_obj = dbfact.DBFactoryToConnection(dbms_params_dict)
 
 
-def insert_folder(folder_path):
-  parent_path, foldername = os.path.split(folder_path)
-  home_dir_id = find_folder_path_id_on_db_or_enter_it(parent_path)
-  # first, insert folder name, return its id
-  
-  data_tuple_record = (home_dir_id, sha1hex, filename, filesize, modified_datime)
-  sql = '''
-  INSERT INTO "%(tablename_for_file_entries)s" (home_dir_id, sha1hex, filename, filesize, modified_date)
-                                       VALUES  (     ?     ,    ?   ,    ?    ,    ?    ,       ?      );
-  '''
-  db_obj = sqlaccessor.DBFactoryToConnection()
-  conn = db_obj.get_db_connection()
-  cursor = conn.cursor()
-  cursor.execute(sql, data_tuple_record)
+  def insert_file_n_get_file_id(self, file_values_dict):
+    '''
 
-for e in entries:
-  entry_type = e[0]
-  if entry_type == FOLDER:
-    insert_folder(e[1])
-  elif entry_type == FILE:
-    insert_file(e[1:])
+    :param file_values_dict:
+    :return:
+    '''
 
+    filepath = file_values_dict['filepath']
+    parent_path, filename = os.path.split(filepath)
+
+    file_values_dict['filename']=filename
+    home_dir_id = db_performer.insert_n_get_home_dir_id_for_foldernamed_path(parent_path)
+    file_id = db_performer.insert_file_n_get_its_id_by_field_values( \
+      filename        = file_values_dict['filename'],
+      sha1hex         = file_values_dict['sha1hex'],
+      home_dir_id     = home_dir_id,
+      filesize        = file_values_dict['filesize'],
+      modified_datime = file_values_dict['modified_datime'],
+    )
+    return file_id
+
+  def insert_folder(self, folder_path):
+    parent_path, foldername = os.path.split(folder_path)
+    home_dir_id = find_folder_path_id_on_db_or_enter_it(parent_path)
+    # first, insert folder name, return its id
+
+    data_tuple_record = (home_dir_id, sha1hex, filename, filesize, modified_datime)
+    sql = '''
+    INSERT INTO "%(tablename_for_file_entries)s" (home_dir_id, sha1hex, filename, filesize, modified_date)
+                                         VALUES  (     ?     ,    ?   ,    ?    ,    ?    ,       ?      );
+    '''
+    db_obj = sqlaccessor.DBFactoryToConnection()
+    conn = db_obj.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql, data_tuple_record)
+
+
+
+  def make_tuple_list_data_for_dbinsert(self):
+
+    tuple_list = make_tuple_list_data_for_dbinsert()
+    for tuple_record in tuple_list:
+      entry_type = tuple_record[0]
+      if entry_type == FOLDER:
+        self.insert_folder(tuple_record[1])
+      elif entry_type == FILE:
+        self.insert_file(tuple_record[1:])
 
 
 
@@ -212,8 +227,6 @@ class SomeTests1(sqlite_mod.DBAccessorBase):
     print db_acessor.get_up_tree_contents_as_text()
 
 def test1():
-  DEVICE_PREFIX_ABSPATH = os.path.abspath('.')
-  test1 = SomeTests1(DEVICE_PREFIX_ABSPATH)
   test1.insert_root_record_on_db_table()
   test1.insert_a_sample_file_on_db_table()
   test1.insert_multiple_files_and_folders_on_db_table()
