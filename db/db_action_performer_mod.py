@@ -128,6 +128,8 @@ class DBProxyFetcher(object):
     if not self.insert_folder_path_list_str_for(folder_id, folder_path_id_list_str):
       self.update_folder_path_list_str_for(folder_id, folder_path_id_list_str)
 
+class CannotInsertFolderWithSameNameAsAFile(OSError):
+  pass
 
 class DBActionPerformer(object):
 
@@ -216,11 +218,24 @@ class DBActionPerformer(object):
     cursor = conn.cursor()
     result = cursor.execute(sql)
     row = result.fetchone()
+    folder_id_found = None
     if row <> None and len(row) > 0:
       folder_id_found = row[0]
-    else:
-      folder_id_found = self.insert_foldername_n_get_id_with_parent_dir_id_for(foldername, parent_dir_id)
+    conn.close()
+    if folder_id_found <> None:
+      return folder_id_found
+    # we still have to look for a samenamed entry in the file_entries table
+    filename    = foldername
+    home_dir_id = parent_dir_id
+    file_id = None
+    file_id = self.check_file_on_folder_existence_n_get_file_id(filename, home_dir_id)
+    if file_id <> None:
+      raise CannotInsertFolderWithSameNameAsAFile('CannotInsertFolderWithSameNameAsAFile')
+    folder_id_found = self.insert_foldername_n_get_id_with_parent_dir_id_for(foldername, parent_dir_id)
     return folder_id_found
+
+  def check_file_on_folder_existence_n_get_file_id(self, filename, home_dir_id):
+    pass
 
   def insert_n_get_folder_id_for_foldernamed_path(self, foldernamed_path):
     '''
@@ -231,18 +246,104 @@ class DBActionPerformer(object):
     foldernamed_path.rstrip('/')
     if not foldernamed_path.startswith('/'):
       foldernamed_path = '/' + foldernamed_path
-    pp = foldernamed_path.split('/')
-    if pp == ['',''] or foldernamed_path == '/':
+    foldernames = foldernamed_path.split('/')
+    if foldernames == ['',''] or foldernamed_path == '/':
       return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
-    del pp[0] # the first / produces an empty '' first element
+    del foldernames[0] # the first / produces an empty '' first element
     parent_dir_id = PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
     id_path_list = [parent_dir_id]
-    for foldername in pp[1:]:
-      next_parent_dir_id = self.retrieve_or_insert_foldername_n_get_id_with_parent_dir_id_for(foldername, parent_dir_id)
+    for foldername in foldernames: # 1st foldername is a 1st level entry below ROOT
+      try:
+        next_parent_dir_id = self.retrieve_or_insert_foldername_n_get_id_with_parent_dir_id_for(foldername, parent_dir_id)
+      except CannotInsertFolderWithSameNameAsAFile:
+        print 'CannotInsertFolderWithSameNameAsAFile'
+        return None
       id_path_list.append(next_parent_dir_id)
       parent_dir_id = next_parent_dir_id
     foldernamed_path_folder_id = id_path_list[-1]
     return foldernamed_path_folder_id
+
+  def insert_file_field_values_n_get_file_id(self, filename, sha1hex, home_dir_id, filesize, modified_datetime):
+    '''
+
+    :param filename:
+    :param sha1hex:
+    :param home_dir_id:
+    :param filesize:
+    :param modified_datime:
+    :return:
+    '''
+    file_id, found_sha1hex, found_filesize, found_modified_datetime = self.does_samenamed_file_exist_in_db(filename, home_dir_id)
+    if file_id <> None:
+      if found_sha1hex == sha1hex and found_filesize == filesize and found_modified_datetime == modified_datetime:
+        # record is the same, no SQL-UPDATE is needed
+        return file_id
+      else:
+        self.update_file_field_values_with_file_id(file_id, filename,sha1hex,home_dir_id,filesize,modified_datetime)
+        return file_id
+    sql = '''
+      INSERT INTO %(tablename_for_file_entries)s
+              (filename, sha1hex, home_dir_id, filesize, modified_datetime)
+      VALUES  (   ?,        ?,         ?,          ?,         ? ) ''' \
+      %{
+        'tablename_for_file_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ENTRIES, \
+      }
+    data_tuple_in_order = (filename, sha1hex, home_dir_id, filesize, modified_datetime,)
+    conn = self.conn_obj.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql, data_tuple_in_order)
+    file_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return file_id
+
+  def update_file_field_values_with_file_id(self,file_id,filename,sha1hex,home_dir_id,filesize,modified_datime):
+    sql = '''
+    UPDATE %(tablename_for_file_entries)s
+      SET
+        sha1hex  = ? ,
+        filesize = ? ,
+        modified_datetime = ?
+      WHERE
+        id = %(file_id)d ;
+    ''' %{
+      'tablename_for_file_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ENTRIES, \
+      'file_id' : file_id,
+    }
+    data_tuple_field_values = (sha1hex, filesize, modified_datime)
+    conn = self.conn_obj.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(sql, data_tuple_field_values)
+    conn.commit()
+    conn.close()
+    return
+
+  def does_samenamed_file_exist_in_db(self, filename, home_dir_id):
+    sql = '''
+      SELECT id, sha1hex, filesize, modified_datetime FROM %(tablename_for_file_entries)s
+        WHERE
+          filename    = "%(filename)s" AND
+          home_dir_id = %(home_dir_id)d
+    ''' %{
+        'tablename_for_file_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ENTRIES, \
+        'filename'   : filename, \
+        'home_dir_id': home_dir_id, \
+      }
+    conn = self.conn_obj.get_db_connection()
+    cursor = conn.cursor()
+    result = cursor.execute(sql)
+    row = result.fetchone()
+    file_id  = None
+    sha1hex  = None
+    filesize = None
+    modified_datetime = None
+    if row <> None:
+      file_id  = row[0]
+      sha1hex  = row[1]
+      filesize = row[2]
+      modified_datetime = row[3]
+    conn.close()
+    return file_id, sha1hex, filesize, modified_datetime
 
   def db_insert_dirnames_bulk_with_parent_dir_id(self, dirnames, parent_dir_id):
     '''
@@ -354,38 +455,6 @@ class DBActionPerformer(object):
     if ok_dir_id_to_return == None:
       self.entry_id_for_dirs = entry_id_for_dirs_position_to_undo_to_if_needed
     return ok_dir_id_to_return
-
-  def db_insert_filename_and_its_sha1hex_with_parent_dir_id(self, filename, parent_dir_id, sha1hex):
-    '''
-
-    :param filename:
-    :param parent_dir_id:
-    :return:
-    '''
-    entry_id_for_files_position_to_undo_to_if_needed = self.entry_id_for_files
-    sql = '''
-      INSERT INTO %(tablename)s
-        (entry_id, entryname, parent_dir_id, sha1hex)
-      VALUES
-        ("%(entry_id)d", "%(entryname)s", "%(parent_dir_id)d", "%(sha1hex)s") ''' \
-      %{
-        'tablename'     : self.get_dbtable_name(), \
-        'entry_id'      : self.increment_and_get_entry_id_for_files(),
-        'entryname'     : filename,
-        'parent_dir_id' : parent_dir_id,
-        'sha1hex'       : sha1hex,
-        }
-    conn = self.get_db_connection_handle()
-    try:
-      retVal = conn.execute(sql)
-      conn.commit()
-    except sqlite3.Error:
-      self.entry_id_for_files = entry_id_for_files_position_to_undo_to_if_needed
-    '''
-    if retVal <> 0:
-      print 'retVal NOT ZERO', retVal, 'for', sql
-    '''
-    conn.close()
 
   def find_foldername_in_path_traces(self, foldername, _index, ids_starting_trace_path):
     compare_paths = get_all_paths_starting_with_trace(ids_starting_trace_path)
@@ -887,7 +956,7 @@ def test2():
 
 def main():
   # test1()
-  sqlcreate.create_tables_and_initialize_root()
+  # sqlcreate.create_tables_and_initialize_root()
   test2()
 
 if __name__ == '__main__':

@@ -18,12 +18,12 @@ PYMIRROR_DB_PARAMS = db_settings.PYMIRROR_DB_PARAMS
 
 sql_create_table_for_file_entries = '''
 CREATE TABLE IF NOT EXISTS "%(tablename_for_file_entries)s" (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, -- NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   home_dir_id INT NOT NULL,
   sha1hex CHAR(40),
   filename TEXT NOT NULL,
   filesize INT,
-  modified_date TEXT,
+  modified_datetime TEXT,
   FOREIGN KEY(home_dir_id) REFERENCES %(tablename_for_dir_entries)s(id)
 );
 ''' % { \
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS "%(tablename_for_entries_linked_list)s" (
 
 sql_create_table_for_dir_entries = '''
 CREATE TABLE IF NOT EXISTS "%(tablename_for_dir_entries)s" (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, -- NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   foldername TEXT NOT NULL,
   FOREIGN KEY(id) REFERENCES %(tablename_for_entries_linked_list)s(id)
 );
