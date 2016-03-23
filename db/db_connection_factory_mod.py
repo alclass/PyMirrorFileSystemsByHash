@@ -17,6 +17,17 @@ import db_settings as dbsetts
 PYMIRROR_DB_PARAMS = dbsetts.PYMIRROR_DB_PARAMS
 
 class DBFactoryToConnection(object):
+  '''
+  This class is instantiated receiving dbms_params_dict.
+
+    A hint to know what's inside db_params_dict is available in the db_settings __doc__
+  This may change, but for now, it has the following keyfields:
+    + the dbms type which may be sqlite, mysql, postgresql and some others
+    + sqlite_db_filepath
+    + mysql_tuple_params
+    + postgresql_tuple_params
+
+  '''
 
   def __init__(self, dbms_params_dict=None):
 

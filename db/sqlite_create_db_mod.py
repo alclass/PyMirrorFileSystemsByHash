@@ -15,60 +15,63 @@ import db_settings
 # equal refs for textual economy
 PYMIRROR_DB_PARAMS = db_settings.PYMIRROR_DB_PARAMS
 
-
-sql_create_table_for_file_entries = '''
-CREATE TABLE IF NOT EXISTS "%(tablename_for_file_entries)s" (
-  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  home_dir_id INT NOT NULL,
-  sha1hex CHAR(40),
-  filename TEXT NOT NULL,
-  filesize INT,
-  modified_datetime TEXT,
-  FOREIGN KEY(home_dir_id) REFERENCES %(tablename_for_dir_entries)s(id)
+sql_create_table_for_entries_linked_list = '''
+CREATE TABLE IF NOT EXISTS %(tablename_for_entries_linked_list)s (
+  id INT PRIMARY KEY NOT NULL,
+  %(fieldname_for_parent_or_home_dir_id)s INT, -- same as parent_dir_id
+  FOREIGN KEY(%(fieldname_for_parent_or_home_dir_id)s) REFERENCES %(tablename_for_entries_linked_list)s(id)
 );
-''' % { \
-  'tablename_for_file_entries' : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ENTRIES,
-  'tablename_for_dir_entries'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES \
+''' %{
+  'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
+  'fieldname_for_parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID,
 }
 
-sql_create_table_for_entries_linked_list = '''
-CREATE TABLE IF NOT EXISTS "%(tablename_for_entries_linked_list)s" (
-  id INT PRIMARY KEY NOT NULL,
-  parent_dir_id INT,
-  FOREIGN KEY(parent_dir_id) REFERENCES %(tablename_for_entries_linked_list)s(id)
-);
-''' %{ 'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST }
-
-sql_create_table_for_dir_entries = '''
-CREATE TABLE IF NOT EXISTS "%(tablename_for_dir_entries)s" (
+sql_create_table_for_file_n_folder_entries = '''
+CREATE TABLE IF NOT EXISTS "%(tablename_for_file_n_folder_entries)s" (
   id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  foldername TEXT NOT NULL,
+  entryname TEXT NOT NULL,
+  entrytype INT NOT NULL,
   FOREIGN KEY(id) REFERENCES %(tablename_for_entries_linked_list)s(id)
 );
 ''' %{ \
-  'tablename_for_dir_entries'         : PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES,
-  'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
+  'tablename_for_file_n_folder_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES,
+  'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
+}
+
+sql_create_table_for_file_attrib_values = '''
+CREATE TABLE IF NOT EXISTS "%(tablename_for_file_attrib_values)s" (
+  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  sha1hex CHAR(40),
+  filesize INT,
+  modified_datetime TEXT,
+  FOREIGN KEY(id) REFERENCES %(tablename_for_file_n_folder_entries)s(id)
+);
+''' % { \
+  'tablename_for_file_attrib_values'   : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ATTRIB_VALUES,
+  'tablename_for_file_n_folder_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES \
 }
 
 sql_create_table_for_auxtab_path_id_list_per_folder = '''
-CREATE TABLE IF NOT EXISTS "%(tablename_auxtab_path_id_list_per_folder)s" (
+CREATE TABLE IF NOT EXISTS "%(tablename_auxtab_path_id_list_per_entries)s" (
   id INT PRIMARY KEY NOT NULL,
-  folder_path_id_list_str TEXT NOT NULL,
-  FOREIGN KEY(id) REFERENCES %(tablename_for_dir_entries)s(id)
+  %(fieldname_for_entries_path_id_list_str)s TEXT NOT NULL,
+  FOREIGN KEY(id) REFERENCES %(tablename_for_file_n_folder_entries)s(id)
 );
 ''' % { \
-  'tablename_auxtab_path_id_list_per_folder' : PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS,
-  'tablename_for_dir_entries'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES \
+  'tablename_auxtab_path_id_list_per_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS,
+  'tablename_for_file_n_folder_entries'      : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES, \
+  'fieldname_for_entries_path_id_list_str'   : PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
 }
 
 sql_init_dir_entries_table_with_root = '''
-INSERT INTO %(tablename_for_dir_entries)s (id, foldername)
-  VALUES (?, ?);
-''' %{ 'tablename_for_dir_entries' : PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES }
+INSERT INTO %(tablename_for_file_n_folder_entries)s (id, entryname, entrytype)
+  VALUES (?, ?, ?);
+''' %{ 'tablename_for_file_n_folder_entries' : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES }
 
 root_record_tuple_list_in_dir_entries_table = [( \
   PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID, \
   PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME, \
+  PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FOLDER, \
 )]
 
 sql_init_dir_linked_list_table_with_root = '''
@@ -81,19 +84,14 @@ root_record_tuple_list_in_linked_list_table = [( \
   PYMIRROR_DB_PARAMS.CONVENTIONED_DUMMY_PARENT_OF_TOP_ROOT_FOLDER_ID, \
 )]
 
-
-class DBParams:
-
-  def __init__(self):
-    dbms_to_use = None
-    sqlite_db_filepath = None
-    mysql_params = None
-
 class DBTablesCreator(object):
 
   def __init__(self, db_params_dict=None):
     '''
-    The sqlite_accessor_mod (or its alias sqlaccessor) shows the current keys to db_params_dict
+    If db_params_dict is None, the db_obj defaults to a
+      standard named sqlite db file in the script's or app's executing folder [gotten by os.path.abspath('.')].
+    See more about the db_params_dict in the DBFactoryToConnection class documentation
+
     :param db_params_dict:
     :return:
     '''
@@ -111,9 +109,9 @@ class DBTablesCreator(object):
   def create_tables(self):
     conn = self.get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(sql_create_table_for_dir_entries)
     cursor.execute(sql_create_table_for_entries_linked_list)
-    cursor.execute(sql_create_table_for_file_entries)
+    cursor.execute(sql_create_table_for_file_n_folder_entries)
+    cursor.execute(sql_create_table_for_file_attrib_values)
     cursor.execute(sql_create_table_for_auxtab_path_id_list_per_folder)
     conn.commit()
     conn.close()
@@ -148,9 +146,10 @@ class DBTablesCreator(object):
       found_tablenames.append(tablename)
     conn.close()
     should_be_there_tables = []
-    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ENTRIES)
-    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES)
+    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ATTRIB_VALUES)
+    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES)
     should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST)
+    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS)
     for should_be_there_table in should_be_there_tables:
       if should_be_there_table not in found_tablenames:
         return False

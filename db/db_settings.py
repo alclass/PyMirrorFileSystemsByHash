@@ -7,7 +7,12 @@ SQLITE     = 1
 MYSQL      = 2
 POSTGRESQL = 3
 
+
 class PYMIRROR_DB_PARAMS:
+
+  class ENTRY_TYPE_ID:
+    FOLDER = 0
+    FILE   = 1
 
   class DBMS:
     SQLITE = SQLITE
@@ -26,10 +31,24 @@ class PYMIRROR_DB_PARAMS:
   CONVENTIONED_ROOT_DIR_NAME = '/' # 'TOP_ROOT_FOLDER'
 
   class TABLE_NAMES:
-    FILE_ENTRIES        = 'file_entries'
-    DIR_ENTRIES         = 'dir_entries'
-    ENTRIES_LINKED_LIST = 'parent_dir_linked_list_table'
+    FILE_ATTRIB_VALUES    = 'file_entries' # tablename_for_file_attrib_values
+    FILE_N_FOLDER_ENTRIES = 'dir_entries'  # tablename_for_file_n_folder_entries
+    ENTRIES_LINKED_LIST   = 'parent_dir_linked_list_table' # tablename_for_entries_linked_list
     AUXTAB_FOR_PRE_PREPARED_PATHS = 'auxtab_path_id_list_per_folder'
+
+  class FIELD_NAMES_ACROSS_TABLES:
+    '''
+    # fieldnames considered 'standard-safe', ie, don't need to be here:
+      1 id, 2 entryname, 3 entrytype, 4 sha1hex, 5 filesize &  6 modified_datetime
+    In a nut shell, the two here are:
+      + fieldname_for_parent_or_home_dir_id because
+        it might confuse at the moment of writing a SELECT/UPDATE/INSERT/DELETE whether
+        it's parent_dir_id or home_dir_id
+      + fieldname_for_entries_path_id_list_str
+    '''
+    PARENT_OR_HOME_DIR_ID    = 'home_dir_id' # fieldname_for_parent_or_home_dir_id
+    ENTRIES_PATH_ID_LIST_STR = 'entries_path_id_list_str'
+
 
   class SQLITE:
     HASHES_ETC_DATA_FILENAME = DATABASE_NAME + '.sqlite'

@@ -24,6 +24,27 @@ PYMIRROR_DB_PARAMS = dbsetts.PYMIRROR_DB_PARAMS
 import db_connection_factory_mod as dbfact
 import sqlite_create_db_mod as sqlcreate
 
+class FolderPathAjuster(object):
+  '''
+  This class has functionality to help ajust the abspath to the relpath, ie, the os-absolute path must
+    be stripped of the device_and_middle_path, remaining the relative path (ie, the relpath)
+  '''
+
+  def fetch_folderpath_id(self, folderpath):
+    '''
+    The idea here is following: having a slash-separated path (or other 'sep'),
+      find the folder_id of the ending folder
+    :param folderpath:
+    :return:
+    '''
+    relative_folder = folderpath[ len(self.device_and_middle_abspath) : ]
+    foldernames = relative_folder.split(os.sep)
+    if len(foldernames) == 1:
+      return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
+    ids_starting_trace_path = [PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID]
+    return self.fetch_folderpath_id_recursive(foldernames[1:], ids_starting_trace_path)
+
+
 class DBProxyFetcher(object):
 
   def __init__(self, dbms_params_dict=None):
@@ -36,9 +57,13 @@ class DBProxyFetcher(object):
     :param _id:
     :return:
     '''
-    sql = '''SELECT id FROM %(tablename_for_entries_linked_list)s WHERE parent_dir_id=%(node_id)d ORDER BY id;
+    sql = '''SELECT id FROM %(tablename_for_entries_linked_list)s
+    WHERE
+      %(fieldname_for_parent_or_home_dir_id)s=%(node_id)d
+    ORDER BY id;
     ''' %{ \
-      'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST, \
+      'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST, \
+      'fieldname_for_parent_or_home_dir_id':PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
       'node_id' : node_id, \
     }
     # n_of_selects += 1 # global module var
@@ -57,8 +82,14 @@ class DBProxyFetcher(object):
     :param _id:
     :return:
     '''
-    sql = '''SELECT id, foldername FROM %(tablename_for_dir_entries)s;
-    ''' %{'tablename_for_dir_entries':PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES}
+    sql = '''SELECT id, entryname FROM %(tablename_for_file_n_folder_entries)s;
+      WHERE
+        entrytype = %(FOLDER_ENTRY_TYPE_ID)s
+      ORDER BY id
+    ''' %{ \
+      'tablename_for_file_n_folder_entries':PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES, \
+      'FOLDER_ENTRY_TYPE_ID'               :PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FOLDER, \
+    }
     conn = self.dbfact_obj.get_db_connection()
     cursor = conn.cursor()
     cursor.execute(sql)
@@ -83,11 +114,12 @@ class DBProxyFetcher(object):
   def update_folder_path_list_str_for(self, folder_id, folder_path_id_list_str):
     sql = '''
     UPDATE %(auxtab_path_id_list_per_folder)s
-      SET folder_path_id_list_str = ?
+      SET %(fieldname_for_entries_path_id_list_str)s = ?
     WHERE
       id = ? ;
     ''' %{ \
-      'auxtab_path_id_list_per_folder':PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS,
+      'auxtab_path_id_list_per_folder'        : PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS, \
+      'fieldname_for_entries_path_id_list_str': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
     }
     conn = dbfact.get_db_connection()
     cursor = conn.cursor()
@@ -97,12 +129,19 @@ class DBProxyFetcher(object):
     conn.close()
 
   def insert_folder_path_list_str_for(self, folder_id, folder_path_id_list_str):
+    '''
+
+    :param folder_id:
+    :param folder_path_id_list_str:
+    :return:
+    '''
     sql = '''
     INSERT INTO %(auxtab_path_id_list_per_folder)s
-           (id, folder_path_id_list_str)
-    VALUES ( ? ,           ?           );
+           (id, %(fieldname_for_entries_path_id_list_str)s)
+    VALUES ( ? ,                  ?           );
     ''' %{ \
-      'auxtab_path_id_list_per_folder':PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS,
+      'auxtab_path_id_list_per_folder'        : PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS, \
+      'fieldname_for_entries_path_id_list_str': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
     }
     bool_return = False
     conn = dbfact.get_db_connection()
@@ -129,6 +168,7 @@ class DBProxyFetcher(object):
       self.update_folder_path_list_str_for(folder_id, folder_path_id_list_str)
 
 class CannotInsertFolderWithSameNameAsAFile(OSError):
+  # For me: not yet used or check usage or decide whether a None returned is better
   pass
 
 class DBActionPerformer(object):
@@ -146,28 +186,7 @@ class DBActionPerformer(object):
 
     self.conn_obj = dbfact.DBFactoryToConnection(dbms_params_dict)
 
-
-
-  def init_entry_ids_for_files_and_dirs(self):
-    '''
-
-    :return:
-    '''
-    dbms_params_dict = {}
-    dbms_params_dict['dbms'] = PYMIRROR_DB_PARAMS.DBMS.SQLITE
-    sqlite_db_filepath = self.sqlite_db_filepath
-    dbms_params_dict['sqlite_db_filepath'] = sqlite_db_filepath
-    dbfact.DBFactoryToConnection(dbms_params_dict)
-
-  def increment_and_get_entry_id_for_files(self):
-    '''
-
-    :return:
-    '''
-    self.entry_id_for_files -= 1  # files decrement their entry_id's
-    return self.entry_id_for_files
-
-  def insert_foldername_n_get_id_with_parent_dir_id_for(self, foldername, parent_dir_id):
+  def insert_entryname_n_get_id_with_parent_dir_id_for(self, entryname, entrytype, parent_or_home_dir_id):
     '''
 
     :param foldername:
@@ -175,64 +194,110 @@ class DBActionPerformer(object):
     :return:
     '''
     sql = '''
-    INSERT INTO "%(tablename_for_dir_entries)s"
-            (foldername)
-    VALUES  (?) ; '''  %{ \
-      'tablename_for_dir_entries'         : PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES,
+    INSERT INTO %(tablename_for_file_n_folder_entries)s
+           (entryname, entrytype)
+    VALUES (    ?    ,     ?    ) ; '''  %{ \
+      'tablename_for_file_n_folder_entries' : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES,
     }
-    foldername_1tuple = (foldername,)
+    entry_2tuple = (entryname, entrytype)
     conn = self.conn_obj.get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(sql, foldername_1tuple)
-    inserted_folder_id = cursor.lastrowid
-    sql = '''
-    INSERT INTO "%(tablename_for_entries_linked_list)s"
-            (id, parent_dir_id)
-    VALUES  (?, ?) ; '''  %{ \
-      'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
-    }
-    tuple_id_to_parent_dir_id = (inserted_folder_id, parent_dir_id)
-    cursor.execute(sql, tuple_id_to_parent_dir_id)
+    cursor.execute(sql, entry_2tuple)
+    inserted_entry_id = cursor.lastrowid
+    self.insert_corresponding_entries_linked_list_for(inserted_entry_id, parent_or_home_dir_id, cursor)
+    self.insert_new_entry_to_entries_path_id_list_str_for(inserted_entry_id, cursor)
     conn.commit()
-    return inserted_folder_id
+    return inserted_entry_id
 
-  def retrieve_or_insert_foldername_n_get_id_with_parent_dir_id_for(self, foldername, parent_dir_id):
+  def insert_corresponding_entries_linked_list_for(self, entry_id, parent_dir_id, cursor):
     '''
-
-    :param foldername:
-    :param parent_dir_id:
+    This insert is a cascading one, notice [[cursor]] as a parameter.
+    :param entry_id:
+    :param cursor:
     :return:
     '''
     sql = '''
-    SELECT d.id FROM "%(tablename_for_dir_entries)s" d, "%(tablename_for_entries_linked_list)s" p
+    INSERT INTO "%(tablename_for_entries_linked_list)s"
+            (id, %(fieldname_for_parent_or_home_dir_id)s)
+    VALUES  (?, ?) ; '''  %{ \
+      'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST, \
+      'fieldname_for_parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
+    }
+    tuple_id_to_parent_dir_id = (entry_id, parent_dir_id)
+    cursor.execute(sql, tuple_id_to_parent_dir_id)
+
+
+  def insert_new_entry_to_entries_path_id_list_str_for(self, entry_id, cursor):
+    '''
+    This insert is a cascading one, notice [[cursor]] as a parameter.
+    :param entry_id:
+    :param cursor:
+    :return:
+    '''
+    sql = '''
+    SELECT %(fieldname_for_entries_path_id_list_str)s from "%(tablename_auxtab_path_id_list_per_entries)s"
+    WHERE id = %(entry_id)d ;
+    '''  %{ \
+      'tablename_auxtab_path_id_list_per_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS,
+      'fieldname_for_entries_path_id_list_str'   : PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
+      'entry_id' : entry_id, \
+    }
+    result = cursor.execute(sql)
+    row = result.fetchone()
+    entries_path_id_list_str = None
+    if row:
+      entries_path_id_list_str = row[0]
+    else:
+      return False
+    sql = '''
+    INSERT INTO "%(tablename_auxtab_path_id_list_per_entries)s"
+            (id, %(fieldname_for_entries_path_id_list_str)s)
+    VALUES  (?, ?) ; '''  %{ \
+      'tablename_auxtab_path_id_list_per_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS,
+      'fieldname_for_entries_path_id_list_str'   : PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
+    }
+    tuple_id_to_parent_dir_id = (entry_id, entries_path_id_list_str)
+    cursor.execute(sql, tuple_id_to_parent_dir_id)
+    return True
+
+
+  def retrieve_or_insert_entryname_n_get_id_with_parent_dir_id_for(self, entryname, entrytype, parent_or_home_dir_id):
+    '''
+
+    :param entryname:
+    :param parent_or_home_dir_id:
+    :return:
+    '''
+    sql = '''
+    SELECT d.id, d.entrytype FROM %(tablename_for_file_n_folder_entries)s d, %(tablename_for_entries_linked_list)s p
       WHERE
-        d.foldername    = '%(foldername)s'   AND
-        p.parent_dir_id = %(parent_dir_id)d  AND
+        d.entryname    = '%(foldername)s'   AND
+        p.%(fieldname_for_parent_or_home_dir_id)s = %(home_dir_id)d  AND
         d.id = p.id ; ''' %{ \
-      'tablename_for_dir_entries'         : PYMIRROR_DB_PARAMS.TABLE_NAMES.DIR_ENTRIES,
-      'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
-      'foldername'                        : foldername,
-      'parent_dir_id'                     : parent_dir_id,
+      'tablename_for_file_n_folder_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES,
+      'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
+      'fieldname_for_parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID,
+      'foldername'                         : entryname,
+      'home_dir_id'                        : parent_or_home_dir_id,
     }
     conn = self.conn_obj.get_db_connection()
     cursor = conn.cursor()
     result = cursor.execute(sql)
     row = result.fetchone()
-    folder_id_found = None
+    entry_id_found = None
     if row <> None and len(row) > 0:
-      folder_id_found = row[0]
+      entry_id_found = row[0]
+      entrytype      = row[1]
     conn.close()
-    if folder_id_found <> None:
-      return folder_id_found
-    # we still have to look for a samenamed entry in the file_entries table
-    filename    = foldername
-    home_dir_id = parent_dir_id
-    file_id = None
-    file_id = self.check_file_on_folder_existence_n_get_file_id(filename, home_dir_id)
-    if file_id <> None:
-      raise CannotInsertFolderWithSameNameAsAFile('CannotInsertFolderWithSameNameAsAFile')
-    folder_id_found = self.insert_foldername_n_get_id_with_parent_dir_id_for(foldername, parent_dir_id)
-    return folder_id_found
+    if entry_id_found <> None:
+      #if entrytype == PYMIRROR_DB_PARAMS.NONDBTYPES.ID_FOLDER_TYPE:
+        #raise CannotInsertFolderWithSameNameAsAFile('CannotInsertFolderWithSameNameAsAFile')
+      return entry_id_found, entrytype
+    # Nothing found at the SELECT above, good to go insert foldername
+    entry_id_found = self.insert_entryname_n_get_id_with_parent_dir_id_for(entryname, entrytype, parent_or_home_dir_id)
+    if entry_id_found == None:
+      return None, None
+    return entry_id_found, entrytype
 
   def check_file_on_folder_existence_n_get_file_id(self, filename, home_dir_id):
     pass
@@ -263,43 +328,62 @@ class DBActionPerformer(object):
     foldernamed_path_folder_id = id_path_list[-1]
     return foldernamed_path_folder_id
 
-  def insert_file_field_values_n_get_file_id(self, filename, sha1hex, home_dir_id, filesize, modified_datetime):
+  def insert_update_or_pass_thru_file_field_values(self, file_id, sha1hex, filesize, modified_datetime):
     '''
 
-    :param filename:
+    :param file_id:
     :param sha1hex:
-    :param home_dir_id:
     :param filesize:
     :param modified_datime:
     :return:
     '''
-    file_id, found_sha1hex, found_filesize, found_modified_datetime = self.does_samenamed_file_exist_in_db(filename, home_dir_id)
-    if file_id <> None:
+    is_found, found_sha1hex, found_filesize, found_modified_datetime = self.retrieve_if_exists_file_attrib_values_entry_for_id(file_id)
+    if is_found:
       if found_sha1hex == sha1hex and found_filesize == filesize and found_modified_datetime == modified_datetime:
         # record is the same, no SQL-UPDATE is needed
-        return file_id
+        return False, 'ENTRY ALREADY EXISTS AND DOES NOT NEED CHANGE'
       else:
-        self.update_file_field_values_with_file_id(file_id, filename,sha1hex,home_dir_id,filesize,modified_datetime)
-        return file_id
+        self.update_file_field_values_with_file_id(file_id, sha1hex, filesize, modified_datetime)
+        return True, 'ENTRY EXISTS AND HAS BEEN UPDATED'
+    self.insert_file_field_values(file_id, sha1hex, filesize, modified_datetime)
+    return True, 'ENTRY HAS BEEN INSERTED'
+
+  def insert_file_field_values(self, file_id, sha1hex, filesize, modified_datetime):
+    '''
+    Notice this method shoud be considered PRIVATE and only callable by insert_update_or_pass_thru_file_field_values(self, file_id, sha1hex, filesize, modified_datetime)
+    :param file_id:
+    :param sha1hex:
+    :param filesize:
+    :param modified_datetime:
+    :return:
+    '''
+
     sql = '''
-      INSERT INTO %(tablename_for_file_entries)s
-              (filename, sha1hex, home_dir_id, filesize, modified_datetime)
-      VALUES  (   ?,        ?,         ?,          ?,         ? ) ''' \
+      INSERT INTO %(tablename_for_file_attrib_values)s
+              (id, sha1hex, filesize, modified_datetime)
+      VALUES  ( ?,    ?,       ?,            ?         ) ''' \
       %{
-        'tablename_for_file_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ENTRIES, \
+        'tablename_for_file_attrib_values'   :PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ATTRIB_VALUES, \
+        'fieldname_for_parent_or_home_dir_id':PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID,
       }
-    data_tuple_in_order = (filename, sha1hex, home_dir_id, filesize, modified_datetime,)
+    data_tuple_in_order = (file_id, sha1hex, filesize, modified_datetime,)
     conn = self.conn_obj.get_db_connection()
     cursor = conn.cursor()
     cursor.execute(sql, data_tuple_in_order)
-    file_id = cursor.lastrowid
     conn.commit()
     conn.close()
-    return file_id
 
-  def update_file_field_values_with_file_id(self,file_id,filename,sha1hex,home_dir_id,filesize,modified_datime):
+  def update_file_field_values_with_file_id(self,file_id,sha1hex,filesize,modified_datime):
+    '''
+    parent_or_home_dir_id is not used here, for it's in the table file_n_folder_entries
+    :param file_id:
+    :param sha1hex:
+    :param filesize:
+    :param modified_datime:
+    :return:
+    '''
     sql = '''
-    UPDATE %(tablename_for_file_entries)s
+    UPDATE %(tablename_for_file_attrib_values)s
       SET
         sha1hex  = ? ,
         filesize = ? ,
@@ -307,7 +391,7 @@ class DBActionPerformer(object):
       WHERE
         id = %(file_id)d ;
     ''' %{
-      'tablename_for_file_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ENTRIES, \
+      'tablename_for_file_attrib_values': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ATTRIB_VALUES, \
       'file_id' : file_id,
     }
     data_tuple_field_values = (sha1hex, filesize, modified_datime)
@@ -318,34 +402,53 @@ class DBActionPerformer(object):
     conn.close()
     return
 
-  def does_samenamed_file_exist_in_db(self, filename, home_dir_id):
+  def does_samenamed_entry_exist_in_db(self, entryname, parent_or_home_dir_id):
     sql = '''
-      SELECT id, sha1hex, filesize, modified_datetime FROM %(tablename_for_file_entries)s
+      SELECT id, entrytype FROM %(tablename_for_file_attrib_values)s e, %(tablename_for_entries_linked_list)s p
         WHERE
-          filename    = "%(filename)s" AND
-          home_dir_id = %(home_dir_id)d
+          entryname    = "%(entryname)s" AND
+          %(fieldname_for_parent_or_home_dir_id)s = %(parent_or_home_dir_id)d
     ''' %{
-        'tablename_for_file_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ENTRIES, \
-        'filename'   : filename, \
-        'home_dir_id': home_dir_id, \
+      'tablename_for_file_attrib_values': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ATTRIB_VALUES, \
+      'entryname'            : entryname, \
+      'parent_or_home_dir_id': parent_or_home_dir_id, \
       }
     conn = self.conn_obj.get_db_connection()
     cursor = conn.cursor()
     result = cursor.execute(sql)
     row = result.fetchone()
-    file_id  = None
-    sha1hex  = None
-    filesize = None
-    modified_datetime = None
+    file_id   = None
+    entrytype = None
     if row <> None:
       file_id  = row[0]
-      sha1hex  = row[1]
-      filesize = row[2]
-      modified_datetime = row[3]
+      entrytype  = row[1]
     conn.close()
-    return file_id, sha1hex, filesize, modified_datetime
+    return file_id, entrytype
 
-  def db_insert_dirnames_bulk_with_parent_dir_id(self, dirnames, parent_dir_id):
+  def get_file_attr_values_by_id(self, file_id):
+    sql = '''
+      SELECT sha1hex, filesize, modified_datetime FROM %(tablename_for_file_attrib_values)s
+        WHERE
+          id = %(file_id)d ;''' \
+      %{
+        'tablename_for_file_attrib_values': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ATTRIB_VALUES, \
+        'file_id'                         : file_id, \
+      }
+    conn = self.conn_obj.get_db_connection()
+    cursor = conn.cursor()
+    result = cursor.execute(sql)
+    row = result.fetchone()
+    sha1hex           = None
+    filesize          = None
+    modified_datetime = None
+    if row <> None:
+      sha1hex           = row[0]
+      filesize          = row[1]
+      modified_datetime = row[2]
+    conn.close()
+    return sha1hex, filesize, modified_datetime
+
+  def insert_dirnames_on_one_home_dir_id(self, dirnames, parent_or_home_dir_id):
     '''
 
     :param dirnames:
@@ -354,145 +457,25 @@ class DBActionPerformer(object):
     '''
     if dirnames == None or len(dirnames) == 0:
       return
+    FOLDER_ENTRY_TYPE_ID = PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FOLDER
+    for entryname in dirnames:
+      self.insert_entryname_n_get_id_with_parent_dir_id_for(entryname, FOLDER_ENTRY_TYPE_ID, parent_or_home_dir_id)
 
-    entry_id_for_dirs_position_to_undo_to_if_needed = self.entry_id_for_dirs
-    # conn_obj = self.
-    conn = self.dbfact_obj.get_db_connection()
-    dirnames_on_db = self.get_dirnames_on_db_with_same_parent_id(parent_dir_id)
-    tuples_list_for_executemany = []
-    for dirname in dirnames:
-      if dirname in dirnames_on_db:
-        continue
-      tuple_record = ("%(entry_id)d", "%(entryname)s", "%(parent_dir_id)d") \
-        %{
-          'entry_id'      : self.increment_and_get_entry_id_for_dirs(),
-          'entryname'     : dirname,
-          'parent_dir_id' : parent_dir_id,
-        }
-      tuples_list_for_executemany.append(tuple_record)
-
-    sql = '''
-      INSERT INTO %(tablename)s
-        (entry_id, entryname, parent_dir_id)
-      VALUES
-        (?, ?, ?) ''' \
-      %{
-        'tablename' : self.get_dbtable_name(), \
-      }
-    try:
-      retVal = conn.executemany(sql, tuples_list_for_executemany)
-      '''
-      if retVal <> 0:
-        print 'retVal <> 0 ', retVal, 'on', sql
-      else:
-        print 'OK\n', sql, '\nOK
-      '''
-      conn.commit()
-    except sqlite3.Error:
-      self.entry_id_for_dirs = entry_id_for_dirs_position_to_undo_to_if_needed
-    conn.close()
-
-  def db_insert_dirnames_bulk_with_dirpath(self, dirnames, dirpath):
+  def insert_dirnames_on_one_home_dir_id_with_folderpath(self, dirnames, folderpath):
     '''
 
     :param dirnames:
-    :param dirpath:
-    :return:
-    '''
-    parent_dir_id = self.find_entry_id_for_dirpath(dirpath)
-    for dirname in dirnames:
-      self.db_insert_dirname_with_parent_dir_id(dirname, parent_dir_id)
-
-  def db_insert_all_subfolders_within_root_minus_path(self, root_minus_path):
-    '''
-
-    :param root_minus_path:
-    :return:
-    '''
-    pp = root_minus_path.split('/')
-    parent_dir_id = PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
-    for foldername in pp:
-      if foldername == '':
-        continue
-      entry_id = self.db_insert_dirname_with_parent_dir_id(foldername, parent_dir_id)
-      if entry_id == None:
-        error_msg = 'Could not db_insert_dirname_with_parent_dir_id in root_minus_path = [%s]' %root_minus_path
-        raise Exception(error_msg)
-      parent_dir_id = entry_id
-
-  def db_insert_dirname_with_parent_dir_id(self, dirname, parent_dir_id):
-    '''
-
-    :param dirname:
-    :param parent_dir_id:
-    :return:
-    '''
-    if parent_dir_id == None:
-      error_msg = 'parent_dir_id is None in db_insert_dirname_with_parent_dir_id()'
-      raise Exception(error_msg)
-    ok_dir_id_to_return = None
-    entry_id_for_dirs_position_to_undo_to_if_needed = self.entry_id_for_dirs
-    dir_id = self.increment_and_get_entry_id_for_dirs()
-    data_dict = { \
-        'tablename'     : self.get_dbtable_name(), \
-        'entry_id'      : dir_id,
-        'entryname'     : dirname,
-        'parent_dir_id' : parent_dir_id,
-        }
-    sql = '''INSERT INTO %(tablename)s
-        (entry_id, entryname, parent_dir_id)
-      VALUES
-        ("%(entry_id)d", "%(entryname)s", "%(parent_dir_id)d") ''' %data_dict
-    print 'db_insert_dirname_with_parent_dir_id %s' %data_dict
-    conn = self.get_db_connection_handle()
-    try:
-      retVal = conn.execute(sql)
-      conn.commit()
-      ok_dir_id_to_return = dir_id
-    except sqlite3.Error:
-      pass
-    conn.close()
-    if ok_dir_id_to_return == None:
-      self.entry_id_for_dirs = entry_id_for_dirs_position_to_undo_to_if_needed
-    return ok_dir_id_to_return
-
-  def find_foldername_in_path_traces(self, foldername, _index, ids_starting_trace_path):
-    compare_paths = get_all_paths_starting_with_trace(ids_starting_trace_path)
-    for _path in compare_paths:
-      corresponding_folder_id = _path[_index]
-      if foldername == foldername_dict[corresponding_folder_id]:
-        return corresponding_folder_id
-    return None
-
-  def fetch_folderpath_id_recursive(self, foldernames, ids_starting_trace_path):
-    '''
-
-    :return:
-    '''
-    for i, foldername in enumerate(foldernames):
-      _index = i + 1 # this index is the one corresponding in the trace path
-      corresponding_folder_id = self.find_foldername_in_path_traces(foldername, _index, ids_starting_trace_path)
-      if corresponding_folder_id == None:
-        return None
-      break
-    ids_starting_trace_path.append(corresponding_folder_id)
-    return ids_starting_trace_path[-1]
-
-  def fetch_folderpath_id(self, folderpath):
-    '''
-    The idea here is following: having a slash-separated path (or other 'sep'),
-      find the folder_id of the ending folder
     :param folderpath:
     :return:
     '''
-    relative_folder = folderpath[ len(self.device_and_middle_abspath) : ]
-    foldernames = relative_folder.split(os.sep)
-    if len(foldernames) == 1:
-      return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
-    ids_starting_trace_path = [PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID]
-    return self.fetch_folderpath_id_recursive(foldernames[1:], ids_starting_trace_path)
 
-  def db_insert_a_file(self, filename, folderpath, sha1hex, modified_date=None):
+    parent_or_home_dir_id = self.fetch_folderpath_id(folderpath)
+    return self.insert_dirnames_on_one_home_dir_id(dirnames, parent_or_home_dir_id)
+
+
+
+
+  def insert_a_file(self, filename, folderpath, sha1hex, modified_date=None):
     '''
 
     :param filename:
@@ -961,3 +944,29 @@ def main():
 
 if __name__ == '__main__':
   main()
+
+
+'''
+  def find_foldername_in_path_traces(self, foldername, _index, ids_starting_trace_path):
+    compare_paths = get_all_paths_starting_with_trace(ids_starting_trace_path)
+    for _path in compare_paths:
+      corresponding_folder_id = _path[_index]
+      if foldername == foldername_dict[corresponding_folder_id]:
+        return corresponding_folder_id
+    return None
+
+  def fetch_folderpath_id_recursive(self, foldernames, ids_starting_trace_path):
+    '''
+
+    : return:
+    '''
+    for i, foldername in enumerate(foldernames):
+      _index = i + 1 # this index is the one corresponding in the trace path
+      corresponding_folder_id = self.find_foldername_in_path_traces(foldername, _index, ids_starting_trace_path)
+      if corresponding_folder_id == None:
+        return None
+      break
+    ids_starting_trace_path.append(corresponding_folder_id)
+    return ids_starting_trace_path[-1]
+
+'''
