@@ -9,7 +9,7 @@ from util import util_mod as um
 # sha1hex, filename, relative_parent_path, device_and_middle_path, filesize, modified_datetime
 
 import db.db_connection_factory_mod as dbfact
-import db.db_action_performer_mod as dbperf
+import db.db_modification_query_performer_mod as dbperf
 import db.sqlite_create_db_mod as dbcreat
 
 FOLDER = 1
@@ -55,7 +55,7 @@ class TestDataFiller(object):
 
   def __init__(self, dbms_params_dict=None):
     self.conn_obj    = dbfact.DBFactoryToConnection(dbms_params_dict)
-    self.dbperformer = dbperf.DBActionPerformer(dbms_params_dict)
+    self.dbperformer = dbperf.DBModificationQueryPerformer(dbms_params_dict)
     self.make_tuple_list_data_for_dbinsert()
 
   def insert_file_n_get_file_id(self, file_values_dict):
@@ -68,7 +68,8 @@ class TestDataFiller(object):
     parent_path, filename = os.path.split(filepath)
 
     file_values_dict['filename']=filename
-    home_dir_id = self.dbperformer.insert_n_get_folder_id_for_foldernamed_path(parent_path)
+    home_dir_id = self.dbperformer.insert_update_or_pass_thru_entryname_n_get_id_with_parent_dir_id_n_entrytype_for(\
+      with_parent_dir_id_for(entryname, entrytype, parent_or_home_dir_id)
     if home_dir_id == None:
       print 'Cannot continue, a folder has the same name of a file in db. Please, look up and correct it if possible, then rerun this script.'
       return
@@ -88,7 +89,7 @@ class TestDataFiller(object):
     :param folderpath:
     :return:
     '''
-    folder_id = self.dbperformer.insert_n_get_folder_id_for_foldernamed_path(folderpath)
+    folder_id = self.dbperformer.insert_entry_n_get_id_for_foldernamed_path_n_entrytype(folderpath)
 
   def make_tuple_list_data_for_dbinsert(self):
     '''

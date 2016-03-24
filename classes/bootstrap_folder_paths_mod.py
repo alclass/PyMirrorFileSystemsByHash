@@ -36,7 +36,7 @@ import os
 import db.db_settings as dbsetts
 PYMIRROR_DB_PARAMS = dbsetts.PYMIRROR_DB_PARAMS
 
-import db.db_action_performer_mod as dbact
+import db.db_modification_query_performer_mod as dbact
 import db.db_connection_factory_mod as dbfact
 import db.sqlite_create_db_mod as sqlcreate
 
@@ -185,7 +185,7 @@ class FolderPathsBootStrapper(object):
     '''
     for current_id in traversal_ids:
       current_prefix_list = prefix_list + [current_id]
-      current_traversal_ids = self.dbproxy.fetch_children_folder_ids_by_node_id_from_db(current_id)
+      current_traversal_ids = self.dbproxy.fetch_children_folder_ids_by_node_id(current_id)
       if len(current_traversal_ids) > 0:
         # print 'current_prefix_list, current_traversal_ids', current_prefix_list, current_traversal_ids
         self.fetch_folder_paths_via_recursive_traversal(current_prefix_list, current_traversal_ids)
@@ -213,7 +213,7 @@ class FolderPathsBootStrapper(object):
 
     :return:
     '''
-    self.folder_id_to_dirname_dict = self.dbproxy.get_folder_id_to_name_dict_from_db()
+    self.folder_id_to_dirname_dict = self.dbproxy.get_all_folder_id_to_name_pairs_dict()
 
   def find_ids_paths_starting_with(self, ids_starting_path_trace):
     '''
@@ -266,8 +266,8 @@ def main():
   bootstrapper.print_all_folder_paths()
   print 'bootstrapper.all_id_path_list_list =',bootstrapper.all_id_path_list_list
   dbproxy = dbact.DBProxyFetcher()
-  print 'dbproxy.get_folder_id_to_name_tuple_list_from_db()'
-  print dbproxy.get_folder_id_to_name_tuple_list_from_db()
+  print 'dbproxy.get_all_folder_id_to_name_2Dtuples_list()'
+  print dbproxy.get_all_folder_id_to_name_2Dtuples_list()
 
   # test1()
 

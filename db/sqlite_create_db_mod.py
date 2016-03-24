@@ -75,9 +75,12 @@ root_record_tuple_list_in_dir_entries_table = [( \
 )]
 
 sql_init_dir_linked_list_table_with_root = '''
-INSERT INTO %(tablename_for_entries_linked_list)s (id, parent_dir_id)
+INSERT INTO %(tablename_for_entries_linked_list)s (id, %(fieldname_for_parent_or_home_dir_id)s)
   VALUES (?, ?);
-''' %{ 'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST }
+''' %{ \
+  'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST, \
+      'fieldname_for_parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
+}
 
 root_record_tuple_list_in_linked_list_table = [( \
   PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID, \
