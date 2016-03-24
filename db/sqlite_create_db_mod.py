@@ -158,6 +158,32 @@ class DBTablesCreator(object):
         return False
     return True
 
+  def delete_all_data_except_root(self):
+    '''
+    this delete rows ==>> delete from parent_dir_linked_list_table
+    this delete the table itself ==>> drop table if exists fs_entries ;
+    :return:
+    '''
+    sqlscript = '''
+    DELETE FROM %(tablename_for_entries_linked_list)s;
+    DELETE FROM %(tablename_for_file_attrib_values)s;
+    DELETE FROM %(tablename_auxtab_path_id_list_per_entries)s;
+    DELETE FROM %(tablename_for_file_n_folder_entries)s;
+
+    ''' % { \
+    'tablename_for_entries_linked_list'        : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
+    'tablename_for_file_attrib_values'         : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ATTRIB_VALUES, \
+    'tablename_auxtab_path_id_list_per_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS, \
+    'tablename_for_file_n_folder_entries'      : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES, \
+  }
+    conn = self.get_db_connection()
+    cursor = conn.cursor()
+    cursor.executescript(sqlscript)
+    conn.commit()
+    conn.close()
+    self.initialize_the_2_dir_tables_with_toproot()
+
+
 def create_tables_and_initialize_root():
   dbcreator = DBTablesCreator()
   print 'dbcreator.create_tables()'
@@ -176,7 +202,13 @@ def test1():
   print conn
 
 def main():
-  create_tables_and_initialize_root()
+  # create_tables_and_initialize_root()
+  dbcreator = DBTablesCreator()
+  dbcreator.create_tables()
+  print 'dbcreator.verify_that_tables_were_created()'
+  dbcreator.verify_that_tables_were_created()
+  # dbcreator.delete_all_data_except_root()
+
   # test1()
 
 if __name__ == '__main__':

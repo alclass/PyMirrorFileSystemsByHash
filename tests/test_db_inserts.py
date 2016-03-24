@@ -25,10 +25,14 @@ def make_tuple_list_data_for_dbinsert():
   entries=[]
   FOLDER = 1
   FILE   = 2
-  e=(FOLDER,'/abc')
+  e=(FOLDER,'/ab')
   entries.append(e)
-  e=(FOLDER,'/abc/ab')
+  # e=(FOLDER,'/abc/ab')
+  # entries.append(e)
+  e=(FOLDER,'/z/abc/abc')
   entries.append(e)
+
+  t='''
   e=(FOLDER,'/ab')
   entries.append(e)
   e=(FOLDER,'/abc/abc')
@@ -39,8 +43,10 @@ def make_tuple_list_data_for_dbinsert():
   seq+=1
   e=(FOLDER,'/abc/abc/file2',sha1hexes[seq],filesizes[seq],modified_datetimes[seq])
   entries.append(e)
+  seq+=1
   e=(FOLDER,'/z')
   entries.append(e)
+  seq+=1
   e=(FOLDER,'/z/z')
   entries.append(e)
   seq+=1
@@ -49,14 +55,16 @@ def make_tuple_list_data_for_dbinsert():
   seq+=1
   e=(FILE,'/abc/abc/file2',sha1hexes[seq],filesizes[seq],modified_datetimes[seq])
   entries.append(e)
+'''
   return entries
 
 class TestDataFiller(object):
 
   def __init__(self, dbms_params_dict=None):
+    self.data_records_tuple_list = []
     self.conn_obj    = dbfact.DBFactoryToConnection(dbms_params_dict)
-    self.dbperformer = dbperf.DBModificationQueryPerformer(dbms_params_dict)
-    self.make_tuple_list_data_for_dbinsert()
+    self.modquerier = dbperf.DBModificationQueryPerformer(dbms_params_dict)
+    # self.make_tuple_list_data_for_dbinsert()
 
   def insert_file_n_get_file_id(self, file_values_dict):
     '''
@@ -64,23 +72,7 @@ class TestDataFiller(object):
     :param file_values_dict:
     :return:
     '''
-    filepath = file_values_dict['filepath']
-    parent_path, filename = os.path.split(filepath)
-
-    file_values_dict['filename']=filename
-    home_dir_id = self.dbperformer.insert_update_or_pass_thru_entryname_n_get_id_with_parent_dir_id_n_entrytype_for(\
-      with_parent_dir_id_for(entryname, entrytype, parent_or_home_dir_id)
-    if home_dir_id == None:
-      print 'Cannot continue, a folder has the same name of a file in db. Please, look up and correct it if possible, then rerun this script.'
-      return
-
-    file_id     = self.dbperformer.insert_file_field_values_n_get_file_id( \
-      filename        = file_values_dict['filename'],
-      sha1hex         = file_values_dict['sha1hex'],
-      home_dir_id     = home_dir_id,
-      filesize        = file_values_dict['filesize'],
-      modified_datetime = file_values_dict['modified_datetime'],
-    )
+    file_id = self.modquerier.insert_a_file_with_conventioned_filedict(file_values_dict)
     return file_id
 
   def insert_folder_n_get_folder_id(self, folderpath):
@@ -89,15 +81,22 @@ class TestDataFiller(object):
     :param folderpath:
     :return:
     '''
-    folder_id = self.dbperformer.insert_entry_n_get_id_for_foldernamed_path_n_entrytype(folderpath)
+    folder_id = self.modquerier.insert_foldername_with_ossep_abspath_n_get_id(folderpath)
+    return folder_id
+
 
   def make_tuple_list_data_for_dbinsert(self):
+    self.data_records_tuple_list = make_tuple_list_data_for_dbinsert()
+
+  def insert_data_into_db(self):
     '''
 
     :return:
     '''
-    tuple_list = make_tuple_list_data_for_dbinsert()
-    for tuple_record in tuple_list:
+    if len(self.data_records_tuple_list) == 0:
+      self.make_tuple_list_data_for_dbinsert()
+
+    for tuple_record in self.data_records_tuple_list:
       entry_type = tuple_record[0]
       if entry_type == FOLDER:
         folderpath = tuple_record[1]
@@ -112,8 +111,14 @@ class TestDataFiller(object):
         file_values_dict['modified_datetime'] = tuple_values[3]
         self.insert_file_n_get_file_id(file_values_dict)
 
+  def __str__(self):
+    outstr = '''Instance of TestDataFiller:
+    %s ''' %self.data_records_tuple_list
+
+
 def test1():
   dbcreat.create_tables_and_initialize_root()
+  dbcreat.delete_all_data_except_root()
   filler = TestDataFiller()
   file_data_dict = { \
     'filepath' : '/abc/test_dir/file1.txt', \
@@ -124,8 +129,16 @@ def test1():
   filler.insert_file_n_get_file_id(file_data_dict)
   pass
 
+def test2():
+  dbcreat.create_tables_and_initialize_root()
+  dbcreator = dbcreat.DBTablesCreator()
+  dbcreator.delete_all_data_except_root()
+  filler = TestDataFiller()
+  filler.insert_data_into_db()
+
 def main():
-  test1()
+  #test1()
+  test2()
 
 if __name__ == '__main__':
   main()
