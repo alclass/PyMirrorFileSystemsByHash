@@ -22,6 +22,7 @@ import sys
 import db_settings as dbsetts
 PYMIRROR_DB_PARAMS = dbsetts.PYMIRROR_DB_PARAMS
 import db_connection_factory_mod as dbfact
+import db_fetcher_mod as dbfetch
 import sqlite_create_db_mod as sqlcreate
 
 class CannotInsertFolderWithSameNameAsAFile(OSError):
@@ -44,6 +45,7 @@ class DBModificationQueryPerformer(object):
     # in Python 3, it's just: super().__init__()
 
     self.conn_obj = dbfact.DBFactoryToConnection(dbms_params_dict)
+    self.dbfetcher = dbfetch.DBFetcher(dbms_params_dict)
 
   def update_entryname_after_existscheck_with_id_parent_dir_id_entrytype_n_cursor_for(self, entry_id, entryname, entrytype, parent_or_home_dir_id, cursor):
     '''
@@ -98,7 +100,7 @@ class DBModificationQueryPerformer(object):
     inserted_entry_id = cursor.lastrowid
     self.insert_corresponding_entries_linked_list_with_cursor_for(inserted_entry_id, parent_or_home_dir_id, cursor)
     # has_insert_or_update_happened, should_be_entries_path_id_list_str =
-    has_insert_or_update_happened, _ = self.insert_entry_to_entries_path_id_list_str_based_on_parent_id_with_cursor_for(inserted_entry_id, parent_or_home_dir_id, cursor)
+    has_insert_or_update_happened, _ = self.insert_entryid_to_entries_path_id_list_with_parent_id_n_cursor_for(inserted_entry_id, parent_or_home_dir_id, cursor)
     # if inserted_entry_id <> None:
       # conn.commit()
     # do not conn.close() here, let the caller do it at the end of its 'pipeline'
@@ -154,7 +156,7 @@ class DBModificationQueryPerformer(object):
     conn.close()
     return entries_path_id_list_str
 
-  def insert_entry_to_entries_path_id_list_str_based_on_parent_id_with_cursor_for(self, entry_id, parent_or_home_dir_id, cursor):
+  def insert_entryid_to_entries_path_id_list_with_parent_id_n_cursor_for(self, entry_id, parent_or_home_dir_id, cursor):
     '''
     This insert is a cascading one, notice [[cursor]] as a parameter.
 
@@ -366,52 +368,15 @@ class DBModificationQueryPerformer(object):
   def check_file_on_folder_existence_n_get_file_id(self, filename, home_dir_id):
     pass
 
-  def filter_foldernamed_path_n_get_foldernames_after_root(self, foldernamed_path):
-    '''
-    This is a PRIVATE method to be shared by methods that loop the names in a split foldernamed_path
-
-    :param foldernamed_path:
-    :return:
-    '''
-    if foldernamed_path == PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME:
-      return [PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID]
-    foldernamed_path.rstrip('/')
-    if not foldernamed_path.startswith('/'):
-      foldernamed_path = '/' + foldernamed_path
-    foldernames = foldernamed_path.split('/')
-    #if foldernames == ['','']: # look up, this is treat in the first 'if'
-      #return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
-    del foldernames[0] # the first / produces an empty '' first element
-    #if len(foldernames) == 0:
-      #return [PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID]
-    return foldernames
-
-  def insert_foldername_with_ossep_abspath_n_get_id(self, foldernamed_path):
+  def insert_foldername_n_get_id_having_ossep_abspath(self, foldernamed_path):
     '''
 
     :param foldernamed_path:
     :return:
     '''
 
-    foldernames = self.filter_foldernamed_path_n_get_foldernames_after_root(foldernamed_path)
-    if foldernames ==  [PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME]:
-      return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
-    parent_dir_id = PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
-    id_path_list = [parent_dir_id]
-    for foldername in foldernames: # 1st foldername is a 1st level entry below ROOT
-      try:
-        next_parent_dir_id = self.insert_update_or_pass_thru_entryname_n_get_id_with_parent_dir_id_n_entrytype_for( \
-            foldername, \
-            PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FOLDER, \
-            parent_dir_id \
-          )
-      except CannotInsertFolderWithSameNameAsAFile:
-        print 'CannotInsertFolderWithSameNameAsAFile'
-        return None
-      id_path_list.append(next_parent_dir_id)
-      parent_dir_id = next_parent_dir_id
-    folder_id = id_path_list[-1]
-    return folder_id
+    folder_id = self.dbfetcher.find_edge_folderid_with_ossepfullpath_via_auxtable(foldernamed_path)
+
 
   def insert_update_or_pass_thru_file_field_values(self, file_id, sha1hex, filesize, modified_datetime):
     '''
@@ -611,7 +576,7 @@ class DBModificationQueryPerformer(object):
     :param foldernamed_path:
     :return:
     '''
-    foldernames = self.filter_foldernamed_path_n_get_foldernames_after_root(foldernamed_path)
+    foldernames = self.dbfetcher.normalize_foldernames_pathlist_from_osfolderpath(foldernamed_path)
     if foldernames == [PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME]:
       return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
 

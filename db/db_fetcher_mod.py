@@ -5,6 +5,7 @@
 
   Written on 2015-01-23 Luiz Lewis
 '''
+import os
 import sqlite3
 import db_settings as dbsetts
 import sqlite_create_db_mod as sqlcreate
@@ -18,6 +19,288 @@ class DBFetcher(object):
   def __init__(self, dbms_params_dict=None):
     self.conn_obj = dbfact.DBFactoryToConnection(dbms_params_dict)
     self.entries_path_id_auxdict = {}
+
+  def fetch_entryname_with_cursor_of(self, folderid, cursor):
+    '''
+    '''
+    sql = '''
+    SELECT entryname FROM %(tablename_for_file_n_folder_entries)s
+      WHERE
+        id = %(folderid)d ;
+    ''' % { \
+      'tablename_for_file_n_folder_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES, \
+      'folderid': folderid, \
+      }
+    result = cursor.execute(sql)
+    one_record = result.fetchone()
+    entryname = None
+    if one_record:
+      entryname = one_record[0]
+    return entryname
+
+  def normalize_foldernamespathlist_with_ossepfullpath(self, ossepfullpath):
+    '''
+    This should be noticed (or remembered)
+    Detail 1:
+    '/'.split('/') produces ['','']
+       : this is protected by the first 'if' for CONVENTIONED_ROOT_DIR_NAME is equal to the os.path.sep parameter
+    Detail 1:
+    '/a'.split('/') produces ['','a']
+       : the first empty '' is erased at the 'del normalized_foldernames[0]' command
+    '''
+    if ossepfullpath == None or ossepfullpath == '':
+      return None
+    normalized_foldernames = []
+    if ossepfullpath == PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME:
+      return [PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID] # same as os.path.sep
+    ossepfullpath = ossepfullpath.rstrip(os.path.sep)
+    if not ossepfullpath.startswith(os.path.sep):
+      ossepfullpath = os.path.sep + ossepfullpath
+    normalized_foldernames = ossepfullpath.split(os.path.sep)
+    del normalized_foldernames[0]  # the first / produces an empty '' first element
+    return normalized_foldernames
+
+  def searchdeeprecursive_edgefolderid_for_the_normalizedfoldernamelist_n_cursor(self, normalizedfoldernamelist, candidate_folder_ids_w_paths_dict, cursor):
+    '''
+    This is a recursive method that tries to find the edge folder id associated to a path.
+    '''
+    # Protect against a 'bad' normalizedfoldernamelist
+    if normalizedfoldernamelist == None or len(normalizedfoldernamelist) == 0:
+      # if this happens, this is weird, it may be that the database is not good, see also the last return in this method
+      return None
+    new_candidate_folder_ids_w_paths_dict = {}
+    edgefoldername_at_this_recursive_level = normalizedfoldernamelist.pop() # edge is the last one; this pop() also prepares for a later recurse, if needed
+    original_ambiguous_edge_folder_id_list = candidate_folder_ids_w_paths_dict.keys()
+    n_collisions = 0
+    for original_ambiguous_edge_folder_id in original_ambiguous_edge_folder_id_list:
+      id_path_list = candidate_folder_ids_w_paths_dict[original_ambiguous_edge_folder_id]
+      candidate_folder_id_in_level = id_path_list.pop() # notice also that id_path_list is also diminished here
+      candidate_foldername_in_level = self.fetch_entryname_with_cursor_of(candidate_folder_id_in_level, cursor)
+      if candidate_foldername_in_level == edgefoldername_at_this_recursive_level:
+        n_collisions += 1
+        collidededgefolderid = original_ambiguous_edge_folder_id
+        new_candidate_folder_ids_w_paths_dict[original_ambiguous_edge_folder_id] = id_path_list  # the one popped above, ie, with minus one element
+
+    if n_collisions == 1: # this means that recursion ends here, for the dict is not ambiguous anymore, see explanation in the caller-before-recursion's __doc__
+      return collidededgefolderid
+    elif n_collisions > 1:
+      return self.searchdeeprecursive_edgefolderid_for_the_normalizedfoldernamelist_n_cursor(normalizedfoldernamelist, new_candidate_folder_ids_w_paths_dict, cursor)
+    # From here n_collisions = 0
+    # It's a weird thing, having no collision, nothing was found; it's probably a data inconsistency
+    #   of some kind, ie, the database is not good. Solution is to return None, not raise an exception.
+    return None
+
+  def find_edgefolderid_of_the_normalizedfoldernamelist_via_auxtable_n_cursor(self, ossepfullpath, cursor):
+    '''
+    This method tries to find the edge folder id associated to a path.
+    (Notice that ossepfullpath is sometimes referred to foldernamed_path.)
+
+    The edge folder id associated to a path is the following. Suppose path p is:
+
+     /a/abc/xpto
+
+    The folder xpto has an id and this is the one that is searched for.
+
+
+    Let's see this search via an example:
+
+    Suppose the 3 following aux paths:
+
+    id-to-name | prefixing named path
+    ---------------------------------
+         d     |  a/b/c
+         x     |  a/e/f/bla/blah
+         d     |  x/xpto/c
+
+    The letters above are names. However, all id's are numbers and they are all different,
+      for they are PRIMARY KEY there.
+
+    Remind also that auxtable has only id's, not names.  The names above are just to explain why
+      we need the logic here.
+
+    Suppose we search for the folderid of path x/xpto/c/d
+
+    This path is the last row above in the example, ie:
+
+         d     |  x/xpto/c
+
+    However, after having passed thru this method, the following 2 rows:
+
+    id-to-name | named path
+    -----------------------
+         d     |  a/b/c/
+         d     |  x/xpto/c/
+
+    will have to go into a recursive method, because both have a 3-level depth
+      and both have the same name, ie, 'd'.
+
+    The folderid of the first 'd' is ambiguous with the folderid of the second 'd'.
+
+    In the first passage thru the recursive search, the table above will become:
+
+    keptid | id-to-name | named path | corresponding original foldername in level 3
+    -------------------------------------------------------------------------------
+     {id1} |     c      |  a/b/      |                c (still ambiguous)
+     {id2} |     c      |  x/xpto/   |                c (still ambiguous)
+
+     {id1} is still ambiguous with {id2}, for both related names are 'c'. It needs to go recurse again:
+
+    keptid | id-to-name | named path | corresponding original foldername in level 2
+    -------------------------------------------------------------------------------
+     {id1} |     b      |  a/        |              xpto (no longer ambiguous, {id1} is out)
+     {id2} |     xpto   |  x/        |              xpto (no longer ambiguous, {id2} is in)
+
+     At this step, {id2} is not ambiguous with {id2} for only {id2} relates to 'xpto',
+       recursion is finished and answer is found, ie, the sought-after folder id is {id2}.
+
+     ***
+
+     This system has a second search algorithm. The first one is this above explained.
+
+     The second algorithm goes top to bottom, search the folder id from root all below to the last name.
+     Let's briefly compare the 2 algorithms:
+       + This second algorithm needs n-level SELECTs for names.
+       + The first algorithm does one first SELECT and some bifurcating name-SELECTs
+         (or no further SELECTs if bootstrap for id-to-names is used).
+         The bifurcating name-SELECTs will equal the n-1- level SELECTs
+           in the worst case scenario of identical names up to the 1st level.
+           In the best case scenario, the folder id may be found right away even before any recursion.
+           However the case/scenario, with bootstrap on no further SELECTs will happen.
+           But the bootstrap on, there exists an option of having all paths in memory, so that would be
+             much simpler, for a single list element match would do.
+             (This is not planned to be done due to memory size economy.)
+    '''
+
+
+    # Because this method may be called by anyone with a cursor, this protection is repeated from the caller in this class
+    if ossepfullpath == None or ossepfullpath == '':
+      return None
+
+    # Because this method may be called by anyone with a cursor, this protection is repeated from the caller in this class
+    if ossepfullpath == PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME:
+      return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
+
+    normalizedfoldernamelist = self.normalize_foldernamespathlist_with_ossepfullpath(ossepfullpath)
+    # Protect against a 'bad' normalizedfoldernamelist
+    if normalizedfoldernamelist == None or len(normalizedfoldernamelist) == 0:
+      # weird thing, return None for edgefolderid
+      return None
+
+    n_levels = len(normalizedfoldernamelist) # because 'root' is also inside the normalized list, the TWO end up the same
+    edgefoldername = normalizedfoldernamelist.pop() # edge is the last element (an entryname here); this pop() also prepares for a later recurse, if needed (see below)
+    sql = '''
+    SELECT id, %(fieldname_for_entries_path_id_list_str)s
+      FROM %(tablename_auxtab_path_id_list_per_entries)s
+      WHERE
+        n_levels = %(n_levels)d
+    ''' % { \
+      'tablename_auxtab_path_id_list_per_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS, \
+      'fieldname_for_entries_path_id_list_str': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
+      'n_levels': n_levels, \
+      }
+    result = cursor.execute(sql)
+    #if result == None:
+      # return None  # ie, edge folder id not found, it must either be inserted in sequence or a message propagate to user
+    aux_records = result.fetchall()
+    if aux_records == None or len(aux_records) == 0:
+      return None  # ie, edge folder id not found, it must either be inserted in sequence or a message propagate to user
+    if len(aux_records) == 1:
+      # this is probably a rare case, because if levels are equal, the folderid should be the edge one there
+      aux_record = aux_records[0]  # first record
+      edgefolderid = aux_record[0]  # first field value
+      candidate_foldername = self.fetch_entryname_with_cursor_of(edgefolderid, cursor)
+      if candidate_foldername == edgefoldername:
+        return edgefolderid  # ok, found it, return it
+      else:
+        # only one record found, but this record doesn't have the edgefolderid-to-the-edgefoldername
+        # then, return None (meaning not found)
+        return None
+
+    # At this point ==>> len(aux_records) > 1 ie: there are more than one n-or-above-level path, all of them are candidates
+    # Prepare the dict and go recurse to find edge folder id
+    # During this preparation, there's a chance to get the edgefolderid first time and not recurse at all
+    n_collisions = 0
+    candidate_folder_ids_w_paths_dict = {}
+    # Gather all records that, having the same n-level path, have that same edgefoldername
+    for record in aux_records:
+      folder_id = record[0]
+      candidate_foldername = self.fetch_entryname_with_cursor_of(folder_id, cursor)
+      if candidate_foldername == edgefoldername:
+        n_collisions += 1
+        edgefolderid = folder_id
+        id_path_list_str = record[1]
+        id_path_strelem_list = id_path_list_str.split(';')
+        id_path_list = map(int, id_path_strelem_list)
+        # Cut it down to the correct level if needed
+        if len(id_path_list) > n_levels:
+          id_path_list = id_path_list[:n_levels]
+        if len(id_path_list) <> n_levels:
+          # a data error, a ';' separated string is wrongly inside the database, raise ValueError
+          error_msg = "The ';'-separated string (=%s) did not convert to the expected sized folder id list. The expected size is %d, the split size is %d." % (id_path_list_str, n_levels, len(id_path_list))
+          raise ValueError(error_msg)
+        candidate_folder_ids_w_paths_dict[folder_id] = id_path_list
+    if n_collisions == 0:
+      # weird thing, there's probably some bad data in database
+      return None
+    # if only one collision happened, good luck, the edgefolderid is that one, no recursion needed, return it
+    if n_collisions == 1:
+      return edgefolderid
+    # From here n_collisions > 1; recursion is needed
+    # Remind that a normalizedfoldernamelist.pop() happened at the entrance; the list's good to go recurse
+    edgefolderid = self.searchdeeprecursive_edgefolderid_for_the_normalizedfoldernamelist_n_cursor( \
+      normalizedfoldernamelist, \
+      candidate_folder_ids_w_paths_dict, \
+      cursor
+    )
+    # let's take the chance to find perhaps a bug here, ie, the edgefolderid returned must be in the candidate_folder_ids list
+    if edgefolderid == None or edgefolderid not in candidate_folder_ids_w_paths_dict.keys():
+      error_msg = 'Logic error in the program. The edgefolderid (%d) was chosen outside candidates (=%s).' %( \
+        edgefolderid, candidate_folder_ids_w_paths_dict.keys() \
+      )
+      raise ValueError(error_msg)
+    # edgefolderid is good, return it
+    return edgefolderid
+
+  def find_edgefolderid_of_the_normalizedfoldernamelist_via_auxtable(self, ossepfullpath):
+    '''
+    This method is a wrapper for method find_edgefolderid_of_the_normalizedfoldernamelist_via_auxtable_n_cursor()
+    It picks up the 'cursor' and calls the above wrapped method.
+
+    The __doc__ for the above method is much more explanatory, please look that up in case it's needed.
+    '''
+
+    # This 'heading-check' is to avoid opening a db-connection. The cursor method to call below also has this checking
+    if ossepfullpath == None or ossepfullpath == '':
+      return None
+
+    # This 'heading-check' is to avoid opening a db-connection. The cursor method to call below also has this checking
+    if ossepfullpath == PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME:
+      return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
+
+    conn = self.conn_obj.get_db_connection()
+    cursor = conn.cursor()
+    edgefolderid = self.find_edgefolderid_of_the_normalizedfoldernamelist_via_auxtable_n_cursor(ossepfullpath, cursor)
+    conn.close()
+    return edgefolderid
+
+  def find_edge_folderid_with_ossepfullpath_via_linktable(self, ossepfullpath):
+
+    parent_dir_id = PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
+    id_path_list = [parent_dir_id]
+    for foldername in foldernames:  # 1st foldername is a 1st level entry below ROOT
+      try:
+        next_parent_dir_id = self.insert_update_or_pass_thru_entryname_n_get_id_with_parent_dir_id_n_entrytype_for( \
+          foldername, \
+          PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FOLDER, \
+          parent_dir_id \
+          )
+      except CannotInsertFolderWithSameNameAsAFile:
+        print 'CannotInsertFolderWithSameNameAsAFile'
+        return None
+      id_path_list.append(next_parent_dir_id)
+      parent_dir_id = next_parent_dir_id
+    folder_id = id_path_list[-1]
+    return folder_id
 
   def fetch_children_folder_ids_by_node_id(self, node_id):
     '''
@@ -176,10 +459,96 @@ def test1():
   print fetcher.get_all_folder_id_to_name_pairs_dict()
   print fetcher.str_tree()
 
+def force_insert_test_mass():
+  '''
+  Test mass is:
+
+  [foldernamed paths]
+  d   a/b/c/
+  x   a/e/f/
+  d   a/z/c/
+
+  [folder id's to names]
+  root is 1
+  a = 2    d = 5    x = 8       2nd d = 11
+  b = 3    e = 6    z = 9
+  c = 4    f = 7    2nd c = 10
+
+  [folder id's to prefixing paths]
+  5   2;3;4
+  8   2;6;7
+  11  2;9;10
+  '''
+  conn_obj = dbfact.DBFactoryToConnection()
+  conn = conn_obj.get_db_connection()
+  cursor = conn.cursor()
+  sql = '''
+  INSERT INTO %(tablename_for_entries_linked_list)s
+   (id,%(fieldname_for_parent_or_home_dir_id)s)
+  VALUES
+   (?,?);
+  ''' % { \
+    'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST, \
+    'fieldname_for_parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
+  }
+  data = ((2,1),(3,2),(4,3),(5,4),(6,2),(7,6),(8,7),(9,2),(10,9),(11,10),)
+  cursor.executemany(sql, data)
+  # for r in data:
+  sql = '''
+  INSERT INTO %(tablename_for_file_n_folder_entries)s
+    (id, entryname, entrytype)
+  VALUES
+    (?,?,?);
+  '''%{ 'tablename_for_file_n_folder_entries' : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES }
+  '''
+  [folder id's to names]
+  root is 1
+  a = 2    d = 5    x = 8       2nd d = 11
+  b = 3    e = 6    z = 9
+  c = 4    f = 7    2nd c = 10
+  '''
+  data = ((2, 'a', 0), (3, 'b', 0), (4, 'c', 0), (5, 'd', 0), (6, 'e', 0), (7, 'f', 0), (8, 'x', 0), (9, 'z', 0), (10, 'c', 0), (11, 'd', 0),)
+  cursor.executemany(sql, data)
+  sql = '''
+  INSERT INTO %(tablename_auxtab_path_id_list_per_entries)s
+    (id, n_levels, %(fieldname_for_entries_path_id_list_str)s)
+  VALUES
+    (?,?,?);
+  ''' % { \
+    'tablename_auxtab_path_id_list_per_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS,
+    'fieldname_for_entries_path_id_list_str'   : PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
+  }
+  data = [ \
+    (2, 1, '1'), (3, 2, '1;2'), (4,  3, '1;2;3'),  (5, 4, '1;2;3;4'),  \
+                 (6, 2, '1;2'), (7,  3, '1;2;6'),  (8, 4, '1;2;6;7'),  \
+                 (9, 2, '1;2'), (10, 3, '1;2;9'), (11, 4, '1;2;9;10'), \
+  ]
+  cursor.executemany(sql, data)
+  # all 3 tables received data
+  conn.commit()
+  conn.close()
+
+
+def prepare_tables():
+  sqlcreator = sqlcreate.DBTablesCreator()
+  sqlcreator.create_tables()
+  sqlcreator.initialize_the_2_dir_tables_with_toproot()
+  sqlcreator.delete_all_data_except_root()
+  force_insert_test_mass()
+
+def test2():
+  dbfetcher = DBFetcher()
+  paths = ['/a/z/c/d/', 'bla/blah/', 'a/e/f/x', '/a/z/', 'a', '/', '//']
+  paths = ['a/e/f/x',]
+  for ossepfullpath_to_find_edgefolderid in paths:
+    print 'ossepfullpath_to_find_edgefolderid', ossepfullpath_to_find_edgefolderid
+    edgefolderid = dbfetcher.find_edgefolderid_of_the_normalizedfoldernamelist_via_auxtable(ossepfullpath_to_find_edgefolderid)
+    print 'Found:', edgefolderid
 
 def main():
-  sqlcreate.create_tables_and_initialize_root()
-  test1()
+  # test1()
+  # prepare_tables()
+  test2()
 
 if __name__ == '__main__':
   main()

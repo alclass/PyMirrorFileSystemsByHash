@@ -81,7 +81,7 @@ class TestDataFiller(object):
     :param folderpath:
     :return:
     '''
-    folder_id = self.modquerier.insert_foldername_with_ossep_abspath_n_get_id(folderpath)
+    folder_id = self.modquerier.insert_foldername_n_get_id_having_ossep_abspath(folderpath)
     return folder_id
 
 

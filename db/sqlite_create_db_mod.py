@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS "%(tablename_for_file_attrib_values)s" (
 sql_create_table_for_auxtab_path_id_list_per_folder = '''
 CREATE TABLE IF NOT EXISTS "%(tablename_auxtab_path_id_list_per_entries)s" (
   id INT PRIMARY KEY NOT NULL,
+  n_levels INT NOT NULL,
   %(fieldname_for_entries_path_id_list_str)s TEXT NOT NULL,
   FOREIGN KEY(id) REFERENCES %(tablename_for_file_n_folder_entries)s(id)
 );
