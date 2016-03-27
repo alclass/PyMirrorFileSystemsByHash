@@ -31,10 +31,9 @@ class PYMIRROR_DB_PARAMS:
   CONVENTIONED_ROOT_DIR_NAME = os.path.sep # '/' # 'TOP_ROOT_FOLDER'
 
   class TABLE_NAMES:
-    FILE_ATTRIB_VALUES    = 'file_attrib_values' # tablename_for_file_attrib_values
-    FILE_N_FOLDER_ENTRIES = 'fs_entries'  # tablename_for_file_n_folder_entries
-    ENTRIES_LINKED_LIST   = 'parent_dir_linked_list_table' # tablename_for_entries_linked_list
-    AUXTAB_FOR_PRE_PREPARED_PATHS = 'auxtab_path_id_list_per_entry'
+    FILE_ATTRIB_VALUES      = 'file_attrib_values' # tablename_for_file_attrib_values
+    FILE_N_FOLDER_ENTRIES   = 'file_n_folder_entries'  # tablename_for_file_n_folder_entries
+    ENTRIES_PARENTS_N_PATHS = 'entries_parents_n_paths' # tablename_for_entries_linked_list
 
   class FIELD_NAMES_ACROSS_TABLES:
     '''

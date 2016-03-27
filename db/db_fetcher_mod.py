@@ -38,6 +38,138 @@ class DBFetcher(object):
       entryname = one_record[0]
     return entryname
 
+  def update_correct_n_levels_in_parent_entries(self, entry_id, n_levels, cursor):
+    '''
+
+    :param n_levels:
+    :return:
+    '''
+    sql = '''
+    UPDATE %(tablename)d
+      SET n_levels = ?
+    WHERE
+      id = %(entry_id)d ;
+    ''' %{ \
+      'tablename': PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS, \
+      'entry_id' : entry_id, \
+    }
+    cursor.execute(sql)
+    # a conn.commit() is delay from here
+
+
+  def fetch_or_build_idpathlist_with_cursor_for(self, entry_id, cursor, at_least_one_dbchange_happened=False):
+    '''
+
+    :param entry_id:
+    :param cursor:
+    :param at_least_one_dbchange_happened:
+    :return: a2tuple (id_path_list, at_least_one_dbchange_happened)
+    '''
+
+    if entry_id == PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID:
+      return [], at_least_one_dbchange_happened
+
+    sql = '''
+    SELECT %(fieldname_parent_or_home_dir_id)s, n_levels, %(fieldname_id_path_list_str)s FROM %(tablename)s
+      WHERE
+        id = %(entry_id)d ;
+    '''  %{ \
+      'tablename'                      : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS, \
+      'fieldname_parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
+      'fieldname_id_path_list_str'     : PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
+      'entry_id'                       : entry_id, \
+    }
+    parent_or_home_dir_id = None
+    n_levels              = None
+    id_path_list_str      = None
+    id_path_list          = None
+
+    result = cursor.execute(sql)
+    record = result.fetchone()
+    if record == None:
+      return None, at_least_one_dbchange_happened
+
+    parent_or_home_dir_id = record[0]
+    n_levels              = record[1]
+    id_path_list_str      = record[2]
+
+    if parent_or_home_dir_id == None:
+      return None, at_least_one_dbchange_happened
+
+    if id_path_list_str <> None and id_path_list_str <> '':
+      try:
+        id_path_strelem_list = id_path_list_str.split(';')
+        id_path_list = map(int, id_path_strelem_list)
+        n_levels_in_list = len(id_path_list)
+        if n_levels == None or n_levels <> n_levels_in_list:
+          has_change_happened = self.update_correct_n_levels_in_parent_entries(entry_id, n_levels, cursor)
+          if not at_least_one_dbchange_happened and has_change_happened:
+            at_least_one_dbchange_happened = True
+
+        if parent_or_home_dir_id == id_path_list[-1]:
+          return id_path_list, at_least_one_dbchange_happened
+      except IndexError:
+        pass
+
+    if parent_or_home_dir_id == PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID:
+      return [PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID], at_least_one_dbchange_happened
+
+    idpathlist_of_parent, change_boolean = self.fetch_or_build_idpathlist_with_cursor_for(parent_or_home_dir_id, cursor, at_least_one_dbchange_happened)
+    if not at_least_one_dbchange_happened and change_boolean:
+      at_least_one_dbchange_happened = True
+
+    id_path_list = idpathlist_of_parent + [parent_or_home_dir_id]
+    change_boolean = self.insert_into_parent_entries_with_cursor_for(entry_id, parent_or_home_dir_id, n_levels, id_path_list, cursor)
+
+    if not at_least_one_dbchange_happened and change_boolean:
+      at_least_one_dbchange_happened = True
+
+    return id_path_list, at_least_one_dbchange_happened
+
+  def insert_into_parent_entries_with_cursor_for(self, entry_id, parent_or_home_dir_id, n_levels, id_path_list, cursor):
+    '''
+
+    :param entry_id:
+    :param parent_or_home_dir_id:
+    :param n_levels:
+    :param id_path_list:
+    :return:
+    '''
+    db_change_happened = False
+
+    # Perhaps this piece may be improved later on for if it's guaranteed that it has one specific caller, this previous caller has already checked this
+    if id_path_list == None or type(id_path_list) <> list:
+      error_msg = 'id_path_list (=%s) is either None or is not a list when trying to insert parententries for entryid=%d and parentid=%d.' %(str(id_path_list), entry_id, parent_or_home_dir_id)
+      raise ValueError(error_msg)
+    if id_path_list == []:
+      if parent_or_home_dir_id == PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID:
+        id_path_list = [parent_or_home_dir_id]
+      else:
+        error_msg = 'Inconsistent empty id_path_list not having the root parentid (entryid=%d and parentid=%d).' %(entry_id, parent_or_home_dir_id)
+        raise ValueError(error_msg)
+
+    id_path_strelem_list = map(str, id_path_list)
+    id_path_list_str = ';'.join(id_path_strelem_list)
+    n_levels = len(id_path_list)
+    sql = '''
+    INSERT INTO %(tablename)s
+        (id, %(fieldname_parent_or_home_dir_id)s, n_levels, %(fieldname_id_path_list_str)s)
+    VALUES
+        (?,?,?,?);
+    '''  %{ \
+      'tablename'                      : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS, \
+      'fieldname_parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
+      'fieldname_id_path_list_str'     : PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
+    }
+    data_4tuple = (entry_id, parent_or_home_dir_id, n_levels, id_path_list_str)
+    try:
+      cursor.execute(sql, data_4tuple)
+    except sqlite3.IntegrityError:
+      return db_change_happened
+    db_change_happened = True
+    return db_change_happened
+
+
   def normalize_foldernamespathlist_with_ossepfullpath(self, ossepfullpath):
     '''
     This should be noticed (or remembered)
@@ -90,7 +222,7 @@ class DBFetcher(object):
     #   of some kind, ie, the database is not good. Solution is to return None, not raise an exception.
     return None
 
-  def find_edgefolderid_of_the_normalizedfoldernamelist_via_auxtable_n_cursor(self, ossepfullpath, cursor):
+  def find_edgefolderid_of_the_ossepfullpath_via_auxtable_n_cursor(self, ossepfullpath, cursor):
     '''
     This method tries to find the edge folder id associated to a path.
     (Notice that ossepfullpath is sometimes referred to foldernamed_path.)
@@ -190,11 +322,11 @@ class DBFetcher(object):
     edgefoldername = normalizedfoldernamelist.pop() # edge is the last element (an entryname here); this pop() also prepares for a later recurse, if needed (see below)
     sql = '''
     SELECT id, %(fieldname_for_entries_path_id_list_str)s
-      FROM %(tablename_auxtab_path_id_list_per_entries)s
+      FROM %(tablename)s
       WHERE
         n_levels = %(n_levels)d
     ''' % { \
-      'tablename_auxtab_path_id_list_per_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS, \
+      'tablename': PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS, \
       'fieldname_for_entries_path_id_list_str': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
       'n_levels': n_levels, \
       }
@@ -261,9 +393,9 @@ class DBFetcher(object):
     # edgefolderid is good, return it
     return edgefolderid
 
-  def find_edgefolderid_of_the_normalizedfoldernamelist_via_auxtable(self, ossepfullpath):
+  def find_edgefolderid_of_the_ossepfullpath_via_auxtable(self, ossepfullpath):
     '''
-    This method is a wrapper for method find_edgefolderid_of_the_normalizedfoldernamelist_via_auxtable_n_cursor()
+    This method is a wrapper for method find_edgefolderid_of_the_ossepfullpath_via_auxtable_n_cursor()
     It picks up the 'cursor' and calls the above wrapped method.
 
     The __doc__ for the above method is much more explanatory, please look that up in case it's needed.
@@ -279,7 +411,7 @@ class DBFetcher(object):
 
     conn = self.conn_obj.get_db_connection()
     cursor = conn.cursor()
-    edgefolderid = self.find_edgefolderid_of_the_normalizedfoldernamelist_via_auxtable_n_cursor(ossepfullpath, cursor)
+    edgefolderid = self.find_edgefolderid_of_the_ossepfullpath_via_auxtable_n_cursor(ossepfullpath, cursor)
     conn.close()
     return edgefolderid
 
@@ -542,7 +674,7 @@ def test2():
   paths = ['a/e/f/x',]
   for ossepfullpath_to_find_edgefolderid in paths:
     print 'ossepfullpath_to_find_edgefolderid', ossepfullpath_to_find_edgefolderid
-    edgefolderid = dbfetcher.find_edgefolderid_of_the_normalizedfoldernamelist_via_auxtable(ossepfullpath_to_find_edgefolderid)
+    edgefolderid = dbfetcher.find_edgefolderid_of_the_ossepfullpath_via_auxtable(ossepfullpath_to_find_edgefolderid)
     print 'Found:', edgefolderid
 
 def main():

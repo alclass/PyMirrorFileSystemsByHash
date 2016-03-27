@@ -15,31 +15,50 @@ import db_settings
 # equal refs for textual economy
 PYMIRROR_DB_PARAMS = db_settings.PYMIRROR_DB_PARAMS
 
-sql_create_table_for_entries_linked_list = '''
-CREATE TABLE IF NOT EXISTS %(tablename_for_entries_linked_list)s (
+tablenames = []
+table_n_create_table_sql_2tuple_list = []
+
+# table 1
+tablename = PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS
+tablenames.append(tablename)
+create_table_sql =  '''
+CREATE TABLE IF NOT EXISTS %(tablename)s (
   id INT PRIMARY KEY NOT NULL,
-  %(fieldname_for_parent_or_home_dir_id)s INT, -- same as parent_dir_id
-  FOREIGN KEY(%(fieldname_for_parent_or_home_dir_id)s) REFERENCES %(tablename_for_entries_linked_list)s(id)
+  %(fieldname_for_parent_or_home_dir_id)s INT NOT NULL, -- same as parent_dir_id,
+  n_levels INT NOT NULL DEFAULT -1,
+  %(fieldname_for_entries_path_id_list_str)s TEXT DEFAULT '-1;',
+  FOREIGN KEY(%(fieldname_for_parent_or_home_dir_id)s) REFERENCES %(tablename)s(id)
 );
 ''' %{
-  'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
-  'fieldname_for_parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID,
+  'tablename': tablename,
+  'fieldname_for_parent_or_home_dir_id'  : PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID,
+  'fieldname_for_entries_path_id_list_str':PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR,
 }
+table_n_create_table_sql_2tuple = (tablename, create_table_sql)
+table_n_create_table_sql_2tuple_list.append(table_n_create_table_sql_2tuple)
 
-sql_create_table_for_file_n_folder_entries = '''
-CREATE TABLE IF NOT EXISTS "%(tablename_for_file_n_folder_entries)s" (
+# table 2
+tablename = PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES
+tablenames.append(tablename)
+create_table_sql =  '''
+CREATE TABLE IF NOT EXISTS "%(tablename)s" (
   id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   entryname TEXT NOT NULL,
   entrytype INT NOT NULL,
-  FOREIGN KEY(id) REFERENCES %(tablename_for_entries_linked_list)s(id)
+  FOREIGN KEY(id) REFERENCES %(tablename_for_entries_parents_n_paths)s(id)
 );
 ''' %{ \
-  'tablename_for_file_n_folder_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES,
-  'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
+  'tablename' : tablename,
+  'tablename_for_entries_parents_n_paths' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS,
 }
+table_n_create_table_sql_2tuple = (tablename, create_table_sql)
+table_n_create_table_sql_2tuple_list.append(table_n_create_table_sql_2tuple)
 
-sql_create_table_for_file_attrib_values = '''
-CREATE TABLE IF NOT EXISTS "%(tablename_for_file_attrib_values)s" (
+# table 3
+tablename = PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ATTRIB_VALUES
+tablenames.append(tablename)
+create_table_sql =  '''
+CREATE TABLE IF NOT EXISTS "%(tablename)s" (
   id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   sha1hex CHAR(40),
   filesize INT,
@@ -47,46 +66,51 @@ CREATE TABLE IF NOT EXISTS "%(tablename_for_file_attrib_values)s" (
   FOREIGN KEY(id) REFERENCES %(tablename_for_file_n_folder_entries)s(id)
 );
 ''' % { \
-  'tablename_for_file_attrib_values'   : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ATTRIB_VALUES,
+  'tablename' : tablename,
   'tablename_for_file_n_folder_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES \
 }
+table_n_create_table_sql_2tuple = (tablename, create_table_sql)
+table_n_create_table_sql_2tuple_list.append(table_n_create_table_sql_2tuple)
 
-sql_create_table_for_auxtab_path_id_list_per_folder = '''
-CREATE TABLE IF NOT EXISTS "%(tablename_auxtab_path_id_list_per_entries)s" (
-  id INT PRIMARY KEY NOT NULL,
-  n_levels INT NOT NULL,
-  %(fieldname_for_entries_path_id_list_str)s TEXT NOT NULL,
-  FOREIGN KEY(id) REFERENCES %(tablename_for_file_n_folder_entries)s(id)
-);
-''' % { \
-  'tablename_auxtab_path_id_list_per_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS,
-  'tablename_for_file_n_folder_entries'      : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES, \
-  'fieldname_for_entries_path_id_list_str'   : PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
-}
-
-sql_init_dir_entries_table_with_root = '''
-INSERT INTO %(tablename_for_file_n_folder_entries)s (id, entryname, entrytype)
-  VALUES (?, ?, ?);
-''' %{ 'tablename_for_file_n_folder_entries' : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES }
-
-root_record_tuple_list_in_dir_entries_table = [( \
+sqlinsert_n_explainlabel_4tuple_list = []
+# 1st sql insert
+sqlinsert_explainlabel = 'Inserting Root to Entries'
+tablename = PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES
+sqlinsert = '''
+INSERT INTO %(tablename)s
+  (id, entryname, entrytype)
+VALUES (?, ?, ?);
+''' %{ 'tablename' : tablename }
+data_3tuple = ( \
   PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID, \
   PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME, \
   PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FOLDER, \
-)]
+)
+sqlinsert_n_explainlabel_4tuple = (sqlinsert_explainlabel, tablename, sqlinsert, data_3tuple)
+sqlinsert_n_explainlabel_4tuple_list.append(sqlinsert_n_explainlabel_4tuple)
 
-sql_init_dir_linked_list_table_with_root = '''
-INSERT INTO %(tablename_for_entries_linked_list)s (id, %(fieldname_for_parent_or_home_dir_id)s)
-  VALUES (?, ?);
+# 2nd sql insert
+sqlinsert_explainlabel = 'Inserting Root Parent and Path'
+tablename = PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS
+sqlinsert = '''
+INSERT INTO %(tablename)s
+  (id, %(fieldname_for_parent_or_home_dir_id)s, n_levels, %(fieldname_for_entries_path_id_list_str)s)
+VALUES (?, ?, ?, ?);
 ''' %{ \
-  'tablename_for_entries_linked_list' : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST, \
-      'fieldname_for_parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
+  'tablename' : tablename, \
+  'fieldname_for_parent_or_home_dir_id'   : PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
+  'fieldname_for_entries_path_id_list_str': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
 }
-
-root_record_tuple_list_in_linked_list_table = [( \
+# Notice n_levels for 'root' is 0 :: ie, the root folder is at the zeroth level
+data_4tuple = ( \
   PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID, \
   PYMIRROR_DB_PARAMS.CONVENTIONED_DUMMY_PARENT_OF_TOP_ROOT_FOLDER_ID, \
-)]
+  0, \
+  '0', \
+)
+sqlinsert_n_explainlabel_4tuple = (sqlinsert_explainlabel, tablename, sqlinsert, data_4tuple)
+sqlinsert_n_explainlabel_4tuple_list.append(sqlinsert_n_explainlabel_4tuple)
+
 
 class DBTablesCreator(object):
 
@@ -113,21 +137,22 @@ class DBTablesCreator(object):
   def create_tables(self):
     conn = self.get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(sql_create_table_for_entries_linked_list)
-    cursor.execute(sql_create_table_for_file_n_folder_entries)
-    cursor.execute(sql_create_table_for_file_attrib_values)
-    cursor.execute(sql_create_table_for_auxtab_path_id_list_per_folder)
+    for table_name, create_table_sql in table_n_create_table_sql_2tuple_list:
+      print 'Creating table', table_name
+      cursor.execute(create_table_sql)
     conn.commit()
     conn.close()
 
   def initialize_the_2_dir_tables_with_toproot(self):
     conn = self.get_db_connection()
     cursor = conn.cursor()
-    try:
-      cursor.executemany(sql_init_dir_entries_table_with_root, root_record_tuple_list_in_dir_entries_table)
-      cursor.executemany(sql_init_dir_linked_list_table_with_root, root_record_tuple_list_in_linked_list_table)
-    except sqlite3.IntegrityError:
-      pass
+    for sqlinsert_n_explainlabel_4tuple in sqlinsert_n_explainlabel_4tuple_list:
+      try:
+        sqlinsert_explainlabel, tablename, sqlinsert, data_tuple_list = sqlinsert_n_explainlabel_4tuple
+        print sqlinsert_explainlabel, 'in table', tablename
+        cursor.execute(sqlinsert, data_tuple_list)
+      except sqlite3.IntegrityError:
+        print 'ATTENTION: sqlite3.IntegrityError for', tablename
     conn.commit()
     conn.close()
 
@@ -149,13 +174,8 @@ class DBTablesCreator(object):
       tablename = record[0]
       found_tablenames.append(tablename)
     conn.close()
-    should_be_there_tables = []
-    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ATTRIB_VALUES)
-    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES)
-    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST)
-    should_be_there_tables.append(PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS)
-    for should_be_there_table in should_be_there_tables:
-      if should_be_there_table not in found_tablenames:
+    for tablename in tablenames:
+      if tablename not in found_tablenames:
         return False
     return True
 
@@ -165,21 +185,11 @@ class DBTablesCreator(object):
     this delete the table itself ==>> drop table if exists fs_entries ;
     :return:
     '''
-    sqlscript = '''
-    DELETE FROM %(tablename_for_entries_linked_list)s;
-    DELETE FROM %(tablename_for_file_attrib_values)s;
-    DELETE FROM %(tablename_auxtab_path_id_list_per_entries)s;
-    DELETE FROM %(tablename_for_file_n_folder_entries)s;
-
-    ''' % { \
-    'tablename_for_entries_linked_list'        : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
-    'tablename_for_file_attrib_values'         : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_ATTRIB_VALUES, \
-    'tablename_auxtab_path_id_list_per_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.AUXTAB_FOR_PRE_PREPARED_PATHS, \
-    'tablename_for_file_n_folder_entries'      : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES, \
-  }
     conn = self.get_db_connection()
     cursor = conn.cursor()
-    cursor.executescript(sqlscript)
+    for tablename in tablenames:
+      sql = 'DELETE FROM %(tablename)s;' %{'tablename':tablename}
+      cursor.execute(sql)
     conn.commit()
     conn.close()
     self.initialize_the_2_dir_tables_with_toproot()
@@ -197,7 +207,10 @@ def create_tables_and_initialize_root():
 
 def test1():
   dbms_to_use=PYMIRROR_DB_PARAMS.SQLITE
-  sqlite_db_filepath = 'test01.sqlite'
+  sqlite_db_filename = 'test01.sqlite'
+  dbms_params_dict = {}
+  filepath = os.path.join(os.path.abspath('.'), sqlite_db_filename)
+  dbms_params_dict['db_sqlite_filepath'] = filepath
   conn_obj = dbfact.DBFactoryToConnection(dbms_params_dict)
   conn = conn_obj.get_db_connection()
   print conn
@@ -208,6 +221,7 @@ def main():
   dbcreator.create_tables()
   print 'dbcreator.verify_that_tables_were_created()'
   dbcreator.verify_that_tables_were_created()
+  dbcreator.initialize_the_2_dir_tables_with_toproot()
   # dbcreator.delete_all_data_except_root()
 
   # test1()

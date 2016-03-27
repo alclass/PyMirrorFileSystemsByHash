@@ -11,9 +11,10 @@ from util import util_mod as um
 import db.db_connection_factory_mod as dbfact
 import db.db_modification_query_performer_mod as dbperf
 import db.sqlite_create_db_mod as dbcreat
-
-FOLDER = 1
-FILE = 2
+import db.db_settings as dbsetts
+PYMIRROR_DB_PARAMS = dbsetts.PYMIRROR_DB_PARAMS
+FOLDER = PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FOLDER
+FILE   = PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FILE
 
 sha1hexes=[];filesizes=[];modified_datetimes=[]
 for i in xrange(4):
@@ -23,8 +24,6 @@ for i in xrange(4):
 
 def make_tuple_list_data_for_dbinsert():
   entries=[]
-  FOLDER = 1
-  FILE   = 2
   e=(FOLDER,'/ab')
   entries.append(e)
   # e=(FOLDER,'/abc/ab')
@@ -81,7 +80,8 @@ class TestDataFiller(object):
     :param folderpath:
     :return:
     '''
-    folder_id = self.modquerier.insert_foldername_n_get_id_having_ossep_abspath(folderpath)
+    folder_id = self.modquerier.insert_foldername_n_get_id_having_ossepfullpath(folderpath)
+
     return folder_id
 
 
@@ -100,7 +100,8 @@ class TestDataFiller(object):
       entry_type = tuple_record[0]
       if entry_type == FOLDER:
         folderpath = tuple_record[1]
-        self.insert_folder_n_get_folder_id(folderpath)
+        folder_id = self.insert_folder_n_get_folder_id(folderpath)
+        print folder_id, '==>>', folderpath
       elif entry_type == FILE:
         # '/abc/abc/file1',sha1hexes[seq],filesizes[seq],modified_datetimes[seq]
         file_values_dict = {}

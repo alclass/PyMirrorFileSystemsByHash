@@ -44,7 +44,7 @@ class DBModificationQueryPerformer(object):
     # super(DBAccessor, self).__init__(device_and_middle_abspath)
     # in Python 3, it's just: super().__init__()
 
-    self.conn_obj = dbfact.DBFactoryToConnection(dbms_params_dict)
+    self.conn_obj  = dbfact.DBFactoryToConnection(dbms_params_dict)
     self.dbfetcher = dbfetch.DBFetcher(dbms_params_dict)
 
   def update_entryname_after_existscheck_with_id_parent_dir_id_entrytype_n_cursor_for(self, entry_id, entryname, entrytype, parent_or_home_dir_id, cursor):
@@ -83,48 +83,138 @@ class DBModificationQueryPerformer(object):
     # do not conn.close() here, let the caller do it at the end of its 'pipeline'
     return has_insert_or_update_happened
 
-  def insert_entryname_after_existscheck_n_get_id_with_parent_dir_id_n_cursor_for(self, entryname, entrytype, parent_or_home_dir_id, cursor):
+  def insert_entryname_entrytype_after_existscheck_n_get_id_with_cursor(self, entryname, entrytype, cursor):
+    '''
+
+    :param entryname:
+    :param entrytype:
+    :param cursor:
+    :return:
+    '''
+    inserted_entry_id = None
+    sql = '''
+    INSERT INTO %(tablename)s
+           (entryname, entrytype)
+    VALUES (    ?    ,     ?    ) ; '''  %{ \
+      'tablename' : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES,
+    }
+    try:
+      cursor.execute(sql, (entryname, entrytype))
+      inserted_entry_id = cursor.lastrowid
+    except sqlite3.IntegrityError:
+      pass
+    return inserted_entry_id
+
+  def insert_entryname_n_parentlink_after_existscheck_n_get_id_with_parent_dir_id_n_cursor_for(self, entryname, entrytype, parent_or_home_dir_id, cursor, file_values_dict=None):
     '''
 
     :param foldername:
     :param parent_dir_id:
-    :return:
+    :return: a2tuple (inserted_entry_id, dbchange_has_happened)
     '''
-    sql = '''
-    INSERT INTO %(tablename_for_file_n_folder_entries)s
-           (entryname, entrytype)
-    VALUES (    ?    ,     ?    ) ; '''  %{ \
-      'tablename_for_file_n_folder_entries' : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES,
-    }
-    cursor.execute(sql, (entryname, entrytype))
-    inserted_entry_id = cursor.lastrowid
-    self.insert_corresponding_entries_linked_list_with_cursor_for(inserted_entry_id, parent_or_home_dir_id, cursor)
-    # has_insert_or_update_happened, should_be_entries_path_id_list_str =
-    has_insert_or_update_happened, _ = self.insert_entryid_to_entries_path_id_list_with_parent_id_n_cursor_for(inserted_entry_id, parent_or_home_dir_id, cursor)
-    # if inserted_entry_id <> None:
-      # conn.commit()
-    # do not conn.close() here, let the caller do it at the end of its 'pipeline'
-    return inserted_entry_id
+    dbchange_has_happened = False
 
-  def insert_corresponding_entries_linked_list_with_cursor_for(self, entry_id, parent_dir_id, cursor):
+    inserted_entry_id  = self.insert_entryname_entrytype_after_existscheck_n_get_id_with_cursor(entryname, entrytype, cursor)
+    if inserted_entry_id == None:
+      return None, False
+    dbchange_has_happened = True
+
+    parentlink_inserted  = False
+    parentlink_inserted = self.insert_into_parententries_entryid_entrytype_n_idpathlist_ifany_with_cursor(inserted_entry_id, parent_or_home_dir_id, entrytype, cursor, n_levels=None, id_path_list=None )
+    if not dbchange_has_happened and parentlink_inserted:
+      dbchange_has_happened = True
+
+    return inserted_entry_id, dbchange_has_happened
+
+  def insert_into_parententries_fileid_with_cursor(self, entry_id, parent_dir_id, cursor):
     '''
-    This insert is a cascading one, notice [[cursor]] as a parameter.
+
     :param entry_id:
+    :param parent_dir_id:
     :param cursor:
     :return:
     '''
+    dbchange_happened = False
     sql = '''
-    INSERT INTO "%(tablename_for_entries_linked_list)s"
-            (id, %(fieldname_for_parent_or_home_dir_id)s)
-    VALUES  (?, ?) ; '''  %{ \
-      'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST, \
-      'fieldname_for_parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
+    INSERT INTO "%(tablename)s"
+            (id, %(parent_or_home_dir_id), n_levels, %(id_path_list_str)s)
+    VALUES  (?, ?, ?, ?) ; '''  %{ \
+      'tablename'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS, \
+      'parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
+      'id_path_list_str': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
+    }
+    data_4tuple = (entry_id, parent_dir_id, -1, '')
+    try:
+      cursor.execute(sql, data_4tuple)
+      dbchange_happened = False
+    except sqlite3.IntegrityError:
+      pass
+    return dbchange_happened
+
+  def insert_into_parententries_folderid_with_cursor(self, entry_id, parent_dir_id, cursor, n_levels=None, id_path_list=None):
+    '''
+
+    :param entry_id:
+    :param parent_dir_id:
+    :param cursor:
+    :return:
+    '''
+    dbchange_happened = False
+    if parent_dir_id == PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID:
+      id_path_list = []
+
+    if id_path_list==None:
+      id_path_list, has_dbchange_happened = self.dbfetcher.fetch_or_build_idpathlist_with_cursor_for(parent_dir_id, cursor)
+      if id_path_list == None or type(id_path_list) <> list or id_path_list == []: # at this point, it can't be [] for ROOT has been tested above
+        # can't decide, something wrong happened
+        error_msg = 'Could not find the id_path_list of entryid=%d with parentid=%d.' %(entry_id, parent_dir_id)
+        raise ValueError(error_msg)
+
+    # It's guaranteed id_path_list is not None at the point in code (see above)
+    id_path_list += [parent_dir_id]
+    id_path_strelem_list = map(str, id_path_list)
+    id_path_list_str = ';'.join(id_path_strelem_list)
+    n_levels = len(id_path_list)
+
+    sql = '''
+    INSERT INTO "%(tablename)s"
+            (id, %(parent_or_home_dir_id)s, n_levels, %(id_path_list_str)s)
+    VALUES  (?, ?, ?, ?) ; '''  %{ \
+      'tablename'            : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS, \
+      'parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
+      'id_path_list_str'     : PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.ENTRIES_PATH_ID_LIST_STR, \
     }
     try:
-      cursor.execute(sql, (entry_id, parent_dir_id))
+      cursor.execute(sql, (entry_id, parent_dir_id, n_levels, id_path_list_str))
+      dbchange_happened = True
     except sqlite3.IntegrityError:
-      return False
-    return True
+      pass
+    return dbchange_happened
+
+  def insert_into_parententries_entryid_entrytype_n_idpathlist_ifany_with_cursor(self, entry_id, parent_dir_id, entrytype, cursor, n_levels=None, id_path_list=None):
+    '''
+    # This insert is a cascading one, notice [[cursor]] as a parameter.
+    :param entry_id:
+    :param parent_dir_id:
+    :param n_levels:
+    :param id_path_list_str:
+    :param cursor:
+    :return:
+    '''
+    dbchange_happened = False
+    # if entrytype is FILE, no id_path_list is necessary (for it's '' for files), so it's simpler, we can solve it first in code
+    if entrytype == PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FILE:
+      fileparent_inserted = self.insert_into_parententries_fileid_with_cursor(self, entry_id, parent_dir_id, cursor)
+      if not dbchange_happened and fileparent_inserted:
+        dbchange_happened = True
+      return dbchange_happened
+
+    # From here, entrytype is FOLDER, now we'll need id_path_list
+    folderparent_inserted = self.insert_into_parententries_folderid_with_cursor(entry_id, parent_dir_id, cursor, n_levels, id_path_list)
+    if not dbchange_happened and folderparent_inserted:
+      dbchange_happened = True
+
+    return dbchange_happened
 
   def fetch_entries_path_id_list_str_with_cursor_for(self, entry_id, cursor):
     '''
@@ -295,13 +385,13 @@ class DBModificationQueryPerformer(object):
     :return:
     '''
     sql = '''
-    SELECT d.id, d.entrytype FROM %(tablename_for_file_n_folder_entries)s d, %(tablename_for_entries_linked_list)s p
+    SELECT d.id, d.entrytype FROM %(tablename)s d, %(tablename_for_parent_entries)s p
       WHERE
         d.entryname    = "%(foldername)s"   AND
         p.%(fieldname_for_parent_or_home_dir_id)s = %(home_dir_id)d  AND
         d.id = p.id ; ''' %{ \
-      'tablename_for_file_n_folder_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES,
-      'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,
+      'tablename'                          : PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES,
+      'tablename_for_parent_entries'       : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS,
       'fieldname_for_parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID,
       'foldername'                         : entryname,
       'home_dir_id'                        : parent_or_home_dir_id,
@@ -353,7 +443,7 @@ class DBModificationQueryPerformer(object):
       db_action = DO_NOTHING
 
     if db_action == DO_INSERT:
-      entry_id = self.insert_entryname_after_existscheck_n_get_id_with_parent_dir_id_n_cursor_for( \
+      entry_id, has_insert_or_update_happened = self.insert_entryname_n_parentlink_after_existscheck_n_get_id_with_parent_dir_id_n_cursor_for( \
         entryname, entrytype, parent_or_home_dir_id, cursor \
       )
       if entry_id <> None:
@@ -368,15 +458,36 @@ class DBModificationQueryPerformer(object):
   def check_file_on_folder_existence_n_get_file_id(self, filename, home_dir_id):
     pass
 
-  def insert_foldername_n_get_id_having_ossep_abspath(self, foldernamed_path):
+  def insert_foldername_n_get_id_having_ossepfullpath_afternotexist(self, ossepfullpath):
     '''
 
-    :param foldernamed_path:
+    :param ossepfullpath:
+    :param cursor:
     :return:
     '''
+    entrytype = PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FOLDER
+    normalizedfoldernamespathlist = self.dbfetcher.normalize_foldernamespathlist_with_ossepfullpath(ossepfullpath)
+    parent_dir_id = PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
+    for foldername in normalizedfoldernamespathlist:
+      passing_folder_id = self.insert_update_or_pass_thru_entryname_n_get_id_with_parent_dir_id_n_entrytype_for(foldername, entrytype, parent_dir_id)
+      if passing_folder_id == None:
+        error_msg = 'Could not insert foldername %s in path %s.' %(foldername, ossepfullpath)
+        raise ValueError(error_msg)
+      parent_dir_id = passing_folder_id
+    folder_id = passing_folder_id
+    return folder_id
 
-    folder_id = self.dbfetcher.find_edge_folderid_with_ossepfullpath_via_auxtable(foldernamed_path)
+  def insert_foldername_n_get_id_having_ossepfullpath(self, ossepfullpath):
+    '''
+    ossepfullpath = foldernamed_path
+    :param ossepfullpath:
+    :return: folder_id
+    '''
 
+    folder_id = self.dbfetcher.find_edgefolderid_of_the_ossepfullpath_via_auxtable(ossepfullpath)
+    if folder_id == None:
+      folder_id = self.insert_foldername_n_get_id_having_ossepfullpath_afternotexist(ossepfullpath)
+    return folder_id
 
   def insert_update_or_pass_thru_file_field_values(self, file_id, sha1hex, filesize, modified_datetime):
     '''
@@ -521,7 +632,9 @@ class DBModificationQueryPerformer(object):
     cursor = conn.cursor()
     at_least_one_insert_happened = False
     for entryname in dirnames:
-      next_parent_or_home_dir_id = self.insert_entryname_after_existscheck_n_get_id_with_parent_dir_id_n_cursor_for(entryname, FOLDER_ENTRY_TYPE_ID, parent_or_home_dir_id)
+      next_parent_or_home_dir_id, dbchange_happened = self.insert_entryname_n_parentlink_after_existscheck_n_get_id_with_parent_dir_id_n_cursor_for(entryname, FOLDER_ENTRY_TYPE_ID, parent_or_home_dir_id)
+      if not at_least_one_insert_happened and dbchange_happened:
+        at_least_one_insert_happened = True
       if next_parent_or_home_dir_id <> None:
         at_least_one_insert_happened = False
       parent_or_home_dir_id = next_parent_or_home_dir_id
@@ -587,7 +700,7 @@ class DBModificationQueryPerformer(object):
     for foldername in foldernames:
       next_parent_dir_id, entrytype = self.fetch_entryid_n_entrytype_by_foldername_n_parent_dir_id_with_cursor(foldername, parent_dir_id, cursor)
       if next_parent_dir_id == None:
-        next_parent_dir_id = self.insert_entryname_after_existscheck_n_get_id_with_parent_dir_id_n_cursor_for(foldername, PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FOLDER, parent_dir_id, cursor)
+        next_parent_dir_id, has_insert_happened = self.insert_entryname_n_parentlink_after_existscheck_n_get_id_with_parent_dir_id_n_cursor_for(foldername, PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FOLDER, parent_dir_id, cursor)
         if next_parent_dir_id == None:
           error_msg = 'Could not create foldername %s for path %s' %(foldername, foldernamed_path)
           raise OSError(error_msg)
