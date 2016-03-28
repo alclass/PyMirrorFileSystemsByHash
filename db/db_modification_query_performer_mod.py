@@ -137,7 +137,7 @@ class DBModificationQueryPerformer(object):
     dbchange_happened = False
     sql = '''
     INSERT INTO "%(tablename)s"
-            (id, %(parent_or_home_dir_id), n_levels, %(id_path_list_str)s)
+            (id, %(parent_or_home_dir_id)s, n_levels, %(id_path_list_str)s)
     VALUES  (?, ?, ?, ?) ; '''  %{ \
       'tablename'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS, \
       'parent_or_home_dir_id': PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
@@ -146,7 +146,7 @@ class DBModificationQueryPerformer(object):
     data_4tuple = (entry_id, parent_dir_id, -1, '')
     try:
       cursor.execute(sql, data_4tuple)
-      dbchange_happened = False
+      dbchange_happened = True
     except sqlite3.IntegrityError:
       pass
     return dbchange_happened
@@ -204,7 +204,7 @@ class DBModificationQueryPerformer(object):
     dbchange_happened = False
     # if entrytype is FILE, no id_path_list is necessary (for it's '' for files), so it's simpler, we can solve it first in code
     if entrytype == PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FILE:
-      fileparent_inserted = self.insert_into_parententries_fileid_with_cursor(self, entry_id, parent_dir_id, cursor)
+      fileparent_inserted = self.insert_into_parententries_fileid_with_cursor(entry_id, parent_dir_id, cursor)
       if not dbchange_happened and fileparent_inserted:
         dbchange_happened = True
       return dbchange_happened
@@ -668,7 +668,7 @@ class DBModificationQueryPerformer(object):
       e.id = p.id ;
     ''' %{ \
 
-      'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_LINKED_LIST,   \
+      'tablename_for_entries_linked_list'  : PYMIRROR_DB_PARAMS.TABLE_NAMES.ENTRIES_PARENTS_N_PATHS,   \
       'tablename_for_file_n_folder_entries': PYMIRROR_DB_PARAMS.TABLE_NAMES.FILE_N_FOLDER_ENTRIES, \
       'fieldname_for_parent_or_home_dir_id' : PYMIRROR_DB_PARAMS.FIELD_NAMES_ACROSS_TABLES.PARENT_OR_HOME_DIR_ID, \
       'foldername' : foldername, \
@@ -689,8 +689,8 @@ class DBModificationQueryPerformer(object):
     :param foldernamed_path:
     :return:
     '''
-    foldernames = self.dbfetcher.normalize_foldernames_pathlist_from_osfolderpath(foldernamed_path)
-    if foldernames == [PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME]:
+    foldernames = self.dbfetcher.normalize_foldernamespathlist_with_ossepfullpath(foldernamed_path)
+    if foldernames == []:
       return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
 
     parent_dir_id = PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
@@ -731,6 +731,8 @@ class DBModificationQueryPerformer(object):
     filesize = file_values_dict['filesize']
     modified_datetime = file_values_dict['modified_datetime']
 
+    if not filepath.startswith(PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME):
+      filepath = PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME + filepath
     foldernamed_path, filename = os.path.split(filepath)
 
     parent_or_home_dir_id = self.fetch_entryid_by_its_foldernamed_path_or_create_namedpath(foldernamed_path)

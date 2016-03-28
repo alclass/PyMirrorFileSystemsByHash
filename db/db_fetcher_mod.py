@@ -183,8 +183,8 @@ class DBFetcher(object):
     if ossepfullpath == None or ossepfullpath == '':
       return None
     normalized_foldernames = []
-    if ossepfullpath == PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME:
-      return [PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID] # same as os.path.sep
+    if ossepfullpath == PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME: # same as os.path.sep
+      return []
     ossepfullpath = ossepfullpath.rstrip(os.path.sep)
     if not ossepfullpath.startswith(os.path.sep):
       ossepfullpath = os.path.sep + ossepfullpath
@@ -231,30 +231,30 @@ class DBFetcher(object):
 
      /a/abc/xpto
 
-    The folder xpto has an id and this is the one that is searched for.
+    The bottom-most folder 'xpto' has an id and this is the one that is searched for.
 
 
     Let's see this search via an example:
 
-    Suppose the 3 following aux paths:
+    Suppose the 3 following example paths:
 
-    id-to-name | prefixing named path
-    ---------------------------------
-         d     |  a/b/c
-         x     |  a/e/f/bla/blah
-         d     |  x/xpto/c
+    bottom-most | prefixing named path | path
+    ---------------------------------------------
+         d      |  a/b/c               | a/b/c/d
+         x      |  a/e/f/bla/blah      | a/e/f/bla/blah/x
+         d      |  x/xpto/c            | x/xpto/c/d
 
     The letters above are names. However, all id's are numbers and they are all different,
-      for they are PRIMARY KEY there.
+      for they are PRIMARY KEY, ie, every folder has its UNIQUE id.
 
-    Remind also that auxtable has only id's, not names.  The names above are just to explain why
+    Remind also that the path table has only id's, not names.  The names above are just to explain why
       we need the logic here.
 
-    Suppose we search for the folderid of path x/xpto/c/d
+    Suppose we search for the folderid of path x/xpto/c/d (the last one at 3rd row above). ie:
 
-    This path is the last row above in the example, ie:
-
-         d     |  x/xpto/c
+    bottom-most | prefixing named path | path
+    ---------------------------------------------
+         d      |  x/xpto/c            | x/xpto/c/d
 
     However, after having passed thru this method, the following 2 rows:
 
@@ -264,43 +264,45 @@ class DBFetcher(object):
          d     |  x/xpto/c/
 
     will have to go into a recursive method, because both have a 3-level depth
-      and both have the same name, ie, 'd'.
-
-    The folderid of the first 'd' is ambiguous with the folderid of the second 'd'.
+      and both have the same name, ie, 'd'.  The id-getting is ambiguous, ie,
+      the folderid of the first 'd' is ambiguous with the folderid of the second 'd'.
 
     In the first passage thru the recursive search, the table above will become:
 
-    keptid | id-to-name | named path | corresponding original foldername in level 3
+    keptid | new bottom | new prefix | corresponding original foldername at level 3
     -------------------------------------------------------------------------------
      {id1} |     c      |  a/b/      |                c (still ambiguous)
      {id2} |     c      |  x/xpto/   |                c (still ambiguous)
 
      {id1} is still ambiguous with {id2}, for both related names are 'c'. It needs to go recurse again:
 
-    keptid | id-to-name | named path | corresponding original foldername in level 2
+    keptid | new bottom | new prefix | corresponding original foldername in level 2
     -------------------------------------------------------------------------------
-     {id1} |     b      |  a/        |              xpto (no longer ambiguous, {id1} is out)
+     {id1} |     b      |  a/        |              b    (no longer ambiguous, {id1} is out)
      {id2} |     xpto   |  x/        |              xpto (no longer ambiguous, {id2} is in)
 
-     At this step, {id2} is not ambiguous with {id2} for only {id2} relates to 'xpto',
+     At this step, {id2} is no longer ambiguous with {id2} for only {id2} relates to 'xpto',
        recursion is finished and answer is found, ie, the sought-after folder id is {id2}.
 
      ***
 
-     This system has a second search algorithm. The first one is this above explained.
+     This system has a second search algorithm. The first is this one above explained.
 
-     The second algorithm goes top to bottom, search the folder id from root all below to the last name.
+     The second algorithm goes top to bottom, searching the folder id from ROOT all below to the last name.
+
      Let's briefly compare the 2 algorithms:
        + This second algorithm needs n-level SELECTs for names.
        + The first algorithm does one first SELECT and some bifurcating name-SELECTs
          (or no further SELECTs if bootstrap for id-to-names is used).
+         (Of course, if the entire bootstrap is on, this search is not needed in the first place,
+           but bootstrap 'eats up' memory.)
          The bifurcating name-SELECTs will equal the n-1- level SELECTs
            in the worst case scenario of identical names up to the 1st level.
            In the best case scenario, the folder id may be found right away even before any recursion.
-           However the case/scenario, with bootstrap on no further SELECTs will happen.
-           But the bootstrap on, there exists an option of having all paths in memory, so that would be
-             much simpler, for a single list element match would do.
-             (This is not planned to be done due to memory size economy.)
+           Whichever the case/scenario, with id-name bootstrap on (an economical one),
+            no further name-SELECTs will happen.
+
+     The system must have some configuration option to use this search only if complete bootstrap is off.
     '''
 
 
@@ -310,7 +312,7 @@ class DBFetcher(object):
 
     # Because this method may be called by anyone with a cursor, this protection is repeated from the caller in this class
     if ossepfullpath == PYMIRROR_DB_PARAMS.CONVENTIONED_ROOT_DIR_NAME:
-      return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID
+      return PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID # edgefolder id of ROOT is ROOT's id
 
     normalizedfoldernamelist = self.normalize_foldernamespathlist_with_ossepfullpath(ossepfullpath)
     # Protect against a 'bad' normalizedfoldernamelist
@@ -376,6 +378,7 @@ class DBFetcher(object):
       return None
     # if only one collision happened, good luck, the edgefolderid is that one, no recursion needed, return it
     if n_collisions == 1:
+      # Most of the cases will fall into this one, ie, at a level, name collisions is unlikely
       return edgefolderid
     # From here n_collisions > 1; recursion is needed
     # Remind that a normalizedfoldernamelist.pop() happened at the entrance; the list's good to go recurse

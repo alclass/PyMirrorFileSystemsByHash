@@ -20,7 +20,7 @@ Explanation:
 import hashlib
 import os
 
-from db import sqlite_accessor_mod as db_accessor_mod
+# from db import sqlite_accessor_mod as db_accessor_mod
 
 
 class SHA1_NOT_OBTAINED(Exception):

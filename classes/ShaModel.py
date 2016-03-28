@@ -40,32 +40,47 @@ class ShaItem(object):
 
   '''
 
-  def __init__(self, sha1hex, filename, relative_parent_path, device_and_middle_path, filesize, modified_datetime, mockmode=False):
+  def __init__(self,
+               filename,
+               sha1hex,
+               relative_from_repotop_filepath,
+               device_dependent_absolute_filepath,
+               filesize,
+               modified_datetime,
+               mockmode = False):
+    '''
+    The __init__() constructor
+    '''
     self.sha1hex  = sha1hex
     self.filename = filename
-    self.relative_parent_path = relative_parent_path
-    self.device_and_middle_path = device_and_middle_path
+    self.relative_from_repotop_filepath     = relative_from_repotop_filepath
+    self.device_dependent_absolute_filepath = device_dependent_absolute_filepath
     self.filesize = filesize
     self.modified_datetime = modified_datetime
     self.mockmode = mockmode
     if not self.mockmode:
       self.verify_object_field_values()
 
+  @property
+  def conventioned_filedict(self):
+    filedict = {}
+    filedict['filepath'] = self.relative_from_repotop_filepath
+    filedict['sha1hex']  = self.sha1hex
+    filedict['filesize'] = self.filesize
+    filedict['modified_datetime'] = self.modified_datetime
+    return filedict
+
   def verify_object_field_values(self):
     if not is_sha1hex_consistent(self.sha1hex):
       raise ValueError('ValueError: sha1hex given (%s) is not consistent.' %self.sha1hex)
-    if not os.path.isdir(self.device_and_middle_path):
-      raise OSError('OSError: device_and_middle_path given (%s) does not exist or is not mounted.' %self.device_and_middle_path)
-    if not os.path.isdir(self.parent_folder_abspath):
-      raise OSError('OSError: relative_parent_path given (%s) does not exist or is not mounted.' %self.relative_parent_path)
-    if not os.path.isfile(self.file_abspath):
-      raise OSError('OSError: file_abspath given (%s) does not exist.' %self.file_abspath)
+    if not os.path.isfile(self.device_dependent_absolute_filepath):
+      raise OSError('OSError: device_dependent_absolute_filepath given (%s) does not exist or is not mounted.' %self.device_dependent_absolute_filepath)
     if type(self.filesize) != int:
       raise TypeError('TypeError: filesize given (%s) is not typed int.' %self.filesize)
-    if type(self.modified_datetime) != datetime.datetime:
-      raise TypeError('TypeError: modified_datetime given (%s) is not typed datetime.' %self.modified_datetime)
+    #if type(self.modified_datetime) != datetime.datetime:
+      #raise TypeError('TypeError: modified_datetime given (%s) is not typed datetime.' %self.modified_datetime)
 
-  def get_sha1hex_from_path(file_abspath):
+  def get_sha1hex_from_path(self, file_abspath):
     return sha1complementer.calculate_sha1hex_from_file(file_abspath)
 
   def equalize_dates_mock(self, otherShaItem):

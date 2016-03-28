@@ -75,19 +75,19 @@ class DBFactoryToConnection(object):
 
     try:
       dbms = dbms_params_dict['dbms']
-    except IndexError:
+    except KeyError:
       pass
     try:
       db_sqlite_filepath = dbms_params_dict['db_sqlite_filepath']
-    except IndexError:
+    except KeyError:
       pass
     try:
       mysql_tuple_params = dbms_params_dict['mysql_tuple_params']
-    except IndexError:
+    except KeyError:
       pass
     try:
       postgresql_tuple_params = dbms_params_dict['postgresql_tuple_params']
-    except IndexError:
+    except KeyError:
       pass
 
     self.set_dbms(dbms)
@@ -95,6 +95,11 @@ class DBFactoryToConnection(object):
     self.set_mysql_tuple_params(mysql_tuple_params)
     self.set_postgresql_tuple_params(postgresql_tuple_params)
 
+  def set_mysql_tuple_params(self, mysql_tuple_params):
+    pass
+
+  def set_postgresql_tuple_params(self, postgresql_tuple_params):
+    pass
 
   def dynamically_rebuild_dbms_params_dict(self):
     '''
