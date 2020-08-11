@@ -1,0 +1,4 @@
+{
+  'source_abspath': 'dados/src',
+  'target_abspath': 'dados/trg'
+}

@@ -6,8 +6,8 @@ import shutil
 import sys
 sys.path.insert(0, '..')
 '''
-from db.sqlite_accessor_mod import DBAccessor
-from classes.Sha1FileSystemComplementer import calculate_sha1hex_from_file
+from fs.db import DBAccessor
+from models.Sha1FileSystemComplementer import calculate_sha1hex_from_file
 
 def test1():
   from_here_abspath = os.path.abspath('.')

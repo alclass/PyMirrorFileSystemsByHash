@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os
 import string
 
-from db import sqlite_accessor_mod as sqlite_mod
+from fs.db import sqlite_accessor_mod as sqlite_mod
 
 PYMIRROR_CONSTANTS = sqlite_mod.PYMIRROR_CONSTANTS
 import random

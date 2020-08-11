@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
-import classes.FolderTreeWalkerMod as treewalk
+import models.FolderTreeWalkerMod as treewalk
 
 def test1():
   treewalker = treewalk.FolderTreeWalker()

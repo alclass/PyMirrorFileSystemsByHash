@@ -4,9 +4,8 @@
 This script dir-walks the TTC directory tree recording a md5sum file for files inside TTC courses folder
 '''
 import os, sys
-  
-import __init__
-from sha1classes.XmlSha1HexFileMod import XmlSha1HexFile
+
+from models.sha1classes import XmlSha1HexFile
 
 def walk_up_tree(folder_abspath):
   

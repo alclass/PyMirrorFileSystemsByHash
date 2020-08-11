@@ -5,11 +5,11 @@ This script dir-walks the TTC directory tree recording a md5sum file for files i
 '''
 import os #, sys, time
 
-import __init__
-from sha1classes.XmlSha1HexFileMod import XmlSha1HexFile
-from sha1utils.sha1utilsMod import read_xml_sha1file_into_sha1sum_and_filename_tuple_list
-from sha1utils import defaults
-    
+from models.sha1classes import XmlSha1HexFile
+from fs.hashpackage.sha1utilsMod import read_xml_sha1file_into_sha1sum_and_filename_tuple_list
+from fs.hashpackage import defaults
+
+
 def folder_walk_to_remove_default_xml_sha1_filename_entry_from_itself(start_abspath):
   '''
   This script is a run-once one, ie, it will only correct a left-over that happened, not foreseen before
@@ -33,7 +33,7 @@ def folder_walk_to_remove_default_xml_sha1_filename_entry_from_itself(start_absp
       continue
     if found_DEFAULT_XML_SHA1_FILENAME:
       xml_sha1_filer = XmlSha1HexFile(folder_abspath)
-      print 'Saving/Updating',  defaults.DEFAULT_XML_SHA1_FILENAME
+      print 'Saving/Updating', defaults.DEFAULT_XML_SHA1_FILENAME
       xml_sha1_filer.save()
 
 def process():

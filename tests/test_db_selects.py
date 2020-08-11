@@ -1,18 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import os
-import string
-import random
 
-import db.db_connection_factory_mod as dbfact
-from util import util_mod as um
 # sha1hex, filename, relative_parent_path, device_and_middle_path, filesize, modified_datetime
 
-import db.db_connection_factory_mod as dbfact
-import db.db_modification_query_performer_mod as dbperf
-import db.db_fetcher_mod as dbfetch
-import db.sqlite_create_db_mod as dbcreat
-import db.db_settings as dbsetts
+import fs.db.db_connection_factory_mod as dbfact
+from fs import db as dbperf, db as dbsetts
+import fs.db.db_fetcher_mod as dbfetch
+
 PYMIRROR_DB_PARAMS = dbsetts.PYMIRROR_DB_PARAMS
 FOLDER = PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FOLDER
 FILE   = PYMIRROR_DB_PARAMS.ENTRY_TYPE_ID.FILE

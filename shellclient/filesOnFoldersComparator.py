@@ -4,21 +4,20 @@
 This script dir-walks the TTC directory tree recording a md5sum file for files inside TTC courses folder
 '''
 
-import os, sys, time
+import os, sys
 
 OS_SYSTEM_COMM = 'sha1sum * > z-sha1sum.txt'
 
-import __init__
 # from sha1utils import defaults
 import local_settings as ls
 
 # PYTHON_SHA1_SYSTEM_DIR = '/home/dados/Sw3/SwDv/CompLang SwDv/PythonSwDv/python_osutils/dir_trees_comparator/'
 sys.path.insert(0, ls.PYTHON_SHA1_SYSTEM_DIR)
 
-from sha1classes.XmlSha1ExceptionClassesMod              import FolderPassedToXmlSha1GenerationDoesNotExist
-from sha1classes.Sha1FilesPerFolderUpDirTreeGeneratorMod import Sha1FilesPerFolderUpDirTreeGenerator 
-from sha1classes.Sha1UpDirTreeRepeatVerifierMod          import Sha1UpDirTreeRepeatVerifier
-from sha1classes.XmlSha1HexFileMod                       import XmlSha1HexFile
+from models.sha1classes import FolderPassedToXmlSha1GenerationDoesNotExist
+from models.sha1classes import Sha1FilesPerFolderUpDirTreeGenerator
+from models.sha1classes import Sha1UpDirTreeRepeatVerifier
+from models.sha1classes import XmlSha1HexFile
 
 class CLICommandDispatcher(object):
   '''

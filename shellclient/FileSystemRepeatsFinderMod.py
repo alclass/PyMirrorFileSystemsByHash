@@ -3,11 +3,9 @@
 '''
 TwoFileSystemsWideComparatorModule
 '''
-import os, shutil, sys
+import sys
 
-import __init__
-import local_settings as ls
-from sha1classes.TwoFileSystemsWideComparatorMod import TwoFileSystemsWideComparator 
+from models.sha1classes import TwoFileSystemsWideComparator
 
 
 def pickup_arg_and_process():
