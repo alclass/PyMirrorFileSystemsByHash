@@ -18,7 +18,11 @@ MOUNTPOINT_DIRS_DICTFILENAME = 'data_entry_dir_source_n_target.pydict.txt'
 SQLITE_UPDIRENTRIES_DEFAULT_FILENAME = '.updirentries.sqlite'
 
 
-def get_mountpoint_datadirs_dict(source=True):
+def get_dirtree_tablename():
+  return SQLITE_UPDIRENTRIES_DEFAULT_FILENAME
+
+
+def get_mountpoint_datadirs_dict():
   abspath = os.path.join(get_apps_root_abspath(), MOUNTPOINT_DIRS_DICTFILENAME)
   return eval(open(abspath).read())
 

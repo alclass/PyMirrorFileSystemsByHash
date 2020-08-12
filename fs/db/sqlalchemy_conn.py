@@ -1,34 +1,10 @@
 #!/usr/bin/env python3
 """
-In other to make mysql work with sqlalchemy, two things were done:
-  1) Ubuntu's package python3-dev and libmysqlclient-dev were installed;
-  2) after that, mysqlclient was installed via pip.
-
-Because in this machine, a virtualenv is taken by the IDE (PyCharm),
- mysqlclient was installed both globally (so that app could be run without activating
- virtualenv and then also installed locally. so that PyCharm could also run app).
-
-SqlAlchemy
-
-=> to learn how to use Foreign Keys in SqlAlchemy
-  => docs.sqlalchemy.org/en/13/orm/join_conditions.html?highlight=foreign key
-
-this_db = config.THIS_DATABASE
-user = config.DATABASE_DICT[this_db]['USER']
-password = config.DATABASE_DICT[this_db]['PASSWORD']
-address = config.DATABASE_DICT[this_db]['ADDRESS']
-port = config.DATABASE_DICT[this_db]['PORT']
-databasename = config.DATABASE_DICT[this_db]['DATABASENAME']
-
-engine_line = this_db + '://' + user + ':' + password + '@' + address + '/' + databasename
-if engine_line.startswith('mysql'):
-  engine_line = engine_line + '?charset=utf8mb4'
-
 """
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+# import fs.db.create_table_if_not_exists_mod as tblcreat
 import config
-
 
 def get_engineline_for_sqlitefilepath(source=True):
   sqlitefilepath = config.get_datatree_sqlitefilepath(source)
@@ -45,6 +21,17 @@ def get_engine_for_sqlitefilepath(source=True):
 def get_sessionmaker_from_sqlitefilepath(source=True):
   sqlalchemy_engine = get_engine_for_sqlitefilepath(source)
   return sessionmaker(bind=sqlalchemy_engine)  # Session
+
+
+def get_session_from_sqlitefilepath(source=True):
+  smaker = get_sessionmaker_from_sqlitefilepath(source)
+  session = smaker()
+  try:
+    from models.samodels import create_table_if_not_exists
+    create_table_if_not_exists(source)
+  except ImportError:
+    print('ImportError', ImportError)
+  return session
 
 
 def adhoc_test():

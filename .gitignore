@@ -7,3 +7,5 @@ venv/
 */*.pyc
 *.sqlite
 */*.sqlite
+*.txt
+*/*.txt

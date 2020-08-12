@@ -7,7 +7,7 @@
 """
 import os
 import shutil
-import fs.hashpackage.hexfunctionsMod as hfM
+import time
 import fs.hashpackage.fileshexfunctionsMod as fhfM
 
 
@@ -30,7 +30,9 @@ class MetaFile:
     self.previous_middlepath = None
     self._os_meta_tuple = None
     self.set_os_meta_tuple()
-    self.set_sha1hex_if_none()
+    # the following line is commeted out in order
+    # to avoid (re)calculating the sha1 hash for large files operation which may last dozens of seconds to return
+    # self.calc_n_set_sha1hex()
 
   @property
   def filesfolder_abspath(self):
@@ -66,8 +68,6 @@ class MetaFile:
 
   @property
   def sha1hex(self):
-    if self._sha1hex is None:
-      self.set_sha1hex_if_none()
     return self._sha1hex
 
   @sha1hex.setter
@@ -75,11 +75,15 @@ class MetaFile:
     if self._sha1hex is not None and len(self._sha1hex) == 40:
       self._sha1hex = psha1hex
 
-  def set_sha1hex_if_none(self, reset=False):
+  def calc_n_set_sha1hex(self, reset=False):
     if self.mockmode:
       return
     if self._sha1hex is None or len(self._sha1hex) != 40 or reset:
+      start_time = time.time()
+      print('Calculatin sha1 for [%s]. Please wait.' % self.filename)
       self._sha1hex = fhfM.generate_sha1hexdigest_from_filepath(self.file_abspath)
+      elapsed_time = time.time() - start_time
+      print('Took ', elapsed_time, 'elapsed_time', self._sha1hex)
 
   def move_inside_src_tree_to_rel_pos_of(self, target_metafile):
 
