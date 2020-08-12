@@ -13,31 +13,6 @@ hex_40digit_max = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 ENCODINGS_TO_TRY_IN_ORDER_FOR_FILENAMES = ['iso-8859-1', 'windows-1250', 'windows-1252']
 
 
-def get_tag_text_and_encoding_if_necessary(sha1file_tag, filename):
-  """
-  This is an important function and has also been documented at the beginning of this module.
-  It is called when UnicodeDecodeError is raised, meaning that we need to try some encodings to
-   "make it go" to the node.text field.
-  Once it's successful, an extra XML-attribute, called 'encoding', is added to the file tag.
-  This extra attribute is essential at the moment when this file-tag is read from the XML.
-  """
-  sha1file_tag.text = None
-  encoding = None
-  for encoding in ENCODINGS_TO_TRY_IN_ORDER_FOR_FILENAMES:
-    try:
-      sha1file_tag.text = str(filename, encoding, 'strict')
-      # print 'filename in tag is', filename, 'encoding is', encoding
-      break
-    except UnicodeDecodeError:
-      pass
-  if sha1file_tag.text is None:
-    error_msg = 'File System Has Filenames That Have An Unknown Encoding, ' \
-                'please try to rename them removing accents.'
-    raise OSError(error_msg)
-    # raise FileSystemHasFilenamesThatHaveAnUnknownEncoding(error_msg)
-  sha1file_tag.set('encoding', encoding)
-
-
 def generate_sha1hexdigest_from_filepath(file_abspath):
   """
   This functions mimics, so to say, the sha1sum "bash" executable from the command line.
@@ -70,3 +45,29 @@ def process():
 
 if __name__ == '__main__':
   process()
+
+
+# DEPRECATED
+
+def get_tag_text_and_encoding_if_necessary(sha1file_tag, filename):
+  """
+  This function is called when UnicodeDecodeError is raised, meaning that we need to try some encodings to
+   "make it go" to the node.text field.
+  Once it's successful, an extra XML-attribute, called 'encoding', is added to the file tag.
+  This extra attribute is essential at the moment when this file-tag is read from the XML.
+  """
+  sha1file_tag.text = None
+  encoding = None
+  for encoding in ENCODINGS_TO_TRY_IN_ORDER_FOR_FILENAMES:
+    try:
+      sha1file_tag.text = str(filename, encoding, 'strict')
+      # print 'filename in tag is', filename, 'encoding is', encoding
+      break
+    except UnicodeDecodeError:
+      pass
+  if sha1file_tag.text is None:
+    error_msg = 'File System Has Filenames That Have An Unknown Encoding, ' \
+                'please try to rename them removing accents.'
+    raise OSError(error_msg)
+    # raise FileSystemHasFilenamesThatHaveAnUnknownEncoding(error_msg)
+  sha1file_tag.set('encoding', encoding)

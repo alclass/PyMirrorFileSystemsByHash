@@ -2,6 +2,7 @@ bin_local_settings.py
 local_settings.py
 .idea/
 dados/
+venv/
 *.pyc
 */*.pyc
 *.sqlite

@@ -1,12 +1,13 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-'''
+"""
 
   This module contains the FolderPathsBootStrapper class which, as its main function,
     loads and prepares all folder full paths in database.
   This data is kept as a linked-list and needs a recursive procedure to derive all paths.
-  This recursive procedure is relatively expensive (it costs 1 select per node, and a node models/equals a directory)
-    and it's been designed that it should derived the whole set only once (ie, in a bootstrap/init routine).
+  This recursive procedure is relatively expensive (it costs 1 select per node, and
+    a node models/equals a directory)
+    and it's been designed that it should derived the whole set only once
+    (ie, in a bootstrap/init routine).
 
   Example:
     Suppose all paths are (actually, these are found after bootstrap, see doc of method fetch_folder_paths_via_recursive_traversal()):
@@ -30,12 +31,13 @@
   [1, 5, 99, 101] = '/Science/Physics/Astrophysics'
 
   Written on 2015-01-18 Luiz Lewis
-'''
+"""
 import os
+import config
+import fs.db.db_proxy_mod as dbprox
+import fs.db.sqlite_create_db_mod as sqlcreate
 
-from fs import db as dbsetts, db as dbact, db as sqlcreate
-
-PYMIRROR_DB_PARAMS = dbsetts.PYMIRROR_DB_PARAMS
+PYMIRROR_DB_PARAMS = config.PYMIRROR_DB_PARAMS
 
 
 class FolderPath(object):
@@ -85,7 +87,7 @@ class FolderPathsBootStrapper(object):
     # self.n_of_found_paths # This is dynamically gotten from len(self.all_id_path_list_list)
     self.n_of_found_paths_audit = 0 # This must equal the above n_of_found_paths
     self.dbms_params_dict = dbms_params_dict
-    self.dbproxy = dbact.DBProxyFetcher(self.dbms_params_dict)
+    self.dbproxy = dbprox.DBProxyFetcher(self.dbms_params_dict)
     self.bootstrap_folder_paths()
     self.init_folder_id_to_dirname_dict()
     self.reversed_id_path_list_list = []
@@ -157,7 +159,7 @@ class FolderPathsBootStrapper(object):
       return self.reversed_id_path_list_list[index_fim]
     # Nothing found here, try the db aux table
     folder_id_path_list_str = self.dbproxy.fetch_folder_path_list_str_for(folder_id)
-    if folder_id_path_list_str <> None:
+    if folder_id_path_list_str != None:
       str_ids = folder_id_path_list_str.split(',')
       id_path_list = map(int, str_ids)
       self.include_a_new_id_path_list_to_bootstrapper_for(folder_id, id_path_list)
@@ -170,7 +172,11 @@ class FolderPathsBootStrapper(object):
       folder_name_list.append(self.folder_id_to_dirname_dict[folder_id])
     return folder_name_list
 
-  def fetch_folder_paths_via_recursive_traversal(self, prefix_list=[], traversal_ids=[PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID]):
+  def fetch_folder_paths_via_recursive_traversal(
+      self,
+      prefix_list=None,
+      traversal_ids=[PYMIRROR_DB_PARAMS.CONVENTIONED_TOP_ROOT_FOLDER_ID]
+  ):
     '''
     This is the recursive method that finds all folder index paths.
     The trick, so to say, is seen in the parameters to the method. It starts with an empty prefix_list
@@ -202,7 +208,7 @@ class FolderPathsBootStrapper(object):
     :return:
     '''
     self.fetch_folder_paths_via_recursive_traversal()
-    if self.n_of_found_paths_audit <> len(self.all_id_path_list_list):
+    if self.n_of_found_paths_audit != len(self.all_id_path_list_list):
       raise ValueError('n_of_found_paths=%d <> len(folder_ids_paths_list)=%d' %(self.n_of_found_paths, len(self.folder_ids_paths_list)))
 
   def init_folder_id_to_dirname_dict(self):
@@ -239,13 +245,13 @@ class FolderPathsBootStrapper(object):
   def print_all_folder_paths(self):
     ossep_named_paths_as_list_of_str = self.fetch_all_paths_as_ossep_names_as_list_of_str()
     for ossep_named_path in ossep_named_paths_as_list_of_str:
-      print ossep_named_path
+      print(ossep_named_path)
 
   def print_folder_id_to_dirname_dict(self):
-    print self.folder_id_to_dirname_dict
-    print self.all_id_path_list_list
+    print(self.folder_id_to_dirname_dict)
+    print(self.all_id_path_list_list)
     for folder_id in self.folder_id_to_dirname_dict.keys():
-      print 'Folder ID', folder_id,'==>>', self.folder_id_to_dirname_dict[folder_id]
+      print('Folder ID', folder_id,'==>>', self.folder_id_to_dirname_dict[folder_id])
 
 def test1():
   bootstrapper = FolderPathsBootStrapper()
@@ -257,14 +263,14 @@ def test1():
 def main():
   sqlcreate.create_tables_and_initialize_root()
   bootstrapper = FolderPathsBootStrapper()
-  print 'bootstrapper.print_folder_id_to_dirname_dict()'
+  print('bootstrapper.print_folder_id_to_dirname_dict()')
   bootstrapper.print_folder_id_to_dirname_dict()
-  print 'bootstrapper.print_all_folder_paths()'
+  print('bootstrapper.print_all_folder_paths()')
   bootstrapper.print_all_folder_paths()
-  print 'bootstrapper.all_id_path_list_list =',bootstrapper.all_id_path_list_list
-  dbproxy = dbact.DBProxyFetcher()
-  print 'dbproxy.get_all_folder_id_to_name_2Dtuples_list()'
-  print dbproxy.get_all_folder_id_to_name_2Dtuples_list()
+  print('bootstrapper.all_id_path_list_list =',bootstrapper.all_id_path_list_list)
+  dbproxy = dbprox.DBProxyFetcher()
+  print('dbproxy.get_all_folder_id_to_name_2Dtuples_list()')
+  print(dbproxy.get_all_folder_id_to_name_2Dtuples_list())
 
   # test1()
 

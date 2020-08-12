@@ -1,12 +1,39 @@
 #!/usr/bin/env python3
 
 import os
-import pathlib
+# import pathlib
 
 THIS_MODULES_FOLDER_ABSPATH = os.path.dirname(__file__)
 USER_HOME_DIR = os.path.expanduser('~')
 USER_HOME_DATA_DIR = os.path.join(USER_HOME_DIR, '.pymirrorfsbyhash_data')
 DATA_FOLDERNAME = 'dados'
+PYMIRROR_DB_PARAMS = {}
+
+
+MOUNTPOINT_SOURCEDATADIR_DICTKEY = 'MOUNTPOINT_SOURCEDATADIR'
+MOUNTPOINT_TARGETDATADIR_DICTKEY = 'MOUNTPOINT_TARGETDATADIR'
+
+# MOUNTPOINT_DATADIRS_DICT = {}
+MOUNTPOINT_DIRS_DICTFILENAME = 'data_entry_dir_source_n_target.pydict.txt'
+SQLITE_UPDIRENTRIES_DEFAULT_FILENAME = '.updirentries.sqlite'
+
+
+def get_mountpoint_datadirs_dict(source=True):
+  abspath = os.path.join(get_apps_root_abspath(), MOUNTPOINT_DIRS_DICTFILENAME)
+  return eval(open(abspath).read())
+
+
+def get_datatree_mountpoint_abspath(source=True):
+  pdict = get_mountpoint_datadirs_dict()
+  if source:
+    return pdict[MOUNTPOINT_SOURCEDATADIR_DICTKEY]
+  return pdict[MOUNTPOINT_TARGETDATADIR_DICTKEY]
+
+
+def get_datatree_sqlitefilepath(source=True):
+  abspath = get_datatree_mountpoint_abspath(source)
+  return os.path.join(abspath, SQLITE_UPDIRENTRIES_DEFAULT_FILENAME)
+
 
 def get_apps_root_abspath():
   return THIS_MODULES_FOLDER_ABSPATH
@@ -15,7 +42,6 @@ def get_apps_root_abspath():
 
 def get_data_abspath():
   return os.path.join(get_apps_root_abspath(), DATA_FOLDERNAME)
-
 
 
 try:
@@ -30,6 +56,12 @@ def adhoc_test():
   print('apps_root_abspath', apps_root_abspath)
   print('__file__', __file__)
   print(get_data_abspath())
+  mountpoint_srcdir = get_datatree_sqlitefilepath(source=True)
+  mountpoint_trgdir = get_datatree_sqlitefilepath(source=False)
+  print('mountpoint_srcdir', mountpoint_srcdir)
+  print('mountpoint_trgdir', mountpoint_trgdir)
+  datatree_sqlitefilepath = get_datatree_sqlitefilepath()
+  print('datatree_sqlitefilepath', datatree_sqlitefilepath)
 
 
 def process():

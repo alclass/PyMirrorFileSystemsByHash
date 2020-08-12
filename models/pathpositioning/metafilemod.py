@@ -7,6 +7,8 @@
 """
 import os
 import shutil
+import fs.hashpackage.hexfunctionsMod as hfM
+import fs.hashpackage.fileshexfunctionsMod as fhfM
 
 
 class MetaFile:
@@ -18,8 +20,11 @@ class MetaFile:
 
     self.filename = filename
     self.middlepath = middlepath
+    if self.middlepath is None:
+      self.middlepath = ''
+    self.middlepath = self.middlepath.lstrip('/')
     self.mount_abspath = mount_abspath
-    self.sha1hex = sha1hex
+    self._sha1hex = sha1hex
     self.mockmode = mockmode
     self.previous_filename = None
     self.previous_middlepath = None
@@ -41,7 +46,7 @@ class MetaFile:
   def file_abspath(self):
     fap = os.path.join(self.filesfolder_abspath, self.filename)
     if not self.mockmode:
-      if not os.path.isdir(fap):
+      if not os.path.isfile(fap):
         error_msg = 'Error: filesfolder_abspath (%s) does not exist.' \
                     % str(fap)
         raise OSError(error_msg)
@@ -58,13 +63,23 @@ class MetaFile:
       return
     self._os_meta_tuple = os.stat(self.file_abspath)
 
-  def set_sha1hex_if_none(self):
+
+  @property
+  def sha1hex(self):
+    if self._sha1hex is None:
+      self.set_sha1hex_if_none()
+    return self._sha1hex
+
+  @sha1hex.setter
+  def sha1hex(self, psha1hex):
+    if self._sha1hex is not None and len(self._sha1hex) == 40:
+      self._sha1hex = psha1hex
+
+  def set_sha1hex_if_none(self, reset=False):
     if self.mockmode:
       return
-    if self.sha1hex is None:
-      # calc sha1hex
-      self.sha1hex = 1
-    return self.sha1hex
+    if self._sha1hex is None or len(self._sha1hex) != 40 or reset:
+      self._sha1hex = fhfM.generate_sha1hexdigest_from_filepath(self.file_abspath)
 
   def move_inside_src_tree_to_rel_pos_of(self, target_metafile):
 
@@ -94,12 +109,13 @@ class MetaFile:
   def as_dict(self):
     return {
       'filename': self.filename,
-      'previous_filename': self.previous_filename,
       'mount_abspath': self.mount_abspath,
       'middlepath': self.middlepath,
-      'previous_middlepath': self.previous_middlepath,
       'filesfolder_abspath': self.filesfolder_abspath,
       'file_abspath': self.file_abspath,
+      'sha1hex': self.sha1hex,
+      'previous_middlepath': self.previous_middlepath,
+      'previous_filename': self.previous_filename,
     }
 
   def __str__(self):
@@ -109,6 +125,7 @@ mount_abspath      : %(mount_abspath)s
 middlepath         : %(middlepath)s
 filesfolder_abspath: %(filesfolder_abspath)s
 file_abspath       : %(file_abspath)s
+sha1hex            : %(sha1hex)s
 previous_middlepath: %(previous_middlepath)s
 previous_filename  : %(previous_filename)s
     ''' % self.as_dict()
@@ -132,6 +149,11 @@ def adhoc_test1():
   print(trg_metafile)
   trg_metafile.move_inside_src_tree_to_rel_pos_of(src_metafile)
   print('Target Again (after move):')
+  print(trg_metafile)
+  mount_path = '/home/dados/Sw3/SwDv/OSFileSystemSwDv/PyMirrorFileSystemsByHashSwDv/dados/src'
+  filename = 'rootf1.txt'
+  trg_metafile = MetaFile(mount_path, '', filename)
+  print('Target:')
   print(trg_metafile)
 
 

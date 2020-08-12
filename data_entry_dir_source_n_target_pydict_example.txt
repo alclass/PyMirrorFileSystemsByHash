@@ -1,4 +1,4 @@
 {
-  'source_abspath': 'dados/src',
-  'target_abspath': 'dados/trg'
+  'MOUNTPOINT_SOURCEDATADIR_DICTKEY': 'dados/src',
+  'MOUNTPOINT_TARGETDATADIR_DICTKEY': 'dados/trg'
 }

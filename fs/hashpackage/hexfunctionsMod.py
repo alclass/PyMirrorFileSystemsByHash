@@ -2,8 +2,6 @@
 """
   docstring
 """
-import hashlib  # hashlib is the replacement of the deprecated sha module in Python2
-import os
 from random import randint
 
 HEXS_ABOVE_9 = 'abcdef'  # lowercase

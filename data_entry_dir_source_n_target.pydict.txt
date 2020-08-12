@@ -1,4 +1,4 @@
 {
-  'source_abspath': 'dados/src',
-  'target_abspath': 'dados/trg'
+  'MOUNTPOINT_SOURCEDATADIR': '/home/dados/Sw3/SwDv/OSFileSystemSwDv/PyMirrorFileSystemsByHashSwDv/dados/src',
+  'MOUNTPOINT_TARGETDATADIR': '/home/dados/Sw3/SwDv/OSFileSystemSwDv/PyMirrorFileSystemsByHashSwDv/dados/trg'
 }
