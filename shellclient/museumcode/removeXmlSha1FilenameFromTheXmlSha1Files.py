@@ -6,8 +6,8 @@ This script dir-walks the TTC directory tree recording a md5sum file for files i
 import os #, sys, time
 
 from models.sha1classes import XmlSha1HexFile
-from fs.hashpackage.sha1utilsMod import read_xml_sha1file_into_sha1sum_and_filename_tuple_list
-from fs.hashpackage import defaults
+from fs.os.sha1utilsMod import read_xml_sha1file_into_sha1sum_and_filename_tuple_list
+from fs.os import defaults
 
 
 def folder_walk_to_remove_default_xml_sha1_filename_entry_from_itself(start_abspath):

@@ -1,4 +1,4 @@
 {
-  'MOUNTPOINT_SOURCEDATADIR': '/media/friend/SAMSUNG',
+  'MOUNTPOINT_SOURCEDATADIR': '/media/friend/PyCon Talks et al 2TOrig',
   'MOUNTPOINT_TARGETDATADIR': '/home/dados/Sw3/SwDv/OSFileSystemSwDv/PyMirrorFileSystemsByHashSwDv/dados/trg'
 }

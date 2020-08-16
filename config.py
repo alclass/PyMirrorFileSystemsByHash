@@ -8,13 +8,14 @@ USER_HOME_DIR = os.path.expanduser('~')
 USER_HOME_DATA_DIR = os.path.join(USER_HOME_DIR, '.pymirrorfsbyhash_data')
 DATA_FOLDERNAME = 'dados'
 PYMIRROR_DB_PARAMS = {}
-
+COUNTER_ROTATE_SIZE_FOR_COMMITS = 1000
+L1DIRS_TO_AVOID_IN_MIRRORING = ['z Extra', 'z Tmp', 'z Triage', 'z-Extra', 'z-Tmp', 'z-Triage']
 
 MOUNTPOINT_SOURCEDATADIR_DICTKEY = 'MOUNTPOINT_SOURCEDATADIR'
 MOUNTPOINT_TARGETDATADIR_DICTKEY = 'MOUNTPOINT_TARGETDATADIR'
 
 # MOUNTPOINT_DATADIRS_DICT = {}
-MOUNTPOINT_DIRS_DICTFILENAME = 'data_entry_dir_source_n_target.pydict.txt'
+MOUNTPOINT_DIRS_DICTFILENAME = 'data_entry_dir_source_n_target_pydict.txt'
 SQLITE_UPDIRENTRIES_DEFAULT_FILENAME = '.updirentries.sqlite'
 
 

@@ -69,8 +69,8 @@ import os, sys #, shutil,
 
 #from sha1utils.Sha1XmlFileFunctions import read_xml_sha1file_into_sha1sum_and_filename_dict
 #from sha1utils.Sha1XmlFileFunctions import generate_xml_sha1file_against_all_files_on_its_folder
-from fs.hashpackage.Sha1XmlFileFunctions import transpose_sha1sum_and_filename_dict_into_tuple_list
-from fs.hashpackage.Sha1XmlFileFunctions import generate_sha1hexdigest_from_filepath
+from fs.os.Sha1XmlFileFunctions import transpose_sha1sum_and_filename_dict_into_tuple_list
+from fs.os.Sha1XmlFileFunctions import generate_sha1hexdigest_from_filepath
 # import sha1classes.XmlSha1ExceptionClassesMod as sha1exceptions
 from Sha1AndItsFilenamesOnAFolderDictMod import Sha1AndItsFilenamesOnAFolderDict
 

@@ -8,7 +8,7 @@
 import os
 import shutil
 import time
-import fs.hashpackage.fileshexfunctionsMod as fhfM
+import fs.os.fileshexfunctionsMod as fhfM
 
 
 class MetaFile:
@@ -18,6 +18,7 @@ class MetaFile:
       sha1hex=None, mockmode=False
   ):
 
+    self.error_on_filepath = False  # yet to find out
     self.filename = filename
     self.middlepath = middlepath
     if self.middlepath is None:
@@ -46,12 +47,15 @@ class MetaFile:
 
   @property
   def file_abspath(self):
-    fap = os.path.join(self.filesfolder_abspath, self.filename)
-    if not self.mockmode:
-      if not os.path.isfile(fap):
+    """
         error_msg = 'Error: filesfolder_abspath (%s) does not exist.' \
                     % str(fap)
         raise OSError(error_msg)
+    """
+    fap = os.path.join(self.filesfolder_abspath, self.filename)
+    if not self.mockmode:
+      if not os.path.isfile(fap):
+        self.error_on_filepath = True
     return fap
 
   @property
@@ -63,8 +67,10 @@ class MetaFile:
   def set_os_meta_tuple(self):
     if self.mockmode:
       return
-    self._os_meta_tuple = os.stat(self.file_abspath)
-
+    try:
+      self._os_meta_tuple = os.stat(self.file_abspath)
+    except OSError:
+      self._os_meta_tuple = ()
 
   @property
   def sha1hex(self):
@@ -76,6 +82,8 @@ class MetaFile:
       self._sha1hex = psha1hex
 
   def calc_n_set_sha1hex(self, reset=False):
+    if self.error_on_filepath:
+      return
     if self.mockmode:
       return
     if self._sha1hex is None or len(self._sha1hex) != 40 or reset:
@@ -85,10 +93,30 @@ class MetaFile:
       elapsed_time = time.time() - start_time
       print('Took ', elapsed_time, 'elapsed_time', self._sha1hex)
 
-  def move_inside_src_tree_to_rel_pos_of(self, target_metafile):
+  def move_file_to_another_middepath(self, target_middlepath):
+    target_path = os.path.join(self.mount_abspath, target_middlepath)
+    if self.file_abspath == target_path:
+      return True
+    if os.path.isfile(target_path):
+      return False
+    shutil.move(self.file_abspath, target_path)
+    return True
+
+  def copy_to_target_fs(self, trg_mount_abspath):
+    trg_folderpath = os.path.join(trg_mount_abspath, self.middlepath)
+    try:
+      if not os.path.isdir(trg_folderpath):
+        os.makedirs(trg_folderpath)
+      trg_abspath = os.path.join(trg_folderpath, self.filename)
+      shutil.copy2(self.file_abspath, trg_abspath)
+    except OSError:
+      return False
+    return True
+
+  def move_file_within_its_fs_to_relative_middepath_of_another_metafile(self, target_metafile):
 
     if type(target_metafile) != MetaFile:
-      error_msg = 'Error: target_metafile %s passed to move_inside_src_tree_to_rel_pos_of() is not type MetaFile' \
+      error_msg = 'Error: target_metafile %s passed to move_file_within_its_fs_to_relative_middepath_of_another_metafile() is not type MetaFile' \
                   % str(target_metafile)
       raise OSError(error_msg)
 
@@ -100,7 +128,9 @@ class MetaFile:
     if not self.mockmode:
       if os.path.exists(new_file_abspath):
         error_msg = 'File %s already exists, cannot move it.' % new_file_abspath
-        raise OSError(error_msg)
+        print(error_msg)
+        return False
+        # raise OSError(error_msg)
       shutil.move(self.file_abspath, new_file_abspath)
 
     self.previous_middlepath = self.middlepath
@@ -123,6 +153,10 @@ class MetaFile:
     }
 
   def __str__(self):
+    """
+previous_middlepath: %(previous_middlepath)s
+previous_filename  : %(previous_filename)s
+    """
     outstr = '''
 filename           : %(filename)s
 mount_abspath      : %(mount_abspath)s
@@ -130,8 +164,6 @@ middlepath         : %(middlepath)s
 filesfolder_abspath: %(filesfolder_abspath)s
 file_abspath       : %(file_abspath)s
 sha1hex            : %(sha1hex)s
-previous_middlepath: %(previous_middlepath)s
-previous_filename  : %(previous_filename)s
     ''' % self.as_dict()
     return outstr
 
@@ -151,7 +183,7 @@ def adhoc_test1():
   trg_metafile = MetaFile(mount_path, middlepath, filename, None, mockmode)
   print('Target:')
   print(trg_metafile)
-  trg_metafile.move_inside_src_tree_to_rel_pos_of(src_metafile)
+  trg_metafile.move_file_within_its_fs_to_relative_middepath_of_another_metafile(src_metafile)
   print('Target Again (after move):')
   print(trg_metafile)
   mount_path = '/home/dados/Sw3/SwDv/OSFileSystemSwDv/PyMirrorFileSystemsByHashSwDv/dados/src'

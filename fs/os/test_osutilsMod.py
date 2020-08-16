@@ -5,7 +5,7 @@
 import os
 import sys
 import unittest
-import fs.hashpackage.osutilsMod as utilM
+import fs.os.osutilsMod as utilM
 
 
 class Test1(unittest.TestCase):

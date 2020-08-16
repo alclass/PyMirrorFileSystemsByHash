@@ -7,9 +7,9 @@ For the Sha1AndItsFilenamesOnAFolderDict class documentation,
 import time, sys
 import xml.etree.ElementTree as ET
 
-from fs.hashpackage.hexfunctionsMod import is_it_a_sha1hex
-from fs.hashpackage.hexfunctionsMod import generate_a_40char_random_hex
-from fs.hashpackage.hexfunctionsMod import get_tag_text_and_encoding_if_necessary
+from fs.os.hexfunctionsMod import is_it_a_sha1hex
+from fs.os.hexfunctionsMod import generate_a_40char_random_hex
+from fs.os.hexfunctionsMod import get_tag_text_and_encoding_if_necessary
 # from Sha1FlatReaderWriterMod import get_tag_text_and_encoding_if_necessary
 
 

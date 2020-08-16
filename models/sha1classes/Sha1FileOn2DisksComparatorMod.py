@@ -7,7 +7,7 @@ import os, sys # shutil
 
 from .SourceAndTargetBaseDirsKeeperMod import SourceAndTargetBaseDirsKeeper
 #import local_settings as ls
-from fs.hashpackage.hexfunctionsMod import generate_a_40char_random_hex
+from fs.os.hexfunctionsMod import generate_a_40char_random_hex
 #from sha1utils.osutilsMod import verify_path_existence_then_raise_or_return_with_trailing_slash
 
 class Sha1FilePlusBaseAndRelPaths(object):

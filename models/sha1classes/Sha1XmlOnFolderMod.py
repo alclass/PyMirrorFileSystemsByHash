@@ -6,10 +6,10 @@
 import os, sys
 
 # import sha1classes.XmlSha1ExceptionClassesMod as sha1exceptions
-from fs.hashpackage import defaults
+from fs.os import defaults
 from .Sha1AndItsFilenamesOnAFolderDictMod import Sha1AndItsFilenamesOnAFolderDict
 # from Sha1XMLReaderWriterMod import Sha1XMLReader
-from fs.hashpackage.sha1utilsMod import generate_sha1hexdigest_from_filepath
+from fs.os.sha1utilsMod import generate_sha1hexdigest_from_filepath
 # from Sha1XmlFileFunctions import read_xml_sha1file_into_sha1sum_and_filename_dict
 
 

@@ -3,6 +3,8 @@ local_settings.py
 .idea/
 dados/
 venv/
+*.log
+*/*.log
 *.pyc
 */*.pyc
 *.sqlite

@@ -6,7 +6,7 @@ Sha1ContentsDictMod.py
 import sys # os, shutil
 
 from .Sha1FileOn2DisksComparatorMod import Sha1FileOn2DisksComparator
-from fs.hashpackage.hexfunctionsMod import generate_a_40char_random_hex
+from fs.os.hexfunctionsMod import generate_a_40char_random_hex
 from .SourceAndTargetBaseDirsKeeperMod import SourceAndTargetBaseDirsKeeper
 
 class Sha1ContentsDict(dict):
