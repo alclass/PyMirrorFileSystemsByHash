@@ -6,11 +6,15 @@ import os
 import config
 
 
-def commit_on_counter_rotate(session, commit_rotate_count, countlimit=None):
+def commit_on_counter_rotate(session, commit_rotate_count, countlimit=None, finalcommit=False):
   commit_rotate_count += 1
   if countlimit is None:
     countlimit = config.COUNTER_ROTATE_SIZE_FOR_COMMITS
-  if commit_rotate_count >= countlimit:
+  if commit_rotate_count >= countlimit or finalcommit:
+    if finalcommit:
+      print('============== finalcommit ==============')
+      print('finalcommit', finalcommit, commit_rotate_count)
+      print('============== finalcommit ==============')
     print('session.commit() on count', commit_rotate_count)
     session.commit()
     commit_rotate_count = 0
@@ -25,7 +29,7 @@ def extract_middlepath_from_abspath(mount_abspath, abspath):
   return middlepath
 
 
-def form_fil_in_mid_with_progress_percent_line(total_swept, totalf, filename, middlepath):
+def form_fil_in_mid_with_progress_percent_line(total_swept, totalf, middlepath, filename):
   filespercent = total_swept / totalf * 100
   line = '%d of %d %.2f%% [%s] in [%s]' % (total_swept, totalf, filespercent, filename, middlepath)
   return line

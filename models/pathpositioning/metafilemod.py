@@ -9,18 +9,20 @@ import os
 import shutil
 import time
 import fs.os.fileshexfunctionsMod as fhfM
+import models.samodels as sam
 
 
 class MetaFile:
 
   def __init__(
-      self, mount_abspath, middlepath, filename,
+      self, mount_abspath, middlepath, filename, isfile=True,
       sha1hex=None, mockmode=False
   ):
 
     self.error_on_filepath = False  # yet to find out
-    self.filename = filename
     self.middlepath = middlepath
+    self.filename = filename
+    self.isfile = isfile
     if self.middlepath is None:
       self.middlepath = ''
     self.middlepath = self.middlepath.lstrip('/')
@@ -34,6 +36,56 @@ class MetaFile:
     # the following line is commeted out in order
     # to avoid (re)calculating the sha1 hash for large files operation which may last dozens of seconds to return
     # self.calc_n_set_sha1hex()
+
+  def does_mid_n_fil_entry_exist_in_db(self, session):
+    dbentry = session.query(sam.FSEntryInDB).\
+        filter(sam.FSEntryInDB.entryname == self.filename).\
+        filter(sam.FSEntryInDB.middlepath == self.middlepath).\
+        first()
+    return dbentry
+
+  def insert_or_update_mid_n_fil_dbentry(self, session, verifysha1hex=False):
+    dbentry = self.does_mid_n_fil_entry_exist_in_db(session)
+    if dbentry:
+      if verifysha1hex:
+        self.calc_n_set_sha1hex()
+        if dbentry.sha1hex == self.sha1hex:
+          return dbentry, False
+        dbentry.sha1hex = self.sha1hex
+        session.commit()
+        return dbentry, True
+      return dbentry, False
+    else:
+      return self.insert_mid_n_fil_entry_into_db(session)
+
+  def total_equal_sha1hex_other_files(self, session):
+    self.calc_n_set_sha1hex()
+    if self.error_on_filepath:
+      return None
+    return session.query(sam.FSEntryInDB).\
+        filter(sam.FSEntryInDB.sha1hex == self.sha1hex).\
+        count()
+
+  def rename_dbentry_with_self_attrs_for_sha1hex_found(self, dbentry, session):
+    """
+    This method should be used with care, for there may be file copies in the same
+     dirtree, so if this method is used against a copy with different attributes (middlepath,
+       filename even modified date) an inconsistent state will happen
+    """
+    dbentry.middlepath = self.middlepath
+    dbentry.entryname = self.filename
+    session.commit()
+    return dbentry, True
+
+  def insert_mid_n_fil_entry_into_db(self, session):
+    dbentry = sam.FSEntryInDB()
+    session.add(dbentry)
+    dbentry.entryname = self.filename
+    dbentry.middlepath = self.middlepath
+    self.calc_n_set_sha1hex()
+    dbentry.sha1hex = self.sha1hex
+    session.commit()
+    return dbentry, True
 
   @property
   def filesfolder_abspath(self):

@@ -4,8 +4,7 @@
 """
 import os
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, UniqueConstraint
-# import fs.db.sqlalchemy_conn as saconn
+from sqlalchemy import Boolean, Column, Integer, String, UniqueConstraint
 import fs.db.sqlalchemy_conn as con
 import config
 
@@ -29,14 +28,28 @@ class FSEntryInDB(Base):
       ...,
       UNIQUE(column_name1,column_name2,...)
   );
+
+  CREATE [UNIQUE] INDEX index_name
+    ON table_name(column_list);
+
+  CREATE INDEX idx_dirtree_sha1hex
+    ON dirtree_entries(sha1hex);
+
+  To check if Sqlite uses the index or not:
+  EXPLAIN QUERY PLAN
+  SELECT filename, sha1hex FROM dirtree_entries
+  WHERE sha1hex = 'da39a3ee5e6b4b0d3255bfef95601890afd80709' ;
+  It results: SEARCH TABLE dirtree_entries USING INDEX idx_dirtree_sha1hex (sha1hex=?)
   """
 
   __tablename__ = 'dirtree_entries'
 
   id = Column(Integer, primary_key=True)
   entryname = Column(String)
+  isfile = Column(Boolean, default=True)
+  bytesize = Column(Integer, default=0)  # for folders it's the sum of its contents (files and subfolders)
   middlepath = Column(String)
-  sha1hex = Column(String(40))  # , unique=True
+  sha1hex = Column(String(40), index=True)  # , unique=True
 
   __table_args__ = (UniqueConstraint('entryname', 'middlepath', name='entryname_n_middlepath_uniq'),)
 
@@ -51,9 +64,12 @@ class FSEntryInDB(Base):
     parentfolder_abspath = self.get_parentfolder_abspath(mountdir_abspath)
     return os.path.join(parentfolder_abspath, self.entryname)
 
-  def __str__(self):
+  def __repr__(self):
     outstr = '<FSEntryInDB (en="%s", sh="%s")>' % (self.entryname, self.sha1hex)
     return outstr
+
+  def __str__(self):
+    return self.__repr__()
 
 
 def adhoc_test():

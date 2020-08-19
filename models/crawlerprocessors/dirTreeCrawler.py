@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os
-from models.folderscrawler.config_reader import Config
+from models.crawlerprocessors.config_reader import Config
 
 config = Config()
 
