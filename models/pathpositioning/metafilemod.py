@@ -141,7 +141,12 @@ class MetaFile:
     if self._sha1hex is None or len(self._sha1hex) != 40 or reset:
       start_time = time.time()
       print('Calculatin sha1 for [%s]. Please wait.' % self.filename)
-      self._sha1hex = fhfM.generate_sha1hexdigest_from_filepath(self.file_abspath)
+      try:
+        self._sha1hex = fhfM.generate_sha1hexdigest_from_filepath(self.file_abspath)
+      except OSError:
+        self.error_on_filepath = True
+        print(' !!!!!!!!!!!! OS Error')
+        return
       elapsed_time = time.time() - start_time
       print('Took ', elapsed_time, 'elapsed_time', self._sha1hex)
 
