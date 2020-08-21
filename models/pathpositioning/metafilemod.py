@@ -173,7 +173,9 @@ class MetaFile:
   def move_file_within_its_fs_to_relative_middepath_of_another_metafile(self, target_metafile):
 
     if type(target_metafile) != MetaFile:
-      error_msg = 'Error: target_metafile %s passed to move_file_within_its_fs_to_relative_middepath_of_another_metafile() is not type MetaFile' \
+      error_msg = 'Error: target_metafile %s passed to ' \
+                  'move_file_within_its_fs_to_relative_middepath_of_another_metafile() ' \
+                  'is not type MetaFile' \
                   % str(target_metafile)
       raise OSError(error_msg)
 
@@ -229,15 +231,13 @@ def adhoc_test1():
   filename = 'Homo Sapiens.info.txt'
   mount_path = '/media/SAMSUNG_1/'
   middlepath = 'Animals/Vertebrates/Mammals/'
-  mockmode = True
-  src_metafile = MetaFile(mount_path, middlepath, filename, None, mockmode)
+  src_metafile = MetaFile(mount_path, middlepath, filename, isfile=True, sha1hex=None, mockmode=False)
   print('Source:')
   print(src_metafile)
   filename = 'Homo Economicus.odt'
   mount_path = '/media/SAMSUNG_8/'
   middlepath = 'Sociology/The Cities/Looking Ahead/'
-  mockmode = True
-  trg_metafile = MetaFile(mount_path, middlepath, filename, None, mockmode)
+  trg_metafile = MetaFile(mount_path, middlepath, filename, isfile=True, sha1hex=None, mockmode=True)
   print('Target:')
   print(trg_metafile)
   trg_metafile.move_file_within_its_fs_to_relative_middepath_of_another_metafile(src_metafile)
@@ -245,7 +245,7 @@ def adhoc_test1():
   print(trg_metafile)
   mount_path = '/home/dados/Sw3/SwDv/OSFileSystemSwDv/PyMirrorFileSystemsByHashSwDv/dados/src'
   filename = 'rootf1.txt'
-  trg_metafile = MetaFile(mount_path, '', filename)
+  trg_metafile = MetaFile(mount_path, '', filename, isfile=True, sha1hex=None, mockmode=True)
   print('Target:')
   print(trg_metafile)
 

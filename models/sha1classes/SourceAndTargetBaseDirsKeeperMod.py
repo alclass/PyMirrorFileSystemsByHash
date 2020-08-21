@@ -5,7 +5,7 @@
 '''
 import os, sys
 #import local_settings as ls
-from fs.os.osutilsMod import verify_path_existence_then_raise_or_return_with_trailing_slash
+from fs.os.utilsmod import verify_path_existence_then_raise_or_return_with_trailing_slash
 from Sha1XMLReaderWriterMod import Sha1XMLReader
 
 class SourceAndTargetBaseDirsKeeper: # (object)

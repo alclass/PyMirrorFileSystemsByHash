@@ -21,11 +21,55 @@ def commit_on_counter_rotate(session, commit_rotate_count, countlimit=None, fina
   return commit_rotate_count
 
 
-def extract_middlepath_from_abspath(mount_abspath, abspath):
+def extract_middlepath_for_files_or_subfolders_from_abspath(mount_abspath, abspath):
+  if len(abspath) < len(mount_abspath):
+    return None
   if abspath == mount_abspath:
-    middlepath = ''
-  else:
-    middlepath = abspath[len(mount_abspath) + 1:]
+    return ''
+  remaining = abspath[len(mount_abspath) + 1:]
+  remaining = remaining.strip('/')
+  pp = remaining.split('/')
+  middlepath = '/'.join(pp)
+  return middlepath
+
+
+def extract_middlepath_for_folders_from_abspath(mount_abspath, abspath):
+  """
+  examples
+    1) None case
+      mountpath is a/b/c and abspath is a/b/c
+      dirname should be 'c'
+      middlepath should be None
+      (it's level 0, it's the root node)
+    2) error case
+      mountpath is a/b/c and abspath is a/b
+      a ValueError exception should be raised
+    3) empty middlepath
+      mountpath is a/b/c and abspath is a/b/c/d
+      dirname should be 'd'
+      middlepath should be ''
+      (it's level 1, empty middlepath)
+    4) level 2 middlepath
+      mountpath is a/b/c and abspath is a/b/c/d/e
+      dirname should be 'e'
+      middlepath should be 'd'
+      (it's level 2, one-word middlepath)
+    5) level 3 middlepath
+      mountpath is a/b/c and abspath is a/b/c/d/e/f
+      dirname should be 'f'
+      middlepath should be 'd/e'
+      (it's level 3, a two-piece separated by '/' middlepath)
+  """
+  if len(abspath) < len(mount_abspath):
+    return None
+  if abspath == mount_abspath:
+    return None
+  remaining = abspath[len(mount_abspath) + 1:]
+  remaining = remaining.strip('/')
+  pp = remaining.split('/')
+  if len(pp) == 1:
+    return ''
+  middlepath = '/'.join(pp[:-1])
   return middlepath
 
 

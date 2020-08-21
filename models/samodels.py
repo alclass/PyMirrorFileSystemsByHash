@@ -44,7 +44,7 @@ class FSEntryInDB(Base):
 
   __tablename__ = 'dirtree_entries'
 
-  id = Column(Integer, primary_key=True)
+  id = Column(Integer, primary_key=True, autoincrement=True)
   entryname = Column(String)
   isfile = Column(Boolean, default=True)
   bytesize = Column(Integer, default=0)  # for folders it's the sum of its contents (files and subfolders)
