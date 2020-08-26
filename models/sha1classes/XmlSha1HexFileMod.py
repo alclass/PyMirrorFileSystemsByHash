@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 
 # import local_settings as ls
 # import sha1utils.sha1utilsMod as sha1
-from fs.os.hexfunctionsMod import generate_sha1hexdigest_from_filepath
+from fs.hashfunctions.hexfunctionsmod import generate_sha1hexdigest_from_filepath
 from fs.os.Sha1XmlFileFunctions import read_xml_sha1file_into_sha1sum_and_filename_dict
 from fs.os.Sha1XmlFileFunctions import generate_xmlsha1file_on_folder
 from fs.os.Sha1XmlFileFunctions import hash_files_and_get_sha1sum_and_filename_dict_from_folder

@@ -108,6 +108,9 @@ class MetaFile:
     if not self.mockmode:
       if not os.path.isfile(fap):
         self.error_on_filepath = True
+        error_msg = 'Error: file does not exist %s \n mid=[%s]' % (fap, self.middlepath)
+        print(error_msg)
+        raise OSError(error_msg)
     return fap
 
   @property
@@ -145,8 +148,10 @@ class MetaFile:
         self._sha1hex = fhfM.generate_sha1hexdigest_from_filepath(self.file_abspath)
       except OSError:
         self.error_on_filepath = True
-        print(' !!!!!!!!!!!! OS Error')
-        return
+        error_msg = ' !!!!!!!!!!!! OS Error when calculating sha1 ' + self._sha1hex
+        print(error_msg)
+        raise OSError(error_msg)
+        # return
       elapsed_time = time.time() - start_time
       print('Took ', elapsed_time, 'elapsed_time', self._sha1hex)
 

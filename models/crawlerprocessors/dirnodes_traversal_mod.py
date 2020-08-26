@@ -2,12 +2,12 @@
 """
 
 """
-import copy
 import hashlib
 import os
 import models.samodels as sam
-import fs.os.prep_fs_counts_mod as prep
 import fs.os.utilsmod as osutil
+import fs.hashfunctions.hexfunctionsmod as hexfs
+import fs.os.middlepathmakemod as midpath
 import models.pathpositioning.metafilemod as metaf
 import string
 import config
@@ -22,8 +22,9 @@ def add_bins(b1, b2):
 
 
 def create_virtual_root_node(mountpoint_abspath):
+  middlepathobj = midpath.MiddlePath(mountpoint_abspath)
   abspath, dirname = os.path.split(mountpoint_abspath)
-  return DirNode(dirname, None, mountpoint_abspath)
+  return DirNode(dirname, '', middlepathobj)
 
 
 class DirNode:
@@ -89,23 +90,48 @@ class DirNode:
     dirname is 'mountpoint-top-dirname' or, if '/', None
   """
 
-  def __init__(self, dirname, middlepath, mountpoint_abspath):
+  def __init__(self, dirname, middlepath, middlepathobj):
     self.parentnode = None  # auxiliary attribute mainly for external use though it can be used inside
     self.dirname = dirname
+    self.middlepathobj = middlepathobj
+    self.mountpoint_abspath = middlepathobj.mount_abspath  # mountpoint_abspath
+    if middlepath is None:
+      error_msg = 'Error: passed middlepath as None to DirNode na=[%s] mi=[%s] mo=[%s]' \
+        % (str(dirname), str(middlepath), str(middlepathobj))
+      raise ValueError(error_msg)
     self.middlepath = middlepath
-    self.mountpoint_abspath = mountpoint_abspath
     self.sha1hex = None
     self.concatenated_sha1hex = ''
     self.sha1_calculated_children = []
     self._abspath = None
     self._nsubnodes = None  # recursive
     self.children_dirnames = []
-    self.set_children_dirnodes_via_os()
+    self.set_children_dirnames_via_os()
     # self._level = None  #
     # self._root = None  # root now is the exception node of mountpoint_abspath (not db-recordable)
 
-  def set_children_dirnodes_via_os(self):
+  def set_children_dirnames_via_os(self):
     self.children_dirnames = osutil.find_directory_entries_in_abspath(self.abspath, sort=True)
+
+  def form_n_return_middlepath_to_a_childs_entry(self, dirname):
+    return self.middlepathobj.middle_to_a_childs_entry(self.abspath, dirname)
+
+  def create_childnode_with_name(self, dirname):
+    """
+    This routine creates a childnode and fills its parentnode with self.
+    Notice that the childnode is not added to parent in this method,
+      because this adding function is application-dependent and can be deferred to
+      the moment this list may be filled in.
+    At any rate, at instantiation, an os.listdir() will fill in children_dirnames
+      ie children names will come from os at instantiation.
+    Notice also this may be changed in the future with a flag
+      to fill them in thru db or another flag that makes this class
+      work under mockmode, ie without any underlying os or db.
+    """
+    middlepath = self.form_n_return_middlepath_to_a_childs_entry(dirname)
+    childnode = DirNode(dirname, middlepath, self.middlepathobj)
+    childnode.parentnode = self
+    return childnode
 
   def is_root(self):
     """
@@ -116,30 +142,38 @@ class DirNode:
       return True
     return False
 
+  def is_leaf(self):
+    if len(self.children_dirnames) == 0:
+      return True
+    return False
+
   @property
   def abspath(self):
     """
     """
     if self._abspath is not None:
       return self._abspath
-    if self.middlepath is None:
-      # exception for root node
-      return self.mountpoint_abspath
     if self.middlepath == '':
-      # first level directories have middlepath as ''
-      jointmiddle = self.mountpoint_abspath
-    else:
-      jointmiddle = os.path.join(self.mountpoint_abspath, self.middlepath)
-    self._abspath = os.path.join(jointmiddle, self.dirname)
+      # root has conventioned middlepath the empty string ''
+      return self.mountpoint_abspath
+    self._abspath = os.path.join(self.mountpoint_abspath, self.middlepath)
     return self._abspath
 
   @property
   def middlepathforchildren(self):
     if self.is_root():
-      return ''
-    pmiddlepathforchildren = self.middlepath + '/' + self.dirname
-    pmiddlepathforchildren = pmiddlepathforchildren.strip('/')
-    return pmiddlepathforchildren
+      return self.dirname
+    # code must be improved later on and withdraw this try-block
+    # see further explanation below
+    try:
+      pmiddlepathforchildren = self.middlepath + '/' + self.dirname
+      pmiddlepathforchildren = pmiddlepathforchildren.strip('/')
+      return pmiddlepathforchildren
+    # a TypeError will happen when self.middlepath is None
+    # which was the old convention for root (now root has middlepath = '')
+    except TypeError:
+      pass
+    return self.dirname
 
   def get_subdirectories(self, viadb=False):
     if viadb:
@@ -173,7 +207,7 @@ class DirNode:
       else:
         child_middlename = self.middlepath + '/' + child_dirname
         child_middlename = child_middlename.strip('/')  # this is in case middlepath is '' (1st level)
-      childnode = DirNode(child_dirname, child_middlename, self.mountpoint_abspath)
+      childnode = DirNode(child_dirname, child_middlename, self.middlepathobj)
       subnodes.append(childnode)
     return subnodes
 
@@ -189,20 +223,14 @@ class DirNode:
       pp = self.middlepath.split('/')
       parentdirname = pp[-1]  # ie 'science' in the example above
       parentmiddlepath = '/'.join(pp[:-2])  # '' in the example above
-    parentdirnode = DirNode(parentdirname, parentmiddlepath, self.mountpoint_abspath)
+    parentdirnode = DirNode(parentdirname, parentmiddlepath, self.middlepathobj)
     return parentdirnode
 
   @property
   def parentdirname(self):
-    parent = self.get_parent()
-    if parent is None:
-      return None
-    if self.get_level() == 1:
-      root = self.get_root()
-      # it may be None, the case when root is '/', ie it has no name
-      return root.dirname
-    parentdirname = self.middlepath.split('/')[-1]
-    return parentdirname
+    if self.parentnode is None:
+      return ''
+    return self.parentnode.dirname
 
   @property
   def level(self):
@@ -259,7 +287,7 @@ class DirNode:
     else:
       dirname = pp[-1]
       middlepath = '/'.join(pp[:-1])
-    parentnode = DirNode(dirname, middlepath, self.mountpoint_abspath)
+    parentnode = DirNode(dirname, middlepath, self.middlepathobj)
     return parentnode
 
   def save_to_db(self, session, docommit=True):
@@ -298,11 +326,11 @@ class DirNode:
     return dbentry
 
   def calc_sha1hex_n_save_into_db(self, session):
-    self.calc_entry_sha1hex(session)
+    self.process_entry_sha1hex(session)
 
   def concatenate_sha1hexes_from_files(self, session=None):
     if session is not None:
-      return self.concatenate_sha1hexes_from_files_viadb(session)
+      return self.concatenate_sha1hex_of_children_files_via_db(session)
     fileentries = osutil.find_file_entries_in_abspath(self.abspath)
     for filename in fileentries:
       if self.middlepath is None:
@@ -314,10 +342,6 @@ class DirNode:
       mfile.calc_n_set_sha1hex()
       self.concatenated_sha1hex += mfile.sha1hex
 
-  def concatenate_sha1hexes_from_files_viadb(self, session):
-    _ = session
-    self.concatenated_sha1hex = ''
-
   def concatenate_sha1hexes_from_folders(self, session=None):
     if session is not None:
       return self.concatenate_sha1hexes_from_folders_viadb(session)
@@ -325,29 +349,35 @@ class DirNode:
       self.concatenated_sha1hex += dirnode.concatenated_sha1hex
 
   def concatenate_sha1hexes_from_folders_viadb(self, session):
+    """
     _ = session
     self.concatenated_sha1hex = ''
+    """
+    pass
 
   def concatenate_sha1hexes(self, session=None):
     self.concatenated_sha1hex = ''
     self.concatenate_sha1hexes_from_files(session)
+    self.concatenate_sha1hexes_from_folders(session)
     if self.concatenated_sha1hex == '':
       self.concatenated_sha1hex = config.EMPTYFILE_SHA1HEX
-    self.concatenate_sha1hexes_from_folders(session)
-    h = hashlib.new('sha1')
-    sha1contentbytes = bytes(self.concatenated_sha1hex, encoding='utf8')
-    h.update(sha1contentbytes)
-    self.sha1hex = h.hexdigest()
+    # self.sha1hex = hexfs.calc_sha1hex_from_str(self.concatenated_sha1hex)
 
-  def calc_entry_sha1hex(self, session=None):
+  def process_entry_sha1hex(self, session=None):
+    if self.sha1hex:
+      return
     if session is None:
       sha1sconcatenated = self.concatenate_sha1hex_topdownindepth()
     else:
       sha1sconcatenated = self.concatenate_sha1hex_topdownindepth_via_db(session)
-    pbytes = bytes(sha1sconcatenated, encoding='utf8')
-    h = hashlib.new('sha1')
-    h.update(pbytes)
-    self.sha1hex = h.hexdigest()
+    self.calc_n_set_sha1hex_with_concatenated_hexstring(sha1sconcatenated)
+    if session:
+      self.save_to_db(session)
+
+  def calc_n_set_sha1hex_with_concatenated_hexstring(self, sha1sconcatenated):
+    if self.concatenated_sha1hex == '':
+      self.concatenated_sha1hex = config.EMPTYFILE_SHA1HEX
+    self.sha1hex = hexfs.calc_sha1hex_from_str(sha1sconcatenated)
 
   def concatenate_sha1hex_topdownindepth(self):
     sha1sconcatenated = self.concatenate_sha1hex_of_children_files()
@@ -362,8 +392,6 @@ class DirNode:
     for child_dirnode in self.children_dirnames:
       sha1sconcatenated += child_dirnode.concatenate_sha1hex_topdownindepth_via_db(session)
     sha1sconcatenated = self.concatenate_sha1hex_of_children_files_via_db(session)
-    if sha1sconcatenated == '':
-      sha1sconcatenated = config.EMPTYFILE_SHA1HEX
     return sha1sconcatenated
 
   def concatenate_sha1hex_of_children_files(self):
@@ -389,12 +417,6 @@ class DirNode:
     for dbentry in dbentries:
       sha1sconcatenated += dbentry.sha1hex
     return sha1sconcatenated
-
-  @property
-  def is_leaf(self):
-    if len(self.children_dirnames) == 0:
-      return True
-    return False
 
   @property
   def stamp(self):
@@ -441,14 +463,13 @@ class BottomUpTraversal:
   """
 
   def __init__(self, leftmost_bottommost_abspath, mountpoint_abspath):
+    self.middlepathobj = midpath.MiddlePath(mountpoint_abspath)
     self.leftmost_bottommost_abspath = leftmost_bottommost_abspath
     self.mountpoint_abspath = mountpoint_abspath
-    middlepath = prep.extract_middlepath_for_folders_from_abspath(
-      self.mountpoint_abspath, self.leftmost_bottommost_abspath
-    )
+    middlepath = self.middlepathobj.middle_to_entry(self.leftmost_bottommost_abspath)
     _, dirname = os.path.split(self.leftmost_bottommost_abspath)
-    self.currentnode = DirNode(dirname, middlepath, mountpoint_abspath)
-    self.currentnode.calc_entry_sha1hex()
+    self.currentnode = DirNode(dirname, middlepath, self.middlepathobj)
+    self.currentnode.process_entry_sha1hex()
     self.currentparent = self.currentnode.get_parent()
     if self.currentparent is None:  # ie, node is root
       return
@@ -514,76 +535,8 @@ def fetch_dirnames_in_dirpath_return_sorted_dirnames(abspath):
   return dirnames
 
 
-count = 0
-
-
-def jump_indepth_one_step(p_dirnode, mountpoint_abspath):
-  global count
-  dirnode = copy.copy(p_dirnode)
-  count += 1
-  print(count, 'processing', dirnode.dirname)
-  dirnames = fetch_dirnames_in_dirpath_return_sorted_dirnames(dirnode.abspath)
-  if len(dirnames) == 0:
-    return
-  while len(dirnames) > 0:
-    dirname = dirnames[0]
-    middlepath = prep.extract_middlepath_for_folders_from_abspath(mountpoint_abspath, p_dirnode.abspath)
-    child_dirnode = DirNode(dirname, middlepath, mountpoint_abspath)
-    del dirnames[0]
-    jump_indepth_one_step(child_dirnode, mountpoint_abspath)
-
-  # absdirnames = reversed(sorted(dirnames))
-  # dirname = dirnames.pop()
-
-
-def traverse_topdown_leftright(dirnode, session=None):
-  print('Entered', dirnode.stamp)
-  dirnodes = copy.copy(dirnode.children_dirnames)
-  while len(dirnodes) > 0:
-    next_dirnode = dirnodes[0]
-    del dirnodes[0]
-    traverse_topdown_leftright(next_dirnode, session)
-  print('Exhausted', dirnode.stamp)
-  if session is None:
-    dirnode.calc_entry_sha1hex()
-  else:
-    _ = dirnode.fill_in_to_dbentry(session)
-    session.commit()
-  print('sha1hex', dirnode.stamp2)
-  return
-
-
-def load_tree_n_traverse_topdown_leftright(mountpoint_abspath, dirnode, session=None):
-  jump_indepth_one_step(dirnode, mountpoint_abspath)
-  traverse_topdown_leftright(dirnode, session)
-
-
-def process_nodes():
-  # current_dir = '/home/dados/Sw3/SwDv/OSFileSystemSwDv/PyMirrorFileSystemsByHash/fs/'
-  mountpoint_abspath = config.get_datatree_mountpoint_abspath()
-  rootnode = DirNode(None, None, mountpoint_abspath)
-  jump_indepth_one_step(rootnode, mountpoint_abspath)
-  print('================ dirnode ====================')
-  print(rootnode)
-  traverse_topdown_leftright(rootnode)
-  print('last')
-  print(rootnode)
-
-
-def adhoc_test1():
-  h1 = 0x5
-  sh1 = hex(h1)
-  h2 = 0x6
-  sh2 = hex(h2)
-  print(h1, h2)
-  h3 = h1 + h2
-  sh3 = sh1 + sh2
-  print(h3, sh3)
-
-
 def process():
-  # process_nodes()
-  mount_tree_for_bottomup_traversal()
+  pass
 
 
 if __name__ == '__main__':

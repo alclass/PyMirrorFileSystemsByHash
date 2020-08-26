@@ -81,7 +81,7 @@ class MirrorDirTree:
     print('totalf', self.src_totalf)
 
   def oswalk_mirror_source_folderfiles_iteration(self, abspath, files):
-    middlepath = prep.extract_middlepath_for_files_or_subfolders_from_abspath(self.src_mount_abspath, abspath)
+    middlepath = prep.extract_middlepath_as_excess_abspath_on_mountpath(self.src_mount_abspath, abspath)
     print('=>->' * 10, len(files), 'files on middlepath', middlepath)
     for filename in sorted(files):
       self.mirror_source_file_entry(middlepath, filename)

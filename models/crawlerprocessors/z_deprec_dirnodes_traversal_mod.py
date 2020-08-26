@@ -216,7 +216,7 @@ class DirNode:
     for child_dirnode in self.children_dirnodes:
       sha1sconcatenated += child_dirnode.concatenate_sha1hex_topdownindepth_via_db(session)
     sha1sconcatenated = self.concatenate_sha1hex_of_children_files_via_db(session)
-    if sha1sconcatenated == '':
+    if sha1sconcatenated == '' and self.is_leaf():
       sha1sconcatenated = config.EMPTYFILE_SHA1HEX
     return sha1sconcatenated
 
@@ -315,7 +315,7 @@ def traverse_topdown_leftright(dirnode, session=None):
     traverse_topdown_leftright(next_dirnode, session)
   print('Exhausted', dirnode.stamp)
   if session is None:
-    dirnode.calc_entry_sha1hex()
+    dirnode.process_entry_sha1hex()
   else:
     _ = dirnode.fill_in_to_dbentry(session)
     session.commit()

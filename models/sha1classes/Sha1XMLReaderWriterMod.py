@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 
 # import local_settings as ls
 #from sha1utils import defaults
-from fs.os.hexfunctionsMod import generate_a_40char_random_hex
+from fs.hashfunctions.hexfunctionsmod import generate_a_40char_random_hex
 from fs.os.Sha1XmlFileFunctions import generate_xml_sha1file_against_all_files_on_its_folder
 # from sha1utils.sha1utilsMod import get_tag_text_and_encoding_if_necessary
 from .Sha1AndItsFilenamesOnAFolderDictMod import Sha1AndItsFilenamesOnAFolderDict

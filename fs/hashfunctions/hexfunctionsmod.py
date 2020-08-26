@@ -3,6 +3,7 @@
   docstring
 """
 from random import randint
+import hashlib
 
 HEXS_ABOVE_9 = 'abcdef'  # lowercase
 HEX_DIGITS = '0123456789' + HEXS_ABOVE_9
@@ -13,6 +14,13 @@ ENCODINGS_TO_TRY_IN_ORDER_FOR_FILENAMES = ['iso-8859-1', 'windows-1250', 'window
 
 def draw_randomint_0_15():
   return randint(0, 15)
+
+
+def calc_sha1hex_from_str(text, p_encoding='utf8'):
+  byt = bytes(text, encoding=p_encoding)
+  h = hashlib.new('sha1')
+  h.update(byt)
+  return h.hexdigest()
 
 
 def convert_hexint_to_char(hexint):

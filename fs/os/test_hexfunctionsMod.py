@@ -4,7 +4,7 @@
 """
 import sys
 import unittest
-import fs.os.hexfunctionsMod as hexM
+import fs.hashfunctions.hexfunctionsmod as hexM
 
 
 class Test1(unittest.TestCase):

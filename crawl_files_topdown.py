@@ -7,6 +7,7 @@ import time
 import models.samodels as sam
 import fs.db.sqlalchemy_conn as con
 import fs.os.prep_fs_counts_mod as prep
+import fs.os.middlepathmakemod as midpath
 import models.pathpositioning.metafilemod as metaf
 import config
 
@@ -29,6 +30,8 @@ class FileSweeper:
 
   def __init__(self, mount_abspath):
     self.mount_abspath = mount_abspath
+    self.middlepathobj = midpath.MiddlePath(self.mount_abspath)
+
     self.totalf = 0
     self.totalf_swept = 0
     self.n_inserts = 0
@@ -62,9 +65,15 @@ class FileSweeper:
     self.session.close()
 
   def process_oswalk_abspath_iteration(self, abspath, files):
-    middlepath = prep.extract_middlepath_for_files_or_subfolders_from_abspath(self.mount_abspath, abspath)
-    print('=>->' * 10, len(files), 'files on middlepath', middlepath)
+    middlepath = self.middlepathobj.middle_to_entry(abspath)
+    if middlepath in config.L1DIRS_TO_AVOID_IN_MIRRORING:
+      return
+    print('=>->' * 10, len(files), 'files on middlepath [' + middlepath + ']')
+    print(' [abspath]', abspath)
     for filename in sorted(files):
+      if filename == '2018 Course List.txt':
+        print ("filename == '2018 Course List.txt' ", filename)
+        return
       self.process_file_entry(middlepath, filename)
       self.n_deletes += clean_up_folderleaftovers_in_db(self.session, middlepath, files)
       # the delete case will defer db-committing to a next limit or at the end (with finalcommit)
@@ -98,7 +107,10 @@ class FileSweeper:
         mfile.calc_n_set_sha1hex()
         if mfile.error_on_filepath:
           self.files_with_error += 1
-          return dbentry
+          error_msg = ' %d !!! OS Error when calculating sha1 %s ' % (self.files_with_error, mfile.sha1hex)
+          print(error_msg)
+          raise OSError(error_msg)
+          # return dbentry
         dbentry.sha1hex = mfile.sha1hex
         # committing on update
         self.commit_rotate_count = prep.commit_on_counter_rotate(self.session, self.commit_rotate_count)
@@ -122,7 +134,11 @@ class FileSweeper:
     mfile.calc_n_set_sha1hex()
     if mfile.error_on_filepath:
       self.files_with_error += 1
-      return None
+      error_msg = ' %d !!! OS Error when calculating sha1 %s ' \
+                  % (self.files_with_error, str(mfile))
+      print(error_msg)
+      raise OSError(error_msg)
+      # return None
     return self.insert_dbentry_with_mfile(mfile)
 
   def deprec_update_dbentry_based_on_same_sha1hex(self, dbentry, mfile):

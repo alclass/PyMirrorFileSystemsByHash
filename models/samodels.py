@@ -4,7 +4,7 @@
 """
 import os
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Boolean, Column, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, UniqueConstraint
 import fs.db.sqlalchemy_conn as con
 import config
 
@@ -48,6 +48,7 @@ class FSEntryInDB(Base):
   entryname = Column(String)
   isfile = Column(Boolean, default=True)
   bytesize = Column(Integer, default=0)  # for folders it's the sum of its contents (files and subfolders)
+  mdatetime = Column(DateTime, nullable=True)
   middlepath = Column(String)
   sha1hex = Column(String(40), index=True)  # , unique=True
 
