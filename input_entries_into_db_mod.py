@@ -47,7 +47,7 @@ class EntriesProcessor:
     print('n_commits', self.n_commits)
 
   def process_missing_dbentries_txtfile(self):
-    self.session = con.get_session_from_sqlitefilepath(source=True)
+    self.session = con.get_session_for_sqlite_source_or_target(source=True)
     fp = open('missing.log', encoding='utf8')
     line = fp.readline()
     while line:

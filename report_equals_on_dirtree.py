@@ -22,7 +22,7 @@ def report_equal_sha1s():
   """
 
   """
-  src_session = con.get_session_from_sqlitefilepath(source=True)
+  src_session = con.get_session_for_sqlite_source_or_target(source=True)
   sha1dtuplelist = src_session.query(sam.FSEntryInDB.sha1hex).distinct(sam.FSEntryInDB.sha1hex).all()
   print('total of sha1hexes in db', len(sha1dtuplelist))
   print('looking for duplicates')

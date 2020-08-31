@@ -6,7 +6,7 @@ import models.samodels as sam
 
 
 def create_table_if_not_exists(source=True):
-  engine = con.get_engine_for_sqlitefilepath(source)
+  engine = con.get_engine_for_sqlite_source_or_target(source)
   if not engine.dialect.has_table(engine, config.get_dirtree_tablename()):
     sam.FSEntryInDB.__table__.create(bind=engine, checkfirst=True)
     return True

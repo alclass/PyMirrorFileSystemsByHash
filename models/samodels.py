@@ -12,12 +12,21 @@ Base = declarative_base()
 dirtree_tablename = 'dirtree_entries'
 
 
-def create_table_if_not_exists(source=True):
-  engine = con.get_engine_for_sqlitefilepath(source)
+def create_table_if_not_exists_with_engine(engine):
   if not engine.dialect.has_table(engine, config.get_dirtree_tablename()):
     FSEntryInDB.__table__.create(bind=engine, checkfirst=True)
     return True
   return False
+
+
+def create_table_if_not_exists_with_sqlite_abspath(sqlite_abspath):
+  engine = con.get_engine_with_sqlitefilepath(sqlite_abspath)
+  return create_table_if_not_exists_with_engine(engine)
+
+
+def create_table_if_not_exists(source=True):
+  engine = con.get_engine_for_sqlite_source_or_target(source)
+  return create_table_if_not_exists_with_engine(engine)
 
 
 class FSEntryInDB(Base):

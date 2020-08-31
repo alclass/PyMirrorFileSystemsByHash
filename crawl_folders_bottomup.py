@@ -2,6 +2,7 @@
 """
 
 """
+import datetime
 import time
 import models.crawlerprocessors.dirnodes_traversal_mod as dirmod
 import fs.db.sqlalchemy_conn as con
@@ -28,7 +29,7 @@ def traverse_tree_left_to_right_recurse(dirnode, session=None):
 
 
 def traverse_tree_left_to_right_entrance():
-  session = con.get_session_from_sqlitefilepath(source=True)
+  session = con.get_session_for_sqlite_source_or_target(source=True)
   mountpoint_abspath = config.get_datatree_mountpoint_abspath(source=True)
   print('Instantiating root')
   middlepathobj = midpath.MiddlePath(mountpoint_abspath)
@@ -41,11 +42,14 @@ def traverse_tree_left_to_right_entrance():
 def process():
   # sweep_src_n_trg()
   # dirtree_folders_traverse()
-  start_time = time.time()
+  start_time = datetime.datetime.now()
   traverse_tree_left_to_right_entrance()
-  elapsed_time = time.time() - start_time
+  finish_time = datetime.datetime.now()
+  elapsed_time = finish_time - start_time
   print('start_time', start_time)
+  print('finish_time', finish_time)
   print('elapsed_time', elapsed_time)
+
 
 
 if __name__ == '__main__':

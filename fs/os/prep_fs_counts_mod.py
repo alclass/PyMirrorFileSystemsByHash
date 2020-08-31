@@ -90,46 +90,8 @@ def sweep_files_showing_progress_percent(mount_abspath):
       print(line)
 
 
-def adhoc_test():
-  mount_abspath = '/media/friend/TTC_D2_2T_Orig'
-  abspath = "/media/friend/TTC_D2_2T_Orig/A _ TTC Arts/M _ TTC Music/" \
-            "TTC America's Musical Heritage _i Anthony Seeger _f Univ of California"
-  dirname = 'videos'
-  middlepath = extract_middlepath_for_subfolders_from_folderabspath(mount_abspath, abspath, dirname)
-  print('adhoc_test 1')
-  print('dirname', dirname)
-  print('mount_abspath', mount_abspath)
-  print('abspath', abspath)
-  print('middlepath =>', '['+middlepath+']')
-  mount_abspath = '/knowledgetree/science/'
-  abspath = "/knowledgetree/science/physics/relativity/einstein.txt"
-  middlepath = extract_middlepath_as_excess_abspath_on_mountpath(mount_abspath, abspath)
-  middlepath2 = extract_middlepath_of_foldersfile_with_file_n_mountpath(mount_abspath, abspath)
-  print('adhoc_test 2')
-  print('mount_abspath', mount_abspath)
-  print('abspath', abspath)
-  print('middlepath =>', '['+middlepath+']')
-  print('middlepath2 =>', '['+middlepath2+']')
-  mount_abspath = '/knowledgetree/science/'
-  abspath = "/knowledgetree/science/physics/relativity/einstein/"
-  dirname = 'bio'
-  middlepath = extract_middlepath_for_subfolders_from_folderabspath(mount_abspath, abspath, dirname)
-  print('adhoc_test 3')
-  print('dirname', dirname)
-  print('mount_abspath', mount_abspath)
-  print('abspath', abspath)
-  print('middlepath =>', '['+middlepath+']')
-  mount_abspath = '/knowledgetree/science/'
-  abspath = "/knowledgetree/science/physics/relativity/einstein/"
-  middlepath = extract_middlepath_as_excess_abspath_on_mountpath(mount_abspath, abspath)
-  print('adhoc_test 4')
-  print('mount_abspath', mount_abspath)
-  print('abspath', abspath)
-  print('middlepath =>', '[' + middlepath + ']')
-
-
 def process():
-  adhoc_test()
+  pass
 
 
 if __name__ == '__main__':

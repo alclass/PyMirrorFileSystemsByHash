@@ -66,8 +66,8 @@ class MirrorDirTree:
 
     """
     self.src_totalf = prep.prepare_sweep_files_count(self.src_mount_abspath)
-    self.src_session = con.get_session_from_sqlitefilepath(source=True)
-    self.trg_session = con.get_session_from_sqlitefilepath(source=False)
+    self.src_session = con.get_session_for_sqlite_source_or_target(source=True)
+    self.trg_session = con.get_session_for_sqlite_source_or_target(source=False)
     for abspath, dirs, files in os.walk(os.path.abspath(self.src_mount_abspath)):
       self.oswalk_mirror_source_folderfiles_iteration(abspath, files)
 

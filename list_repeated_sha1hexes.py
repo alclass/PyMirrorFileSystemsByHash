@@ -18,7 +18,7 @@ def list_repeated_sha1hexes():
     print(sha1rows)
 
   """
-  session = con.get_session_from_sqlitefilepath(source=True)
+  session = con.get_session_for_sqlite_source_or_target(source=True)
   sha1rows = session.query(sam.FSEntryInDB.sha1hex, func.count(sam.FSEntryInDB.sha1hex)).\
       group_by(sam.FSEntryInDB.sha1hex).\
       having(func.count(sam.FSEntryInDB.sha1hex) > 1).all()

@@ -41,7 +41,7 @@ class FileSweeper:
 
     """
     self.totalf = prep.prepare_sweep_files_count(self.mount_abspath)
-    self.session = con.get_session_from_sqlitefilepath(source=True)
+    self.session = con.get_session_for_sqlite_source_or_target(source=True)
     for abspath, dirs, files in os.walk(os.path.abspath(self.mount_abspath)):
       self.process_oswalk_abspath_iteration(abspath, files)
 

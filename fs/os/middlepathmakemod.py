@@ -133,6 +133,48 @@ def adhoc_test():
   print('midpath obj =>', '[' + str(midpath) + ']')
 
 
+def adhoc_test2():
+  mount_abspath = '/media/friend/TTC_D2_2T_Orig'
+  abspath = "/media/friend/TTC_D2_2T_Orig/A _ TTC Arts/M _ TTC Music/" \
+            "TTC America's Musical Heritage _i Anthony Seeger _f Univ of California"
+  dirname = 'videos'
+  middlepath = extract_middlepath_for_subfolders_from_folderabspath(mount_abspath, abspath, dirname)
+  print('adhoc_test 1')
+  print('dirname', dirname)
+  print('mount_abspath', mount_abspath)
+  print('abspath', abspath)
+  print('middlepath =>', '['+middlepath+']')
+  mount_abspath = '/knowledgetree/science/'
+  abspath = "/knowledgetree/science/physics/relativity/einstein.txt"
+  midpath = MiddlePath(mount_abspath)
+  middlepath = midpath.middle_to_entry(abspath)
+  parent_middlepath = midpath.middle_to_parent(abspath)
+  middlepath_parent = midpath.middle_to_parent(abspath)
+  print('adhoc_test 2')
+  print('mount_abspath', mount_abspath)
+  print('abspath', abspath)
+  print('middlepath =>', '['+middlepath+']')
+  print('middlepath2 =>', '['+middlepath_parent+']')
+  mount_abspath = '/knowledgetree/science/'
+  abspath = "/knowledgetree/science/physics/relativity/einstein/"
+  dirname = 'bio'
+  midpath = MiddlePath(mount_abspath)
+  middlepath = midpath.middle_to_a_childs_entry(abspath, dirname)
+  print('adhoc_test 3')
+  print('dirname', dirname)
+  print('mount_abspath', mount_abspath)
+  print('abspath', abspath)
+  print('middlepath =>', '['+middlepath+']')
+  mount_abspath = '/knowledgetree/science/'
+  abspath = "/knowledgetree/science/physics/relativity/einstein/"
+  midpath = MiddlePath(mount_abspath)
+  middlepath = midpath.middle_to_entry(abspath)
+  print('adhoc_test 4')
+  print('mount_abspath', mount_abspath)
+  print('abspath', abspath)
+  print('middlepath =>', '[' + middlepath + ']')
+
+
 def process():
   adhoc_test()
 

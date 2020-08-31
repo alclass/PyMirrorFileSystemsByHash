@@ -8,12 +8,13 @@ USER_HOME_DIR = os.path.expanduser('~')
 USER_HOME_DATA_DIR = os.path.join(USER_HOME_DIR, '.pymirrorfsbyhash_data')
 DATA_FOLDERNAME = 'dados'
 PYMIRROR_DB_PARAMS = {}
-COUNTER_ROTATE_SIZE_FOR_COMMITS = 1000
+COUNTER_ROTATE_SIZE_FOR_COMMITS = 3
 EMPTYFILE_SHA1HEX = 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
 L1DIRS_TO_AVOID_IN_MIRRORING = ['z Extra', 'z Tmp', 'z Triage', 'z-Extra', 'z-Tmp', 'z-Triage']
 
 MOUNTPOINT_SOURCEDATADIR_DICTKEY = 'MOUNTPOINT_SOURCEDATADIR'
 MOUNTPOINT_TARGETDATADIR_DICTKEY = 'MOUNTPOINT_TARGETDATADIR'
+STORE_SQLITE_IN = '/home/dados/Sw3/SwDv/OSFileSystemSwDv/PyMirrorFileSystemsByHash/dados/disks_sha1_sqlite_data/Bio-EE-Sci-Soc_D1_2T_Orig_n_Bak/.updirentries.sqlite'
 
 # MOUNTPOINT_DATADIRS_DICT = {}
 MOUNTPOINT_DIRS_DICTFILENAME = 'data_entry_dir_source_n_target_pydict.txt'

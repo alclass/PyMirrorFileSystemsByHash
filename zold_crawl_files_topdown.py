@@ -2,7 +2,6 @@
 """
 
 """
-import datetime
 import os
 import time
 import models.samodels as sam
@@ -79,6 +78,9 @@ class FileSweeper:
     print('=>->' * 10, len(files), 'files on middlepath [' + middlepath + ']')
     print(' [abspath]', abspath)
     for filename in sorted(files):
+      if filename == '2018 Course List.txt':
+        print ("filename == '2018 Course List.txt' ", filename)
+        return
       self.process_file_entry(middlepath, filename)
       self.n_deletes += clean_up_folderleaftovers_in_db(self.session, middlepath, files)
       # the delete case will defer db-committing to a next limit or at the end (with finalcommit)
@@ -96,7 +98,7 @@ class FileSweeper:
     dbentry = self.session.query(sam.FSEntryInDB). \
         filter(sam.FSEntryInDB.entryname == mfile.filename). \
         filter(sam.FSEntryInDB.middlepath == mfile.middlepath). \
-        first()  # filter(sam.FSEntryInDB.mdatetime == None). \
+        first()
     if dbentry is not None:
       return self.treat_fileentry_when_its_in_db(dbentry, mfile)
     else:
@@ -146,6 +148,23 @@ class FileSweeper:
       # return None
     return self.insert_dbentry_with_mfile(mfile)
 
+  def deprec_update_dbentry_based_on_same_sha1hex(self, dbentry, mfile):
+    self.n_exists += 1
+    if dbentry.entryname == mfile.filename and dbentry.middlepath == mfile.middlepath:
+      return
+    # either one or the other is different or both are different
+    self.n_updates += 1
+    if dbentry.entryname != mfile.filename:
+      dbentry.entryname = mfile.filename
+    if dbentry.middlepath != mfile.middlepath:
+      dbentry.middlepath = mfile.middlepath
+    linemsg = '%d => ((Updating)) [%s/%s]' \
+              % (self.n_updates, mfile.middlepath, mfile.filename)
+    print(linemsg)
+    # committing on update
+    self.commit_rotate_count = prep.commit_on_counter_rotate(self.session, self.commit_rotate_count)
+    return
+
   def insert_dbentry_with_mfile(self, mfile):
     self.n_inserts += 1
     linemsg = '%d => ((Inserting)) filename=[%s] | middlename=[%s]' \
@@ -168,7 +187,7 @@ def process_sweep_src_uptree():
   start_time = time.time()
   print('[START PROCESSING TIME] sweep_src_uptree at', start_time)
   mount_abspath = config.get_datatree_mountpoint_abspath(source=True)
-  sweep = FileSweeper(mount_abspath, store_sqlite_elsewhere=False)
+  sweep = FileSweeper(mount_abspath, store_sqlite_elsewhere=True)
   sweep.perfom_updir_sweep()
   elapsed_time = time.time() - start_time
   print('[END PROCESSING TIME] elapsed_time at', elapsed_time)
@@ -176,12 +195,10 @@ def process_sweep_src_uptree():
 
 def process():
   # sweep_src_n_trg()
-  start_time = datetime.datetime.now()
+  start_time = time.time()
   process_sweep_src_uptree()
-  finish_time = datetime.datetime.now()
-  elapsed_time = finish_time - start_time
+  elapsed_time = time.time() - start_time
   print('start_time', start_time)
-  print('finish_time', finish_time)
   print('elapsed_time', elapsed_time)
 
 
