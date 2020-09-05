@@ -1,5 +1,6 @@
 bin_local_settings.py
 local_settings.py
+config.py
 .idea/
 dados/
 venv/
