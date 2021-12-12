@@ -131,7 +131,7 @@ class DirTree:
     if node is None:
       return None
     verified = False
-    tuplelist = self.dbtree.fetch_rec_if_hkey_exists_in_db(node.hashkey)
+    tuplelist = self.dbtree.fetch_row_by_id(node.hashkey)
     if len(tuplelist) == 1:
       tuplevalues = tuplelist[0]
       if node.name == tuplevalues[2]:
@@ -148,7 +148,7 @@ class DirTree:
     bool_res = self.dbtree.do_insert_or_update_with_tuplevalues(tuplevalues)
     if bool_res:
       return node
-    tuplelist = self.dbtree.fetch_rec_if_hkey_exists_in_db(nd.hashkey)
+    tuplelist = self.dbtree.fetch_row_by_id(nd.hashkey)
     if len(tuplelist) > 0:
       return node
     return None

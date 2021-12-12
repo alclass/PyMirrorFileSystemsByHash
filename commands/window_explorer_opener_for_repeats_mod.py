@@ -45,20 +45,27 @@ class RepeatVerifier:
     self.dbrepeat = dbr.DBRepeat(self.mountpath)
 
   def verify_sha1_repeats(self, sha1):
+    """
+    The method intends to insert/update table dbrepeats
+      Obs:
+        1) for the time being, table dbrepeats is discontinued
+        2) TO-DO refactor here when a decision to treat the repeats on-the-fly is taken
+    """
     if sha1 in self.sha1_repeat_dict:
       return
     sql = 'SELECT * from %(tablename)s WHERE sha1=?;'
-    tuplevalues = (sha1,)
+    tuplevalues = (sha1, )
     rowlist = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     if len(rowlist) > 1:
       self.sha1_repeat_dict[sha1] = len(rowlist)
       self.n_sha1_repeats += 1
       print('round', self.chunk_rounds, 'n of repeat =', len(rowlist)-1)
       for rowtuple in rowlist:
-        scr_hkey = rowtuple[1]
-        tuplevalues = (None, scr_hkey, sha1, 0)
-        bool_ins_upd = self.dbrepeat.do_insert_or_update_with_tuplevalues(tuplevalues)
-        print('bool_ins_upd', bool_ins_upd, tuplevalues)
+        _id = rowtuple[0]
+        tuplevalues = (_id, sha1, 0)
+        # for the time being, table dbrepeats is discontinued
+        # bool_ins_upd = self.dbrepeat.do_insert_or_update_with_tuplevalues(tuplevalues)
+        # print('bool_ins_upd', bool_ins_upd, tuplevalues)
     else:
       print(' ********  NO REPEATS ******** acumulated repeats :', self.n_sha1_repeats)
 

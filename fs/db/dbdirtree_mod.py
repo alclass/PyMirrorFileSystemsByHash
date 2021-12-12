@@ -57,9 +57,9 @@ class DBDirTree(dbb.DBBase):
     cursor.close()
     conn.close()
 
-  def fetch_rec_if_hkey_exists_in_db(self, hkey):
-    sql = 'SELECT * FROM %(tablename)s WHERE hkey=?;' % {'tablename': self.tablename}
-    tuplevalues = (hkey, )
+  def fetch_row_by_id(self, _id):
+    sql = 'SELECT * FROM %(tablename)s WHERE id=?;' % {'tablename': self.tablename}
+    tuplevalues = (_id, )
     conn = self.get_connection()
     cursor = conn.cursor()
     fetch_result = cursor.execute(sql, tuplevalues)
@@ -107,14 +107,46 @@ class DBDirTree(dbb.DBBase):
       SET
         name=?, 
         parentpath=?, 
-        is_present=?,
         sha1=?,
         bytesize=?, 
         mdatetime=? 
       WHERE
-        hkey=?;
+        id=?;
       '''
     return sql_before_interpol
+
+  def delete_rows_not_existing_on_dirtree(self, mountpath):
+    """
+    This method is not implemented in the super class
+    """
+    pass
+    plimit = 50
+    offset = 0
+    ids = []
+    rowsgenerator = self.do_select_all_w_limit_n_offset(plimit, offset)
+    for rows in rowsgenerator:
+      for row in rows:
+        idx = self.fieldnames.index('name')
+        name = row[idx]
+        idx = self.fieldnames.index('parentpath')
+        parentpath = row[idx]
+        middlepath = os.path.join(parentpath, name)
+        if middlepath.startswith('/'):
+          middlepath = middlepath.lstrip('/')
+        fpath = os.path.join(mountpath, middlepath)
+        if not os.path.isfile(fpath):
+          ids.append(row[0])
+    print('Deleting', ids)
+    conn = self.get_connection()
+    cursor = conn.cursor()
+    for _id in ids:
+      sql = 'delete from %(tablename)s where id=?;' % {'tablename': self.tablename}
+      tuplevalues = (_id, )
+      cursor.execute(sql, tuplevalues)
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print('Deleted/Committed', len(ids), 'records')
 
 
 def adhoc_select():

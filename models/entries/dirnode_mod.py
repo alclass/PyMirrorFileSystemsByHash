@@ -119,18 +119,27 @@ class DirNode:
     return cls.create_n_return_node_in_db(npath, is_file, sha1, bytesize, mdatetime)
 
   @classmethod
-  def create_n_return_node_in_db(cls, dbtree, npath, is_file=False, sha1=None, bytesize=None, mdatetime=None):
+  def create_n_return_node_in_db(cls, dbtree, npath, sha1=None, bytesize=None, mdatetime=None):
     if npath is None or npath == '/':
       return cls.root
     parentpath, name = os.path.split(npath)
-    hkey = hm.HashSimple(npath).num
     bytesize = bytesize
     mdatetime = mdatetime
-    tuplevalues = (None, hkey, name, parentpath, is_file, sha1, bytesize, mdatetime)
+    tuplevalues = (None, name, parentpath, sha1, bytesize, mdatetime)
     question_marks = '?, ' * len(tuplevalues)
     question_marks = question_marks.rstrip(', ')
     sql = "insert into %(tablename)s VALUES (" + question_marks + ");"
-    _ = dbtree.do_insert(sql, tuplevalues)
+    # check existence
+    selectsql = 'select * from  %(tablename)s where name=? and parentpath=?;'
+    fetched_list = dbtree.do_select(selectsql, (name, parentpath))
+    if fetched_list is None or len(fetched_list) == 0:
+      # record does not exists, an insert should be tried
+      _ = dbtree.do_insert_with_sql_n_tuplevalues(sql, tuplevalues)
+    else:
+      # id exists, an update should be tried
+      row_found = fetched_list[0]
+      new_row = (row_found[0], name, parentpath, sha1, bytesize, mdatetime)
+      dbtree.do_update_with_all_fields_with_tuplevalues(new_row)
     return cls.fetch_node_from_db(dbtree, npath)
 
   @staticmethod
@@ -199,7 +208,6 @@ class DirNode:
   def as_dict(self):
     outdict = {
       'name': self.name,
-      'hashkey': self.hashkey,
       'parentpath': self.parentpath,
       'sha1': self.sha1,
       'bytesize': self.bytesize,

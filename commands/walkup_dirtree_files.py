@@ -29,7 +29,9 @@ Operations like copy (in-between dirtrees), move/rename (within the same dirtree
 The data structure of dirnode:
 -----------------------------
 DirNode (at the time of writing) is an 8-tuple ie:
-  0 _id | 1 hkey | 2 name | 3 parentpath | 4 is_present | 5 sha1 | 6 bytesize | 8 mdatetime
+  0 _id | 1 name | 2 parentpath | 3 sha1 | 4 bytesize | 5 mdatetime
+    OBS: dbtree has a property called fieldnames which must be used to avoid hardcoding the indices
+    (though it's still necessary to hardcode the field names themselves).
 
 Transient operations:
 ====================

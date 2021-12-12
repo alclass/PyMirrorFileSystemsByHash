@@ -11,19 +11,19 @@ class ReportFileRepeat:
     self.dbtree = dbt.DBDirTree(mountpath)
 
   def report(self):
-    sql = 'SELECT DISTINCT(sha1), count(hkey) from %(tablename)s GROUP BY sha1;'
+    sql = 'SELECT DISTINCT(sha1), count(id) from %(tablename)s GROUP BY sha1;'
     rowlist = self.dbrepeat.do_select_with_sql_without_tuplevalues(sql)
     total = 0
     for i, row in enumerate(rowlist):
       sha1 = row[0]
       sha1hex = sha1.hex()
-      counthkey = row[1]
-      total += counthkey
-      print(i+1, sha1hex, counthkey)
+      countid = row[1]
+      total += countid
+      print(i+1, sha1hex, countid)
     print('total', total)
 
   def report_sha1_with_paths(self):
-    sql = 'SELECT DISTINCT(sha1), count(hkey) from %(tablename)s GROUP BY sha1;'
+    sql = 'SELECT DISTINCT(sha1), count(id) from %(tablename)s GROUP BY sha1;'
     rowlist = self.dbrepeat.do_select_with_sql_without_tuplevalues(sql)
     total = 0
     for i, row in enumerate(rowlist):

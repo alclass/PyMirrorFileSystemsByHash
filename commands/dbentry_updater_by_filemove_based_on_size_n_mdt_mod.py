@@ -17,7 +17,6 @@ This supposition is based on the following reasoning:
 """
 import os
 import fs.db.dbdirtree_mod as dbdt
-import fs.hashfunctions.hash_mod as hm
 import default_settings as defaults
 
 
@@ -35,9 +34,10 @@ class DBEntryUpdater:
 
   def verify_if_an_update_can_happen(
       self,
-      row_found, filename, middlepath, bytesize, mdatetime
+      row_found, filename, middlepath
     ):
     """
+    bytesize, mdatetime are not used here but row_found had these two equal
     If this point is reached in program flow, the following TWO condtions are met:
       1) a file in os does not have a correspondent entry in db (a dbentry);
       2) one sole dbentry exists with the same bytesize and mdatetime as file's (ie no ambiguity in files);
@@ -47,8 +47,11 @@ class DBEntryUpdater:
       with the new file location (hkey, name, parentpath)
     """
     # check if dbentry has its correspondent osentry:
-    name = row_found[2]
-    parentpath = row_found[3]
+    _id = row_found[0]
+    idx = self.dbtree.fieldnames.index('name')
+    name = row_found[idx]
+    idx = self.dbtree.fieldnames.index('parentpath')
+    parentpath = row_found[idx]
     folderpath = os.path.join(self.dbtree.mountpath, parentpath.lstrip('/'))
     filepath = os.path.join(folderpath, name)
     if os.path.isfile(filepath):
@@ -57,16 +60,15 @@ class DBEntryUpdater:
     sql = '''
     UPDATE %(tablename)s
     SET
-      hkey=?,
       name=?,
       parentpath=?
     WHERE
-      bytesize=? and 
-      mdatetime=?;
+      id=?;
     '''
     print(sql)
-    hkey = hm.HashSimple(middlepath + filename).num
-    tuplevalues = (hkey, filename, middlepath, bytesize, mdatetime)
+    if not middlepath.startswith('/'):
+      middlepath = '/' + middlepath
+    tuplevalues = (filename, middlepath, _id)
     update_result = self.dbtree.do_update_with_sql_n_tuplevalues(sql, tuplevalues)
     if update_result:
       self.n_dbupdates += 1
@@ -74,10 +76,10 @@ class DBEntryUpdater:
     return False
 
   def verify_if_many_exist_if_dbfound_exists_in_os_or_update_location(
-      self, fetched_list, filename, middlepath, bytesize, mdatetime
+      self, fetched_list, filename, middlepath
     ):
     """
-    middlepath is dirnode.parentpath
+    middlepath is dirnode.parentpath (with the starting '/')
     """
     if fetched_list is None or len(fetched_list) == 0:
       return False
@@ -87,7 +89,7 @@ class DBEntryUpdater:
     if len(fetched_list) == 1:
       row_found = fetched_list[0]
       return self.verify_if_an_update_can_happen(
-        row_found, filename, middlepath, bytesize, mdatetime
+        row_found, filename, middlepath
       )
 
   def verify_file_by_its_bysize_n_mdatetime(self, filename, middlepath):
@@ -96,12 +98,12 @@ class DBEntryUpdater:
     bytesize = filestat.st_size
     mdatetime = filestat.st_mtime
     print(self.n_processed_files, '/', self.n_files_in_dirtree, 'bytesize', bytesize, 'mdatetime', mdatetime)
-    sql = 'select * from %(tablename)s where bytesize=? and mdatetime=?;'
+    sql = 'SELECT * FROM %(tablename)s WHERE bytesize=? AND mdatetime=?;'
     tuplevalues = (bytesize, mdatetime)
     fetched_list = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     if len(fetched_list) > 0:
       return self.verify_if_many_exist_if_dbfound_exists_in_os_or_update_location(
-        fetched_list, filename, middlepath, bytesize, mdatetime
+        fetched_list, filename, middlepath
       )
     else:
       print(self.n_processed_files, '/', self.n_files_in_dirtree, filename, 'was not found by bytesize and mdatetime')
@@ -110,7 +112,7 @@ class DBEntryUpdater:
     """
     parentpath is middlepath which is fullpath minus mountpath
     """
-    sql = 'select * from %(tablename)s where name=? and parentpath=?;'
+    sql = 'SELECT * FROM %(tablename)s WHERE name=? AND parentpath=?;'
     tuplevalues = (filename, parentpath)
     fetched_list = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     if len(fetched_list) > 0:

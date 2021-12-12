@@ -52,8 +52,6 @@ class DBBase:
       if not os.path.isfile(self.sqlitefile_abspath):
         error_msg = 'Sqlitefile (%s) does not exist.' % self.sqlitefile_abspath
         raise OSError(error_msg)
-    if self.tablename is None:
-      self.tablename = ls.Paths.get_defaut_sqlitetablename()
     self.sqlite_createtable_if_not_exists()
     return
 
@@ -99,33 +97,10 @@ class DBBase:
     return []
 
   def delete_rows_not_existing_on_dirtree(self, mountpath):
-    plimit = 50
-    offset = 0
-    ids = []
-    rowsgenerator = self.do_select_all_w_limit_n_offset(plimit, offset)
-    for rows in rowsgenerator:
-      for row in rows:
-        idx = self.fieldnames.index('name')
-        name = row[idx]
-        idx = self.fieldnames.index('parentpath')
-        parentpath = row[idx]
-        middlepath = os.path.join(parentpath, name)
-        if middlepath.startswith('/'):
-          middlepath = middlepath.lstrip('/')
-        fpath = os.path.join(mountpath, middlepath)
-        if not os.path.isfile(fpath):
-          ids.append(row[0])
-    print('Deleting', ids)
-    conn = self.get_connection()
-    cursor = conn.cursor()
-    for _id in ids:
-      sql = 'delete from %(tablename)s where id=?;' % {'tablename': self.tablename}
-      tuplevalues = (_id, )
-      cursor.execute(sql, tuplevalues)
-    conn.commit()
-    cursor.close()
-    conn.close()
-    print('Deleted/Committed', len(ids), 'records')
+    """
+    This method is implemented in inherited classes
+    """
+    pass
 
   def delete_all_rows(self):
     sql = 'DELETE FROM %(tablename)s;' % {'tablename': self.tablename}
@@ -158,9 +133,9 @@ class DBBase:
     conn.close()
     return dbdel_result
 
-  def fetch_rec_if_hkey_exists_in_db(self, hkey):
-    sql = 'select * from %(tablename)s WHERE hkey=?;' % {'tablename': self.tablename}
-    tuplevalues = (hkey, )
+  def fetch_row_by_id(self, _id):
+    sql = 'select * from %(tablename)s WHERE id=?;' % {'tablename': self.tablename}
+    tuplevalues = (_id, )
     conn = self.get_connection()
     cursor = conn.cursor()
     fetch_result = cursor.execute(sql, tuplevalues)
@@ -317,8 +292,10 @@ class DBBase:
     """
     returns a boolean ie True if inserted/updated False otherwise ie no inserts or updates happened
     """
-    name = tuplevalues[1]
-    parentpath = tuplevalues[2]
+    idx = self.fieldnames.index('name')
+    name = tuplevalues[idx]
+    idx = self.fieldnames.index('parentpath')
+    parentpath = tuplevalues[idx]
     rowlist = self.fetch_node_by_name_n_parentpath(name, parentpath)
     if len(rowlist) == 0:
       return self.do_insert_with_all_fields_with_tuplevalues(tuplevalues)
@@ -326,7 +303,8 @@ class DBBase:
       found_row = rowlist[0]
       return self.do_update_with_all_fields_with_tuplevalues_if_needed(found_row, tuplevalues)
     # hkey is UNIQUE in db, ie it could not have more than one row in db
-    error_msg = 'Inconsistency Error: the entry hkey (%s) has more than one record in db.' % hkey
+    error_msg = 'Inconsistency Error: the entry (name, parentpath) (%s, %s) has more than one record in db.' \
+                % (name, parentpath)
     raise ValueError(error_msg)
 
   def do_insert_with_all_fields_with_tuplevalues(self, tuplevalues):
@@ -341,14 +319,15 @@ class DBBase:
     return sql_before_interpol
 
   def do_update_with_all_fields_with_tuplevalues(self, tuplevalues):
-    n_fields = self.get_n_fields()
+    # n_fields = self.get_n_fields()
+    n_fields = len(self.fieldnames)
     if len(tuplevalues) != n_fields:
-      error_msg = 'len(tuplevalues) != %d =>' % n_fields + str(tuplevalues)
+      error_msg = 'len(tuplevalues)=%d != len(fieldnames)=%d => ' % (len(tuplevalues), n_fields)
+      error_msg += str(tuplevalues)
       raise ValueError(error_msg)
-    # remove _id from tuplevalues
-    hkey = tuplevalues[1]
-    # change the order of hkey because it's going to the WHERE clause at the end
-    tuplevalues = tuplevalues[2:] + (hkey, )
+    # change the order of _id because it's going to the WHERE clause at the end
+    _id = tuplevalues[0]
+    tuplevalues = tuplevalues[1:] + (_id, )
     sql_before_interpol = self.form_update_with_all_fields_sql()
     return self.do_update_with_sql_n_tuplevalues(sql_before_interpol, tuplevalues)
 
