@@ -1,0 +1,14 @@
+bin_local_settings.py
+config.py
+pyvenv.cfg
+.idea/
+dados/
+venv/
+*.log
+*/*.log
+*.pyc
+*/*.pyc
+*.sqlite
+*/*.sqlite
+*.txt
+*/*.txt
