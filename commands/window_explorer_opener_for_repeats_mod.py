@@ -21,7 +21,10 @@ import models.entries.dirnode_mod as dn
 import fs.hashfunctions.hash_mod as hm
 BUF_SIZE = 65536
 SQL_SELECT_LIMIT_DEFAULT = 50
-EXTENSIONS_TO_JUMP = ['.gif', 'htm', 'html', 'txt', 'pdf']
+EXTENSIONS_TO_JUMP = ['.gif', '.htm', '.html', '.txt', '.pdf']
+EXTENSIONS_IN_SHA1_VERIFICATION = [
+  '.mp4', '.mp3', '.mkv', '.avi', '.webm', '.m4a'
+]
 
 
 class RepeatVerifier:
@@ -124,35 +127,41 @@ class RepeatsGrabber:
     self.n_files_in_db = self.dbtree.count_rows_as_int()
     self.n_unique_files_in_db = self.dbtree.count_unique_sha1s_as_int()
     self.n_repeated_files = self.n_files_in_db - self.n_unique_files_in_db
+    self.n_windows_open = 0
     self.n_processed_repeated_files = 0
 
   def open_window_explorer_for_user(self, n_repeats, sha1):
     sql = 'SELECT * FROM %(tablename)s WHERE sha1=?;'
     tuplevalues = (sha1, )
     rows = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
-    n_windows_open = 0
-    for i, row in enumerate(rows):
+    for n_row, row in enumerate(rows):
       self.n_processed_repeated_files += 1
       idx = self.dbtree.fieldnames.index('name')
       name = row[idx]
       _, ext = os.path.splitext(name)
-      if ext in EXTENSIONS_TO_JUMP:
-        print('Jumping extensions:', EXTENSIONS_TO_JUMP)
-      print(
-        self.n_processed_repeated_files, 'of', self.n_files_in_db,
-        i, 'repeats =', n_repeats, 'file:', name
-      )
-      idx = self.dbtree.fieldnames.index('parentpath')
-      parentpath = row[idx]
-      parentpath = parentpath.lstrip('/')
-      folderpath = os.path.join(self.mountpath, parentpath)
-      filepath = os.path.join(folderpath, name)
-      if os.path.isdir(folderpath) and os.path.isfile(filepath):
-        comm = 'caja "%s"' % folderpath
-        os.system(comm)
-        n_windows_open += 1
-        if n_windows_open % 5:
-          _ = input('Type anything to continue for the next windows open:')
+      if ext in EXTENSIONS_IN_SHA1_VERIFICATION:
+        self.go_open_windows_for_repeats(n_repeats, row, n_row)
+
+  def go_open_windows_for_repeats(self, n_repeats, row, n_row):
+    idx = self.dbtree.fieldnames.index('name')
+    name = row[idx]
+    _, ext = os.path.splitext(name)
+    print(
+      'Extension', ext,
+      self.n_processed_repeated_files, 'of', self.n_files_in_db,
+      n_row, 'repeats =', n_repeats, 'file:', name
+    )
+    idx = self.dbtree.fieldnames.index('parentpath')
+    parentpath = row[idx]
+    parentpath = parentpath.lstrip('/')
+    folderpath = os.path.join(self.mountpath, parentpath)
+    filepath = os.path.join(folderpath, name)
+    if os.path.isdir(folderpath) and os.path.isfile(filepath):
+      comm = 'caja "%s"' % folderpath
+      os.system(comm)
+      self.n_windows_open += 1
+      if self.n_windows_open % 5:
+        _ = input('Type anything to continue for the next windows open:')
 
   def fetch_distinct_sha1s(self):
     sql = 'SELECT DISTINCT sha1, COUNT(id) FROM %(tablename)s GROUP by sha1;'

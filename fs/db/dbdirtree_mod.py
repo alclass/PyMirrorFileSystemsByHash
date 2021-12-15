@@ -18,12 +18,12 @@ class DBDirTree(dbb.DBBase):
 
   default_tablename = 'files_in_tree'
 
-  def __init__(self, mount_abspath=None, inlocus_sqlite_filename=None, tablename=None):
-    self.mountpath = mount_abspath
+  def __init__(self, mountpath=None, inlocus_sqlite_filename=None, tablename=None):
+    self.mountpath = mountpath
     self._fieldnames = ['id', 'name', 'parentpath', 'sha1', 'bytesize', 'mdatetime']
     if tablename is None:
       self.tablename = self.default_tablename
-    super().__init__(mount_abspath, inlocus_sqlite_filename)
+    super().__init__(mountpath, inlocus_sqlite_filename)
 
   # def get_connection(self):
   #   return sqlite3.Connection(self.sqlitefile_abspath)

@@ -24,10 +24,11 @@ import shutil
 import models.entries.dirnode_mod as dn
 import fs.db.dbdirtree_mod as dbdt
 import fs.hashfunctions.hash_mod as hm
+import fs.strfs.strfunctions_mod as strf
 import default_settings as defaults
 from commands.walkup_dirtree_files import FileSweeper
 import commands.resync_mod as rsync
-import commands.paths_endingwith_spaces_mod as spacepaths
+# import commands.paths_endingwith_spaces_mod as spacepaths
 import commands.move_rename_target_based_on_source_mod as moverename
 import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentryupd
 
@@ -247,6 +248,9 @@ class MirrorDirTree:
         self.n_file_not_backable += 1
         print('Continuing for next. File not copiable (.part extension):', src_dirnode.name)
         continue
+      if strf.any_dir_in_path_startswith(src_dirnode.parentpath, 'mp3s '):
+        self.n_file_not_backable += 1
+        continue
       lowercharspath = src_dirnode.parentpath.lower()
       if lowercharspath.find('z-del') > -1:
         self.n_file_not_backable += 1
@@ -323,14 +327,14 @@ class MirrorDirTree:
       return self.n_deleted_files
 
   def process(self):
-    ori_n_bak_dirtrees = [self.ori_dt.mountpath, self.bak_dt.mountpath]
-    print('1 whitespace (more important are the trailing spaces) in names verifier', ori_n_bak_dirtrees)
-    print('-'*40)
-    space_verifier = spacepaths.PathsEndingWithSpacesVerifier(self.ori_dt.mountpath)
-    space_verifier.process()
-    print('2 resync_trees', ori_n_bak_dirtrees)
-    print('-'*40)
-    rsync.resync_trees(ori_n_bak_dirtrees)
+    # print('1 whitespace (more important are the trailing spaces) in names verifier')
+    # print('-'*40)
+    # space_verifier = spacepaths.PathsEndingWithSpacesVerifier(self.ori_dt.mountpath)
+    # space_verifier.process()
+    for mountpath in (self.ori_dt.mountpath, self.bak_dt.mountpath):
+      print('2 resync_tree', mountpath)
+      print('-' * 40)
+      rsync.resync_tree(mountpath)
     self.fetch_total_files_in_src_n_trg()
     self.fetch_total_unique_files_in_src_n_trg()
     print('3 dbentry updater / verify_moving_files_in_target')
