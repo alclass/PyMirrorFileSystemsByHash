@@ -52,6 +52,7 @@ import models.entries.dirnode_mod as dn
 import fs.hashfunctions.hash_mod as hm
 import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentry_upd
 import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
+import fs.db.dbfailed_fileread_mod as freadfail
 import default_settings as defaults
 BUF_SIZE = 65536
 ori_mount_abspath = '/media/friend/CompSci 2T Orig'
@@ -114,6 +115,8 @@ class FileSweeper:
       raise OSError(error_msg)
     self.dirtree = dt.DirTree(treename, self.mountpath)
     self.dbtree = self.dirtree.dbtree  # dbu.DBDirTree(mount_abspath)
+    # freadfailer will record the sha1 fileread failed attempts
+    self.freadfailer = freadfail.DBFailFileReadReporter(self.dbtree.mountpath)
 
   def treat_restart_at_walkloopseq(self):
     """
@@ -166,14 +169,23 @@ class FileSweeper:
           self.n_dbentries_ins_upd += 1
           print('n_dbentries_ins_upd', self.n_dbentries_ins_upd, dirnode)
         else:
-          self.n_dbentries_failed_ins_upd += 1
-          print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd, dirnode)
+          print(' >>>>>>>>>>>>>>>> sha1 is valid but db-insert returned false')
       else:
         # sha1 is None here (file is probably unreadable from disk)
         self.report_unreadable_file(dirnode)
 
   def report_unreadable_file(self, dirnode):
     self.all_nodes_with_osread_problem.append(dirnode)
+    self.n_dbentries_failed_ins_upd += 1
+    print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd, dirnode, '[going to register event]')
+    pdict = {
+      'name': dirnode.name,
+      'parentpath': dirnode.parentpath,
+      'bytesize': dirnode.bytesize,
+      'mdatetime': dirnode.mdatetime,
+      'event_dt': datetime.datetime.now(),
+    }
+    self.freadfailer.do_insert_or_update_with_dict_to_prep_tuplevalues(pdict)
 
   def count_files_in_dirtree(self):
     print('Counting all files in dirtree ' + self.mountpath)
@@ -217,7 +229,7 @@ class FileSweeper:
     self.count_files_in_dirtree()
     self.walkup_dirtree_files()
     dbupdater = dbentry_upd.DBEntryUpdater(self.mountpath)
-    dbupdater.process()
+    dbupdater.process(self.n_all_files_in_dirtree)
     dbdeleter = dbentry_del.DBEntryWithoutCorrespondingOsEntryDeleter(self.mountpath)
     dbdeleter.process()
     self.report_all_nodes_with_osread_problem()

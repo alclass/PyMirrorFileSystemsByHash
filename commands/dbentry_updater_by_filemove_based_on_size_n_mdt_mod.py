@@ -141,7 +141,7 @@ class DBEntryUpdater:
         is_root_dir_looppass = False
         continue
       self.n_files_in_dirtree += len(files)
-      self.n_dirs += 1
+      self.n_dirs += len(folders)
 
   def walkup_dirtree(self):
     n_seq_dir = 0
@@ -167,9 +167,18 @@ class DBEntryUpdater:
     print('n_unique_sha1s', self.n_unique_sha1s)
     print('n_dbupdates', self.n_dbupdates, "(meaning files that were moved before and got unsync'd, now db-sync'd)")
 
-  def process(self):
-    self.n_files_in_db = self.dbtree.count_rows_as_int()
-    self.n_unique_sha1s = self.dbtree.count_unique_sha1s_as_int()
+  def set_totals_in_db(self, n_files_in_db=None, n_unique_sha1s=None):
+    if n_files_in_db is not None:
+      self.n_files_in_db = n_files_in_db
+    else:
+      self.n_files_in_db = self.dbtree.count_rows_as_int()
+    if n_unique_sha1s is not None:
+      self.n_unique_sha1s = n_unique_sha1s
+    else:
+      self.n_unique_sha1s = self.dbtree.count_unique_sha1s_as_int()
+
+  def process(self, n_files_in_db=None, n_unique_sha1s=None):
+    self.set_totals_in_db(n_files_in_db, n_unique_sha1s)
     self.walkup_to_count_files()
     self.walkup_dirtree()
     self.report()

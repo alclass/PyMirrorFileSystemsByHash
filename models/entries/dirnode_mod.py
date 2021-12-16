@@ -156,6 +156,9 @@ class DirNode:
     dirnode._id = _id
     return dirnode
 
+  def get_db_id(self):
+    return self._id
+
   @classmethod
   def get_root_cls(cls):
     if cls._root:

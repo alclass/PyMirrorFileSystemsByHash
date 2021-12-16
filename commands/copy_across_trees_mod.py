@@ -23,6 +23,7 @@ import os.path
 import shutil
 import models.entries.dirnode_mod as dn
 import fs.db.dbdirtree_mod as dbdt
+import fs.db.dbfailed_filecopy_mod as dbfailedcopy
 import fs.hashfunctions.hash_mod as hm
 import fs.strfs.strfunctions_mod as strf
 import default_settings as defaults
@@ -52,6 +53,7 @@ class MirrorDirTree:
     self.total_unique_srcfiles = 0
     self.total_unique_trgfiles = 0
     self.fetch_total_unique_files_in_src_n_trg()  # idem
+    self.dbfailedcopyreporter = dbfailedcopy.DBFailFileCopyReporter(self.ori_dt.mountpath)
 
   @property
   def total_of_repeat_srcfiles(self):
@@ -276,6 +278,16 @@ class MirrorDirTree:
       bool_copied = self.copy_filepath(src_filepath, trg_filepath)
       if bool_copied:
         return trg_dirnode.insert_into_db(self.bak_dt)
+      else:
+        self.report_failed_copy(src_dirnode)
+
+  def report_failed_copy(self, src_dirnode):
+    pdict = {
+      'file_id': src_dirnode.get_db_id(),
+      'trg_mountpath': self.bak_dt.mountpath,
+      'event_id': datetime.datetime.now()
+    }
+    _ = self.dbfailedcopyreporter.do_insert_or_update_with_dict_to_prep_tuplevalues(pdict)
 
   def verify_move_rename_thru_target_based_on_source(self):
     moverenamer = moverename.MoveRename(self.ori_dt.mountpath, self.bak_dt.mountpath)
@@ -340,9 +352,9 @@ class MirrorDirTree:
     print('3 dbentry updater / verify_moving_files_in_target')
     print('-'*40)
     dbentryupdater = dbentryupd.DBEntryUpdater(self.ori_dt.mountpath)
-    dbentryupdater.process()
+    dbentryupdater.process(self.total_srcfiles_in_db, self.total_unique_srcfiles)
     dbentryupdater = dbentryupd.DBEntryUpdater(self.bak_dt.mountpath)
-    dbentryupdater.process()
+    dbentryupdater.process(self.total_trgfiles_in_db, self.total_unique_trgfiles)
     print('4 mirror_by_copying_across_dirtrees')
     print('-'*40)
     self.mirror_by_copying_across_dirtrees()
@@ -373,7 +385,7 @@ class MirrorDirTree:
           '| total_unique_trgfiles =', self.total_unique_trgfiles)
     print('total_of_repeat_srcfiles =', self.total_of_repeat_srcfiles,
           '| total_of_repeat_trgfiles =', self.total_of_repeat_trgfiles)
-    print("Script's Runtime:", elapsed_time)
+    print("Script's Runtime:", elapsed_time, '| today/now = ', datetime.datetime.now())
     print('=_+_+_='*3, 'End of the CopyAcross Report', '=_+_+_='*3)
 
 
