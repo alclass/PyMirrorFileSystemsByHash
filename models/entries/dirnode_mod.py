@@ -300,6 +300,10 @@ class DirNode:
       return mountpath
     return os.path.join(mountpath, middlepath)
 
+  def does_dirnode_exist_in_disk(self, mountpath):
+    abspath = self.get_abspath_with_mountpath(mountpath)
+    return os.path.exists(abspath)
+
   @classmethod
   def fetch_dirnode_by_id_n_db(cls, row_id, dbtree):
     sql = 'SELECT * FROM %(tablename)s WHERE id=?;'

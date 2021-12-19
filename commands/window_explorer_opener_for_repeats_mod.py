@@ -145,23 +145,25 @@ class RepeatsGrabber:
   def go_open_windows_for_repeats(self, n_repeats, row, n_row):
     idx = self.dbtree.fieldnames.index('name')
     name = row[idx]
+    idx = self.dbtree.fieldnames.index('parentpath')
+    parentpath = row[idx]
     _, ext = os.path.splitext(name)
     print(
       'Extension', ext,
       self.n_processed_repeated_files, 'of', self.n_files_in_db,
-      n_row, 'repeats =', n_repeats, 'file:', name
+      n_row, 'repeats =', n_repeats, '[', name, '] =>', parentpath
     )
-    idx = self.dbtree.fieldnames.index('parentpath')
-    parentpath = row[idx]
-    parentpath = parentpath.lstrip('/')
-    folderpath = os.path.join(self.mountpath, parentpath)
+    print('-'*40)
+    middlepath = parentpath.lstrip('/')
+    folderpath = os.path.join(self.mountpath, middlepath)
     filepath = os.path.join(folderpath, name)
     if os.path.isdir(folderpath) and os.path.isfile(filepath):
       comm = 'caja "%s"' % folderpath
       os.system(comm)
       self.n_windows_open += 1
-      if self.n_windows_open % 5:
-        _ = input('Type anything to continue for the next windows open:')
+      msg = 'Type anything to continue for the next windows open:'
+      screen_msg = str(self.n_windows_open) + ' ' + msg
+      _ = input(screen_msg)
 
   def fetch_distinct_sha1s(self):
     sql = 'SELECT DISTINCT sha1, COUNT(id) FROM %(tablename)s GROUP by sha1;'
