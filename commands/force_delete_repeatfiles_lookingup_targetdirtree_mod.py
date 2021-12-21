@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """
-force_delete_repeatfiles_looking_dirup_mod.py
+force_delete_repeatfiles_lookingup_targetdirtree_mod.py
 
 This script takes two folder paths (source and target) and deletes file copies (repeats (*))
   in the target dirtree.
 
 (*) repeats are based on the sha1-hash of its content
+
+Notice the main class here needs 4 parameters to do its job. This is an important different from
+  script:
+    force_delete_every_equal_sha1_in_targetdirtree_mod
+  which only needs 2 parameters, ie src_dirtree (or src_mountpath) and trg_dirtree (or trg_mountpath)
 
 IMPORTANT:
   1) all file deletions are always somehow dangerous but this script only deletes copies

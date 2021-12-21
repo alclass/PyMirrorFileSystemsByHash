@@ -227,9 +227,9 @@ class FileSweeper:
 
   def process(self):
     self.count_files_in_dirtree()
-    self.walkup_dirtree_files()
     dbupdater = dbentry_upd.DBEntryUpdater(self.mountpath)
     dbupdater.process(self.n_all_files_in_dirtree)
+    self.walkup_dirtree_files()
     dbdeleter = dbentry_del.DBEntryWithoutCorrespondingOsEntryDeleter(self.mountpath)
     dbdeleter.process()
     self.report_all_nodes_with_osread_problem()

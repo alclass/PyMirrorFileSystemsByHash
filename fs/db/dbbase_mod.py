@@ -112,6 +112,16 @@ class DBBase:
     conn.close()
     return fetch_result
 
+  def delete_with_sql_n_tuplevalues(self, sql, tuplevalues):
+    conn = self.get_connection()
+    cursor = conn.cursor()
+    delete_result = cursor.execute(sql)
+    conn.commit()
+    n_rows_deleted = delete_result.rowcount
+    cursor.close()
+    conn.close()
+    return n_rows_deleted
+
   def delete_row_by_id(self, _id):
     sql = 'DELETE FROM %(tablename)s WHERE id=?;' % {'tablename': self.tablename}
     tuplevalues = (_id, )
