@@ -29,7 +29,9 @@ For example: suppose a back-up operation is started. An operation in this chain 
 import datetime
 import os.path
 import fs.db.dbdirtree_mod as dbt
+import fs.dirfilefs.dir_n_file_fs_mod as dirfil
 import default_settings as defaults
+import models.entries.dirnode_mod as dn
 SQL_SELECT_LIMIT_DEFAULT = 50
 
 
@@ -43,11 +45,25 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
     """
     """
     self.n_deleted_dbentries = 0
-    self.n_processed = 0
+    # this below is zeroed at every pass thru outside loop (the one with sql-limit/offset)
+    # its counting ajusts the db-select-offset
+    self.n_deleted_in_loop = 0
+    self.n_processed_in_db = 0
     self.n_updates = 0
     self.mountpath = mountpath
     self.dbtree = dbt.DBDirTree(self.mountpath)
-    self.n_files = self.dbtree.count_rows_as_int()
+    self.n_files_in_db = self.dbtree.count_rows_as_int()
+
+  def delete_dbentry_if_theres_no_equivalent_os_entry(self, row):
+    self.n_processed_in_db += 1
+    dirnode = dn.DirNode.create_with_tuplerow(row, self.dbtree.fieldnames)
+    filepath = dirnode.get_abspath_with_mountpath(self.mountpath)
+    if not os.path.isfile(filepath):
+      del_result = self.dbtree.delete_row_by_id(dirnode.get_db_id())
+      self.n_deleted_dbentries += 1
+      self.n_deleted_in_loop += 1
+      print(' *-=-' * 4, 'DELETE DBENTRY', ' *-=-' * 4)
+      print(del_result, self.n_deleted_dbentries, 'deleted dbentry for', dirnode.get_db_id(), dirnode.name)
 
   def fetch_dbentries_n_check_their_osentries(self):
     offset = 0
@@ -57,25 +73,10 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
         % {'limit': k_limit, 'offset': offset}
       sql = 'SELECT * FROM %(tablename)s' + limit_clause
       rows = self.dbtree.do_select_with_sql_without_tuplevalues(sql)
-      n_deleted_in_loop = 0
+      self.n_deleted_in_loop = 0
       for row in rows:
-        self.n_processed += 1
-        _id = row[0]
-        idx = self.dbtree.fieldnames.index('name')
-        name = row[idx]
-        idx = self.dbtree.fieldnames.index('parentpath')
-        parentpath = row[idx]
-        print(_id, name, parentpath)
-        middlepath = os.path.join(parentpath, name)
-        middlepath = middlepath.lstrip('/')
-        filepath = os.path.join(self.mountpath, middlepath)
-        if not os.path.isfile(filepath):
-          del_result = self.dbtree.delete_row_by_id(_id)
-          self.n_deleted_dbentries += 1
-          n_deleted_in_loop += 1
-          print(' *-=-'*4, 'DELETE DBENTRY', ' *-=-'*4)
-          print(del_result, self.n_deleted_dbentries, 'deleted dbentry for', _id, name)
-      offset = offset + k_limit - n_deleted_in_loop
+        self.delete_dbentry_if_theres_no_equivalent_os_entry(row)
+      offset = offset + k_limit - self.n_deleted_in_loop
       if len(rows) < k_limit:  # this is the condition for interrupting the while-infinite-loop "WHILE 1" above
         print('Interrupting while-1 loop: len(rows)', len(rows), ' < k_limit', k_limit, 'offset', offset)
         break
@@ -85,17 +86,24 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
     print('DBEntryWithoutCorrespondingOsEntryDeleter Report')
     print('='*40)
     print('Mountpath is', self.mountpath)
-    print('n_files', self.n_files)
-    print('n_processed', self.n_processed)
+    print('n_files', self.n_files_in_db)
+    print('n_processed', self.n_processed_in_db)
     print('n_deleted_dbentries', self.n_deleted_dbentries)
     print('End of Processing')
 
+  def delete_empty_dirs(self):
+    screen_msg = 'Do you want to delete empty folders in [%s] ? (/Y/n) ' % self.mountpath
+    ans = input(screen_msg)
+    if ans in ['Y', 'y', '']:
+      dirfil.prune_dirtree_deleting_empty_folders(self.mountpath)
+
   def process(self):
     self.fetch_dbentries_n_check_their_osentries()
+    # self.delete_empty_dirs()
     self.report()
 
 
-class PresentOnFolderVerifier:
+class PresentInDBNotInDirTreeReporter:
   """
   The field is_present was DEPRECATED/removed from db.
   The presence occurrence must be done on-the-fly, ie as needed.
@@ -108,38 +116,49 @@ class PresentOnFolderVerifier:
   def __init__(self, mountpath):
     """
     """
-    self.n_files = 0
+    self.n_processed_files = 0
     self.n_updates = 0
-    self.not_present_ids = []
+    self.ids_present_in_db_not_in_os = []
     self.mountpath = mountpath
     self.dbtree = dbt.DBDirTree(self.mountpath)
+    self.total_files_in_db = self.dbtree.count_unique_sha1s_as_int()
 
-  def verify_files_presence(self, rowlist):
-    """
-    """
-    for row in rowlist:
-      self.n_files += 1
-      idx = self.dbtree.fieldnames.index('name')
-      name = row[idx]
-      idx = self.dbtree.fieldnames.index('parentpath')
-      parentpath = row[idx]
-      if parentpath is None:
-        parentpath = ''
-      if parentpath.startswith('/'):
-        parentpath = parentpath.lstrip('/')
-      folderpath = os.path.join(self.dbtree.mount_abspath, parentpath)
-      filepath = os.path.join(folderpath, name)
-      print(self.n_files, 'filepath', filepath)
+  def printline(self, dirnode):
+    filepath = dirnode.get_abspath_with_mountpath(self.dbtree.mount_abspath)
+    print(self.n_processed_files, '/', self.total_files_in_db, dirnode.name)
+    print(' => filepath =', filepath)
+
+  def gather_ids_not_present_in_os(self, rows):
+    for row in rows:
+      self.n_processed_files += 1
+      dirnode = dn.DirNode.create_with_tuplerow(row, self.dbtree.fieldnames)
+      filepath = dirnode.get_abspath_with_mountpath(self.dbtree.mount_abspath)
       if not os.path.isfile(filepath):
-        _id = row[0]
-        self.not_present_ids.append(_id)
+        self.printline(dirnode)
+        self.ids_present_in_db_not_in_os.append(dirnode.get_db_id())
+        screen_line = ' ==>>> this not in dirtree (%d)' % len(self.ids_present_in_db_not_in_os)
+        print(screen_line)
+
+  def loop_thru_files_in_db(self):
+    for generated_rows in self.dbtree.do_select_all_w_limit_n_offset():
+      for rows in generated_rows:
+        self.gather_ids_not_present_in_os(rows)
+
+  def report_files_in_db_not_in_os(self):
+    for _id in self.ids_present_in_db_not_in_os:
+      fetched_list = self.dbtree.fetch_node_by_id(_id)
+      if fetched_list is None or len(fetched_list) == 0:
+        continue
+      row = fetched_list[0]
+      dirnode = dn.DirNode.create_with_tuplerow(row, self.dbtree.fieldnames)
+      self.printline(dirnode)
 
   def process(self):
-    print('Process verify files presence on folder')
+    print('Process verify files present in db not in dirtree')
     print('='*40)
-    for i, rowlist in enumerate(self.dbtree.do_select_all_w_limit_n_offset()):
-      self.verify_files_presence(rowlist)
-    print('Finished with', self.n_files, 'files processed.')
+    self.loop_thru_files_in_db()
+    self.report_files_in_db_not_in_os()
+    print('Finished with', self.n_processed_files, 'files processed.')
 
 
 def process():
