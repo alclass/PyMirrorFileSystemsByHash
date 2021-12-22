@@ -112,7 +112,7 @@ class Mp3ElsewhereMover:
       for src_row in rows:
         self.n_files_processed += 1
         print(src_row)
-        src_dirnode = dn.DirNode.create_with_tuplerow(src_row)
+        src_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.fieldnames)
         self.move_to_target_or_delete_if_its_already_there(src_dirnode)
 
   def process(self):

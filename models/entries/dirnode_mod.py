@@ -143,15 +143,22 @@ class DirNode:
     return cls.fetch_node_from_db(dbtree, npath)
 
   @staticmethod
-  def create_with_tuplerow(tuplerow):
+  def create_with_tuplerow(tuplerow, fieldnames):
     if tuplerow is None:
       return None
-    _id = tuplerow[0]
-    name = tuplerow[1]
-    parentpath = tuplerow[2]
-    sha1 = tuplerow[3]
-    bytesize = tuplerow[4]
-    mdatetime = tuplerow[5]
+    if len(tuplerow) < len(fieldnames):
+      return None
+    _id = tuplerow[0]  # _id is always index 0
+    idx = fieldnames.index('name')
+    name = tuplerow[idx]
+    idx = fieldnames.index('parentpath')
+    parentpath = tuplerow[idx]
+    idx = fieldnames.index('sha1')
+    sha1 = tuplerow[idx]
+    idx = fieldnames.index('bytesize')
+    bytesize = tuplerow[idx]
+    idx = fieldnames.index('mdatetime')
+    mdatetime = tuplerow[idx]
     dirnode = DirNode(name, parentpath, sha1, bytesize, mdatetime)
     dirnode._id = _id
     return dirnode
@@ -311,7 +318,7 @@ class DirNode:
     tuplerowlist = dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     if tuplerowlist and len(tuplerowlist) > 0:
       tuplerow = tuplerowlist[0]
-      return cls.create_with_tuplerow(tuplerow)
+      return cls.create_with_tuplerow(tuplerow, dbtree.fieldnames)
     return None
 
   def is_leaf(self, dbtree):

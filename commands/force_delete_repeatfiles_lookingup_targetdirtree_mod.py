@@ -104,7 +104,7 @@ class ForceDeleterLookingDirUp:
     fetched_list = self.ori_dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     self.n_processed_files += 1
     for row in fetched_list:
-      dirnode = dn.DirNode.create_with_tuplerow(row)
+      dirnode = dn.DirNode.create_with_tuplerow(row, self.ori_dt.fieldnames)
       if not dirnode.does_dirnode_exist_in_disk(self.ori_dbtree.mountpath):
         continue
       id_n_sha1 = (dirnode.get_db_id(), dirnode.sha1)
@@ -119,7 +119,7 @@ class ForceDeleterLookingDirUp:
       fetched_list = self.bak_dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
       for row in fetched_list:
         self.n_deletes += 1
-        dirnode = dn.DirNode.create_with_tuplerow(row)
+        dirnode = dn.DirNode.create_with_tuplerow(row, self.bak_dt.fieldnames)
         if not dirnode.does_dirnode_exist_in_disk(self.ori_dbtree.mountpath):
           continue
         if _id == dirnode.get_db_id():

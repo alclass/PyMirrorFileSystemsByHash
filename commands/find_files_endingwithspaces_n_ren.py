@@ -38,7 +38,7 @@ class FileFinderTreeTraversor:
     self.n_unique_sha1_in_db = self.dbtree.count_unique_sha1s_as_int()
 
   def treat_file_with_endingspaces(self, row):
-    dirnode = dn.DirNode.create_with_tuplerow(row)
+    dirnode = dn.DirNode.create_with_tuplerow(row, self.dbtree.fieldnames)
     # strip extension
     extensionless_name, ext = os.path.splitext(dirnode.name)
     new_extensionless_name = extensionless_name.rstrip(' \t\r\n')

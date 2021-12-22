@@ -64,8 +64,8 @@ class MoveRename:
     if not fetched_rows or len(fetched_rows) != 1:
       return False
     trg_row = fetched_rows[0]
-    src_dirnode = dn.DirNode.create_with_tuplerow(src_row)
-    trg_dirnode = dn.DirNode.create_with_tuplerow(trg_row)
+    src_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.fieldnames)
+    trg_dirnode = dn.DirNode.create_with_tuplerow(trg_row, self.bak_dt.fieldnames)
     print(src_dirnode.path, '?', trg_dirnode.path)
     if src_dirnode.path != trg_dirnode.path:
       if self.move_trg_based_on_src(src_dirnode, trg_dirnode):

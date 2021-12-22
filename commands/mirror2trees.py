@@ -54,8 +54,8 @@ class MirrorDirTree:
       trg_row = self.fetch_row_if_sha1_exists_in_target(sha1)
       if trg_row is None:
         continue
-      src_dirnode = dn.DirNode.create_with_tuplerow(src_row)
-      trg_dirnode = dn.DirNode.create_with_tuplerow(trg_row)
+      src_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.fieldnames)
+      trg_dirnode = dn.DirNode.create_with_tuplerow(trg_row, self.bak_dt.fieldnames)
       if src_dirnode.is_target_in_the_same_pathposition(trg_dirnode):
         continue
       self.move_file_within_its_dirtree(trg_dirnode, src_dirnode)
@@ -75,8 +75,8 @@ class MirrorDirTree:
       if trg_row is not None:
         # no need to copy over
         continue
-      src_dirnode = dn.DirNode.create_with_tuplerow(src_row)
-      trg_dirnode = dn.DirNode.create_with_tuplerow(src_row)
+      src_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.fieldnames)
+      trg_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.bak_dt.fieldnames)
       ori_path = os.path.join(self.ori_dt.mountpath, src_dirnode.path)
       bak_path = os.path.join(self.bak_dt.mountpath, trg_dirnode.path)
       bak_dirpath, _ = os.path.split(bak_path)

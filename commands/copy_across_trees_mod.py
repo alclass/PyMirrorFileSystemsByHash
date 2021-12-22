@@ -123,13 +123,13 @@ class MirrorDirTree:
   def verify_moving_files_thru_target(self):
     for rows in self.bak_dt.do_select_all_w_limit_n_offset():
       for row in rows:
-        trg_dirnode = dn.DirNode.create_with_tuplerow(row)
+        trg_dirnode = dn.DirNode.create_with_tuplerow(row, self.bak_dt.fieldnames)
         inner_sql = 'SELECT * FROM %(tablename)s WHERE sha1=?;'
         tuplevalues = (trg_dirnode.sha1, )
         fetched_rows = self.ori_dt.do_select_with_sql_n_tuplevalues(inner_sql, tuplevalues)
         if len(fetched_rows) > 0:
           src_row = fetched_rows[0]
-          src_dirnode = dn.DirNode.create_with_tuplerow(src_row)
+          src_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.bak_dt.fieldnames)
           if src_dirnode.path != trg_dirnode.path:
             self.move_file_within_target_using_src_position(src_dirnode, trg_dirnode)
 
@@ -226,7 +226,7 @@ class MirrorDirTree:
     """
     for src_row in src_rowlist:
       self.n_files_processed += 1
-      src_dirnode = dn.DirNode.create_with_tuplerow(src_row)
+      src_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.fieldnames)
       print(self.n_files_processed, 'verifying copy/move for', src_row)
       # if src has repeats, it should not copy or move files, because repeats are ambiguity
       # (in thesis, they must be solved before this point and none left here)
@@ -263,7 +263,7 @@ class MirrorDirTree:
         print(self.n_files_processed, '/', self.total_srcfiles_in_db,
               'Continuing for next. Source file does not exist (%s) ' % src_filepath)
         continue
-      trg_dirnode = dn.DirNode.create_with_tuplerow(src_row)
+      trg_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.fieldnames)
       trg_filepath = trg_dirnode.get_abspath_with_mountpath(self.bak_dt.mount_abspath)
       if os.path.isfile(trg_filepath):
         print(self.n_files_processed, '/', self.total_srcfiles_in_db,
@@ -301,7 +301,7 @@ class MirrorDirTree:
     delete_list = []
     for bak_rowlist in self.bak_dt.do_select_all_w_limit_n_offset():
       for trg_row in bak_rowlist:
-        trg_dirnode = dn.DirNode.create_with_tuplerow(trg_row)
+        trg_dirnode = dn.DirNode.create_with_tuplerow(trg_row, self.bak_dt.fieldnames)
         common_middlepath = trg_dirnode.path
         common_middlepath = common_middlepath.lstrip('/')
         trg_filepath = os.path.join(self.bak_dt.mount_abspath, common_middlepath)
