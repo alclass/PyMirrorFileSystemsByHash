@@ -18,10 +18,45 @@ In the client app, the db-field hkey is declared as UNIQUE. In case a collision 
 """
 import hashlib
 import binascii
-
-
 EMPTY_SHA1HEX_STR = 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
 EMPTY_SHA1_AS_BIN = binascii.unhexlify(EMPTY_SHA1HEX_STR)
+BUF_SIZE = 65536
+
+
+def calc_sha1_from_file(filepath):
+  sha1 = hashlib.sha1()
+  with open(filepath, 'rb') as f:
+    while True:
+      try:
+        data = f.read(BUF_SIZE)
+        if not data:
+          break
+        sha1.update(data)
+      except OSError:
+        return None
+    return sha1.digest()
+
+
+def convert_to_size_w_unit(bytesize):
+  if bytesize is None:
+    return "0KMG"
+  kilo = 1024
+  if bytesize < kilo:
+    return str(bytesize) + 'b'
+  mega = 1024*1024
+  if bytesize < mega:
+    bytesize = round(bytesize / kilo, 1)
+    return str(bytesize) + 'K'
+  giga = 1024*1024*1024
+  if bytesize < giga:
+    bytesize = round(bytesize / mega, 1)
+    return str(bytesize) + 'M'
+  bytesize = round(bytesize / giga, 1)
+  tera = 1024*1024*1024*1024
+  if bytesize < tera:
+    return str(bytesize) + 'G'
+  bytesize = round(bytesize / tera, 3)
+  return str(bytesize) + 'T'
 
 
 def get_the_empty_sha1_bin_n_hex_tuple():

@@ -34,6 +34,12 @@ from pathlib import Path
 DATA_FOLDERNAME = 'dados'
 SOURCE_DIRTREE_FOLDERNAME_DEFAULT = 'src'  # this is the srcfolder default mainly for adhoc-testing
 TARGET_DIRTREE_FOLDERNAME_DEFAULT = 'trg'  # this is the trgfolder default mainly for adhoc-testing
+BUF_SIZE = 65536
+SQL_SELECT_LIMIT_DEFAULT = 50
+EXTENSIONS_TO_JUMP = ['.gif', '.htm', '.html', '.txt', '.pdf']
+EXTENSIONS_IN_SHA1_VERIFICATION = [
+  '.mp4', '.mp3', '.mkv', '.avi', '.webm', '.m4a'
+]
 
 
 class Paths:

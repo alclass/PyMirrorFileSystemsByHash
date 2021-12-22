@@ -4,6 +4,34 @@ strfunctions_mod.py
 """
 
 
+def prepend_slash_if_needed(middlepath):
+  try:
+    if not middlepath.startswith('/'):
+      middlepath = '/' + middlepath
+    return middlepath
+  except AttributeError:
+    pass
+  except ValueError:
+    pass
+  return ''
+
+
+def put_ellipsis_in_str_middle(line, linecharsize=80):
+  if line is None:
+    return ''
+  if len(line) <= linecharsize:
+    return line
+  sizediff = len(line) - linecharsize
+  half_sizediff = sizediff // 2
+  midpos = len(line) // 2
+  p1_midpos = midpos - half_sizediff
+  p2_midpos = midpos + half_sizediff
+  p1 = line[: p1_midpos]
+  p2 = line[p2_midpos:]
+  newline = p1 + '...' + p2
+  return newline
+
+
 def any_dir_in_path_startswith(fpath, str_startswith):
   if fpath is None:
     return False

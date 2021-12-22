@@ -19,12 +19,6 @@ import fs.db.dbrepeats_mod as dbr
 import default_settings as defaults
 import models.entries.dirnode_mod as dn
 import fs.hashfunctions.hash_mod as hm
-BUF_SIZE = 65536
-SQL_SELECT_LIMIT_DEFAULT = 50
-EXTENSIONS_TO_JUMP = ['.gif', '.htm', '.html', '.txt', '.pdf']
-EXTENSIONS_IN_SHA1_VERIFICATION = [
-  '.mp4', '.mp3', '.mkv', '.avi', '.webm', '.m4a'
-]
 
 
 class RepeatVerifier:
@@ -35,7 +29,7 @@ class RepeatVerifier:
     self.last_index = last_index
     self.sql_select_limit = sql_select_limit
     if sql_select_limit is None:
-      self.sql_select_limit = SQL_SELECT_LIMIT_DEFAULT
+      self.sql_select_limit = defaults.SQL_SELECT_LIMIT_DEFAULT
     self.offset = 0
     self.chunk_rounds = 0
     self.n_item = 0
@@ -139,7 +133,7 @@ class RepeatsGrabber:
       idx = self.dbtree.fieldnames.index('name')
       name = row[idx]
       _, ext = os.path.splitext(name)
-      if ext in EXTENSIONS_IN_SHA1_VERIFICATION:
+      if ext in defaults.EXTENSIONS_IN_SHA1_VERIFICATION:
         self.go_open_windows_for_repeats(n_repeats, row, n_row)
 
   def go_open_windows_for_repeats(self, n_repeats, row, n_row):

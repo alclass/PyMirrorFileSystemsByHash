@@ -44,7 +44,6 @@ It's called transient, because this system is not integrated with the OS's file 
   of files in disk before any copying, moving/renaming or deleting operations.
 """
 import datetime
-import hashlib
 import os.path
 import sys
 import models.entries.dirtree_mod as dt
@@ -54,44 +53,7 @@ import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentry_u
 import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
 import fs.db.dbfailed_fileread_mod as freadfail
 import default_settings as defaults
-BUF_SIZE = 65536
 ori_mount_abspath = '/media/friend/CompSci 2T Orig'
-
-
-def calc_sha1_from_file(filepath):
-  sha1 = hashlib.sha1()
-  with open(filepath, 'rb') as f:
-    while True:
-      try:
-        data = f.read(BUF_SIZE)
-        if not data:
-          break
-        sha1.update(data)
-      except OSError:
-        return None
-    return sha1.digest()
-
-
-def convert_to_size_w_unit(bytesize):
-  if bytesize is None:
-    return "0KMG"
-  kilo = 1024
-  if bytesize < kilo:
-    return str(bytesize) + 'b'
-  mega = 1024*1024
-  if bytesize < mega:
-    bytesize = round(bytesize / kilo, 1)
-    return str(bytesize) + 'K'
-  giga = 1024*1024*1024
-  if bytesize < giga:
-    bytesize = round(bytesize / mega, 1)
-    return str(bytesize) + 'M'
-  bytesize = round(bytesize / giga, 1)
-  tera = 1024*1024*1024*1024
-  if bytesize < tera:
-    return str(bytesize) + 'G'
-  bytesize = round(bytesize / tera, 3)
-  return str(bytesize) + 'T'
 
 
 class FileSweeper:
@@ -150,14 +112,14 @@ class FileSweeper:
       bytesize = filestat.st_size
       mdatetime = filestat.st_mtime  # file_attr_tuple[9]
       pydt = datetime.datetime.fromtimestamp(mdatetime)
-      print('bytesize =', bytesize, convert_to_size_w_unit(bytesize), ':: mdatetime =', mdatetime, pydt)
+      print('bytesize =', bytesize, hm.convert_to_size_w_unit(bytesize), ':: mdatetime =', mdatetime, pydt)
       if self.exists_in_db_name_parent_n_size(name, parentpath, bytesize):
         print(self.n_files, 'of', self.n_all_files_in_dirtree,
               'DirNode already exists in db. Continuing.')
         continue
       print(self.n_files, 'of', self.n_all_files_in_dirtree,
             ' => calculating sha1 for', name, parentpath)
-      sha1 = calc_sha1_from_file(filepath)
+      sha1 = hm.calc_sha1_from_file(filepath)
       print('sha1 =', sha1)
       dirnode = dn.DirNode(name, parentpath, sha1, bytesize, mdatetime)
       if sha1 == hm.EMPTY_SHA1_AS_BIN:

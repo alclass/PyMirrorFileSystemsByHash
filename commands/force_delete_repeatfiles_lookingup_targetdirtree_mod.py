@@ -25,22 +25,10 @@ Philosophie yu (von Radio) ytpls/Ant 7-v 27' 2014 Philosophie der Antike yu Phil
 import os
 # import shutil
 import sys
-
 import fs.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
-
-
-def prepend_slash_if_needed(middlepath):
-  try:
-    if not middlepath.startswith('/'):
-      middlepath = '/' + middlepath
-    return middlepath
-  except AttributeError:
-    pass
-  except ValueError:
-    pass
-  return ''
+import fs.strfs.strfunctions_mod as strf
 
 
 class ForceDeleterLookingDirUp:
@@ -90,12 +78,12 @@ class ForceDeleterLookingDirUp:
   @property
   def src_dirpath(self):
     middlepath = self.src_fulldirpath[len(self.ori_dbtree.mountpath):]
-    return prepend_slash_if_needed(middlepath)
+    return strf.prepend_slash_if_needed(middlepath)
 
   @property
   def trg_dirpath(self):
     middlepath = self.trg_fulldirpath[len(self.bak_dbtree.mountpath):]
-    return prepend_slash_if_needed(middlepath)
+    return strf.prepend_slash_if_needed(middlepath)
 
   def gather_sha1s_in_srcdir(self):
     charsize = len(self.src_dirpath)
@@ -104,7 +92,7 @@ class ForceDeleterLookingDirUp:
     fetched_list = self.ori_dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     self.n_processed_files += 1
     for row in fetched_list:
-      dirnode = dn.DirNode.create_with_tuplerow(row, self.ori_dt.fieldnames)
+      dirnode = dn.DirNode.create_with_tuplerow(row, self.ori_dbtree.fieldnames)
       if not dirnode.does_dirnode_exist_in_disk(self.ori_dbtree.mountpath):
         continue
       id_n_sha1 = (dirnode.get_db_id(), dirnode.sha1)
@@ -119,7 +107,7 @@ class ForceDeleterLookingDirUp:
       fetched_list = self.bak_dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
       for row in fetched_list:
         self.n_deletes += 1
-        dirnode = dn.DirNode.create_with_tuplerow(row, self.bak_dt.fieldnames)
+        dirnode = dn.DirNode.create_with_tuplerow(row, self.bak_dbtree.fieldnames)
         if not dirnode.does_dirnode_exist_in_disk(self.ori_dbtree.mountpath):
           continue
         if _id == dirnode.get_db_id():

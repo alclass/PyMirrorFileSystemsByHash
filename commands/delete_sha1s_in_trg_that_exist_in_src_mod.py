@@ -27,49 +27,8 @@ import os.path
 import fs.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
-
-
-def prume_dirtree_deleting_empty_folders(base_dirpath):
-  entries = os.listdir(base_dirpath)
-  for e in entries:
-    abspath = os.path.join(base_dirpath, e)
-    if os.path.isfile(abspath):
-      continue
-    if os.path.isdir(abspath):
-      prume_dirtree_deleting_empty_folders(abspath)
-  entries = os.listdir(base_dirpath)
-  if len(entries) == 0:
-    print('Folder-deleting', base_dirpath)
-    os.rmdir(base_dirpath)
-  return
-
-
-def count_total_files_n_folders(mountpath):
-  src_total_files = 0
-  src_total_dirs = 0
-  for current_path, folders, files in os.walk(mountpath):
-    src_total_dirs += len(folders)
-    if current_path == mountpath:
-      # do not count files in root dir only count folders
-      continue
-    src_total_files += len(files)
-  return src_total_files, src_total_dirs
-
-
-def put_ellipsis_in_str_middle(line, linecharsize=80):
-  if line is None:
-    return ''
-  if len(line) <= linecharsize:
-    return line
-  sizediff = len(line) - linecharsize
-  half_sizediff = sizediff // 2
-  midpos = len(line) // 2
-  p1_midpos = midpos - half_sizediff
-  p2_midpos = midpos + half_sizediff
-  p1 = line[: p1_midpos]
-  p2 = line[p2_midpos:]
-  newline = p1 + '...' + p2
-  return newline
+import fs.dirfilefs.dir_n_file_fs_mod as dirfil
+import fs.strfs.strfunctions_mod as strf
 
 
 class TargetSameSha1ForceDeleter:
@@ -103,8 +62,8 @@ class TargetSameSha1ForceDeleter:
     self.src_total_files = 0
     self.src_total_dirs = 0
     print('Counting src_total_files and folders. Please wait.')
-    self.src_total_files, self.src_total_dirs = count_total_files_n_folders(self.ori_dbtree.mountpath)
-    self.trg_total_files, self.trg_total_dirs = count_total_files_n_folders(self.bak_dbtree.mountpath)
+    self.src_total_files, self.src_total_dirs = dirfil.count_total_files_n_folders(self.ori_dbtree.mountpath)
+    self.trg_total_files, self.trg_total_dirs = dirfil.count_total_files_n_folders(self.bak_dbtree.mountpath)
 
   def calc_totals(self):
     self.count_files_in_db()
@@ -149,7 +108,7 @@ class TargetSameSha1ForceDeleter:
           self.n_processed_entries, 'of', self.trg_total_files_in_db,
           sha1hex[:10], dirnode.name
         )
-        ppath = put_ellipsis_in_str_middle(dirnode.get_abspath_with_mountpath(self.bak_dbtree.mountpath))
+        ppath = strf.put_ellipsis_in_str_middle(dirnode.get_abspath_with_mountpath(self.bak_dbtree.mountpath))
         print(ppath)
       if self.does_sha1_exist_in_src(trg_sha1):
         src_sha1 = trg_sha1
@@ -198,17 +157,19 @@ class TargetSameSha1ForceDeleter:
       self.delete_entry_in_os_n_in_db(_id)
 
   def print_out_all_files_to_delete(self):
-    for _id in self.trg_delete_ids:
+    trg_del_total = len(self.trg_delete_ids)
+    for i, _id in enumerate(self.trg_delete_ids):
       fetched_rows = self.bak_dbtree.fetch_node_by_id(_id)
       if fetched_rows is None or len(fetched_rows) == 0:
         print('id', _id, 'is empty. Continuing')
         continue
       row = fetched_rows[0]
       dirnode = dn.DirNode.create_with_tuplerow(row, self.bak_dbtree.fieldnames)
-      print(_id, '/', self.trg_total_files, dirnode.name)
+      print(i+1, 'of', trg_del_total, '/ id', _id, '[', dirnode.name, ']')
       fpath = dirnode.get_abspath_with_mountpath(self.bak_dbtree.mountpath)
-      ppath = put_ellipsis_in_str_middle(fpath)
+      ppath = strf.put_ellipsis_in_str_middle(fpath, 150)
       print(ppath)
+      print('-'*50)
 
   def confirm_deletion(self):
     self.deletion_confirmed = False
@@ -216,24 +177,18 @@ class TargetSameSha1ForceDeleter:
       print('Empty list. No trg deletes to confirm.')
       print('=' * 40)
       return
-    print('Confirm deletion: ids:')
     print('='*40)
-    for i, _id in enumerate(self.trg_delete_ids):
-      fetched_rows = self.bak_dbtree.fetch_node_by_id(_id)
-      if fetched_rows is None or len(fetched_rows) == 0:
-        continue
-      row = fetched_rows[0]
-      dirnode = dn.DirNode.create_with_tuplerow(row, self.bak_dbtree.fieldnames)
-      print(i+1, dirnode.name)
-      ppath = put_ellipsis_in_str_middle(dirnode.parentpath)
-      print(ppath)
+    print('List of File Deletions to Confirm:')
+    print('='*40)
+    self.print_out_all_files_to_delete()
+    print('='*40)
     screen_msg = 'Confirm the deletion of the %d ids above? (*Y/n) ' % len(self.trg_delete_ids)
     ans = input(screen_msg)
     if ans in ['Y', 'y', '']:
       self.deletion_confirmed = True
 
   def remove_empty_folders_in_trg(self):
-    prume_dirtree_deleting_empty_folders(self.bak_dbtree.mountpath)
+    dirfil.prune_dirtree_deleting_empty_folders(self.bak_dbtree.mountpath)
 
   def report(self):
     print('Report:')
@@ -257,10 +212,10 @@ class TargetSameSha1ForceDeleter:
 
   def process(self):
     self.loop_thru_targetdirtree_db_entries()
-    self.print_out_all_files_to_delete()
     self.confirm_deletion()
-    self.do_batch_deletion_if_confirmed()
-    self.remove_empty_folders_in_trg()
+    if self.deletion_confirmed:
+      self.do_batch_deletion_if_confirmed()
+      self.remove_empty_folders_in_trg()
     self.report()
 
 
