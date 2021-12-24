@@ -186,8 +186,7 @@ class FileSweeper:
       middlepath = middlepath.lstrip('./')  # parentpath is '/' + middlepath (in some cases they are the same)
       if ongoingfolder_abspath == self.mountpath:  # this means not to process the mount_abspath folder itself
         continue
-      _, topdirname = os.path.split(ongoingfolder_abspath)
-      if dirf.is_lowerstr_startingwith_any_in_list(topdirname, self.RESTRICTED_DIRNAMES_FOR_WALK):
+      if dirf.is_any_dirname_in_path_startingwith_any_in_list(ongoingfolder_abspath, self.RESTRICTED_DIRNAMES_FOR_WALK):
         self.n_restricted_dirs += 1
         continue
       self.dbinsert(ongoingfolder_abspath, files, middlepath)

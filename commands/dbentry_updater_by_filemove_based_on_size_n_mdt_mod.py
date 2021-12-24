@@ -91,10 +91,14 @@ class DBEntryUpdater:
       return self.verify_if_an_update_can_happen(
         row_found, filename, middlepath
       )
+    return False
 
   def verify_file_by_its_bysize_n_mdatetime(self, filename, middlepath):
     filepath = os.path.join(self.current_abspath, filename)
-    filestat = os.stat(filepath)
+    try:
+      filestat = os.stat(filepath)
+    except OSError:
+      return False
     bytesize = filestat.st_size
     mdatetime = filestat.st_mtime
     print(self.n_processed_files, '/', self.n_files_in_dirtree, 'bytesize', bytesize, 'mdatetime', mdatetime)
@@ -107,6 +111,7 @@ class DBEntryUpdater:
       )
     else:
       print(self.n_processed_files, '/', self.n_files_in_dirtree, filename, 'was not found by bytesize and mdatetime')
+    return False
 
   def does_osfile_exist_in_db(self, filename, parentpath):
     """

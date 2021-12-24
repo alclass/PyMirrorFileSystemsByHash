@@ -77,16 +77,35 @@ def is_lowerstr_startingwith_any_in_list(name, starting_strs_list):
   return False
 
 
+def is_any_dirname_in_path_startingwith_any_in_list(fpath, starting_strs_list):
+  if fpath is None:
+    return False
+  dirnames = fpath.split(os.path.sep)
+  for dirname in dirnames:
+    if is_lowerstr_startingwith_any_in_list(dirname, starting_strs_list):
+      return True
+  return False
+
+
 def adhoc_test():
   starting_strs_list = ['z-del', 'z-tri']
   names = ['bla', 'z-Del', 'z-Triage', 'z-tri legal', "what's up", 'z Triage', 'tri legal']
   for i, name in enumerate(names):
-    booLres = is_lowerstr_startingwith_any_in_list(name, starting_strs_list)
-    print(i+1, '[', name, '] starts with any', starting_strs_list, '=>', booLres)
+    boolres = is_lowerstr_startingwith_any_in_list(name, starting_strs_list)
+    print(i+1, '[', name, '] starts with any', starting_strs_list, '=>', boolres)
+
+
+def adhoc_test2():
+  starting_strs_list = ['z-del', 'z-tri']
+  paths = ['/bla/blah/balalah', '/z-Del', '/z-t/z-Triage', 'z-tri/z-tri legal', "what's up",
+           'z Triage/z-Triage', 'tri legal']
+  for i, fpath in enumerate(paths):
+    boolres = is_any_dirname_in_path_startingwith_any_in_list(fpath, starting_strs_list)
+    print(i+1, '[', fpath, '] starts with any', starting_strs_list, '=>', boolres)
 
 
 def process():
-  adhoc_test()
+  adhoc_test2()
 
 
 if __name__ == '__main__':
