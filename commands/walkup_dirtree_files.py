@@ -54,14 +54,13 @@ import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbent
 import fs.db.dbfailed_fileread_mod as freadfail
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
 import default_settings as defaults
-ori_mount_abspath = '/media/friend/CompSci 2T Orig'
 
 
 class FileSweeper:
 
   RESTRICTED_DIRNAMES_FOR_WALK = ['z-del', 'z-tri']
 
-  def __init__(self, mountpath=None, treename='ori', restart_at_walkloopseq=None):
+  def __init__(self, mountpath, treename='ori', restart_at_walkloopseq=None):
     """
     treename is generally 'ori' (source) or 'bak' (back-up)
     source and target are generally 'src' (source) or 'trg' (back-up)
@@ -72,14 +71,14 @@ class FileSweeper:
     self.total_files_in_dirtree = 0
     self.n_processing_files = 0
     self.n_restricted_dirs = 0
+    self.n_file_exists_in_db = 0
+    self.n_updated_dbentries = 0
     self.n_files_empty_sha1 = 0
     self.n_failed_filestat = 0
     self.n_dbentries_ins_upd = 0
     self.n_dbentries_failed_ins_upd = 0
     self.all_nodes_with_osread_problem = []
     self.mountpath = mountpath
-    if self.mountpath is None:
-      self.mountpath = ori_mount_abspath
     if not os.path.isdir(self.mountpath):
       error_msg = 'Missing file errror mount_abspath (%s) does not exist.'
       raise OSError(error_msg)
@@ -98,13 +97,37 @@ class FileSweeper:
     if self.restart_at_walkloopseq is None:
       self.restart_at_walkloopseq = 0
 
-  def exists_in_db_name_parent_n_size(self, name, parentpath, bytesize):
+  def exists_in_db_name_parent_n_size(self, name, parentpath, bytesize, mdatesize):
     sql = 'SELECT * from %(tablename)s WHERE name=? and parentpath=? and bytesize=?;'
     tuplevalues = (name, parentpath, bytesize)
     reslist = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     if len(reslist) > 0:
-      print(self.n_processing_files, ' => file', name, 'EXISTS. Continuing.')
+      self.n_file_exists_in_db += 1
+      print(self.n_processing_files, '/', self.n_file_exists_in_db, ' => file', name, 'EXISTS. Continuing.')
       return True
+    sql = 'SELECT * from %(tablename)s WHERE bytesize=? and mdatesize=?;'
+    tuplevalues = (parentpath, bytesize, mdatesize)
+    reslist = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
+    if len(reslist) == 1:  # for this hypothesis it is better that repeats are not found, only 1 entry should be found
+      print(self.n_processing_files, ' => file', name, 'EXISTS. Checking if an equivalent os-entry also exists.')
+      found_row = reslist[0]
+      dirnode_supposed_in_dir = dn.DirNode.create_with_tuplerow(found_row, self.dbtree.fieldnames)
+      supposed_path = dirnode_supposed_in_dir.get_abspath_with_mountpath(self.mountpath)
+      # if supposed_path is not in os, update it in db and return True
+      # however, if it exists, it may be a repeat, sha1 will be recalculated later in program flow
+      if not os.path.isfile(supposed_path):
+        sql = '''UPDATE %(tablename)s SET
+          name=?,
+          parentpath=?
+        WHERE
+          id=?;
+        '''
+        tuplevalues = (name, parentpath, dirnode_supposed_in_dir.get_db_id())
+        retval = self.dbtree.do_update_with_sql_n_tuplevalues(sql, tuplevalues)
+        if retval:
+          self.n_updated_dbentries += 1
+          print(self.n_updated_dbentries, name)
+          return True
     return False
 
   def dbinsert(self, current_abspath, files, middlepath):
@@ -128,9 +151,9 @@ class FileSweeper:
       mdatetime = filestat.st_mtime  # file_attr_tuple[9]
       pydt = datetime.datetime.fromtimestamp(mdatetime)
       print('bytesize =', bytesize, hm.convert_to_size_w_unit(bytesize), ':: mdatetime =', mdatetime, pydt)
-      if self.exists_in_db_name_parent_n_size(name, parentpath, bytesize):
+      if self.exists_in_db_name_parent_n_size(name, parentpath, bytesize, mdatetime):
         print(self.n_processing_files, 'of', self.total_files_in_dirtree,
-              'DirNode already exists in db. Continuing.')
+              'DirNode exists in db in the same position (path) or somewhere else (and updated). Continuing.')
         continue
       print(self.n_processing_files, 'of', self.total_files_in_dirtree,
             ' => calculating sha1 for', name, parentpath)
@@ -205,6 +228,8 @@ class FileSweeper:
     print('total_files_in_dirtree', self.total_files_in_dirtree, ':: files in root-dirtree are not counted')
     print('total_dirs_in_dirtree', self.total_dirs_in_dirtree)
     print('n_processed_files', self.n_processing_files)
+    print('n_file_exists_in_db', self.n_file_exists_in_db)
+    print('n_updated_dbentries', self.n_updated_dbentries)
     print('n_restricted_dirs', self.n_restricted_dirs, ':: those in ', self.RESTRICTED_DIRNAMES_FOR_WALK)
     print('n_files_empty_sha1', self.n_files_empty_sha1)
     print('n_failed_filestat', self.n_failed_filestat)
@@ -212,6 +237,13 @@ class FileSweeper:
     print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd)
 
   def process(self):
+    """
+    Before walking up the dirtree, it must check whether or not file-entries have already been sha1'ed
+    One strategy for that is to check file's existence in db with size and mdatetime,
+      excepting smaller text-files in that case (that kind of sha1 is inexpensive and probability of
+        a small text file being change with same size and mdatetime [to study/test more)
+        having the same sha1 is unknown.
+    """
     self.count_total_dirs_n_files_in_dirtree()
     dbupdater = dbentry_upd.DBEntryUpdater(self.mountpath)
     dbupdater.process(self.total_files_in_dirtree)
