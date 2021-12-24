@@ -49,7 +49,7 @@ import sys
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
 import fs.hashfunctions.hash_mod as hm
-import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentry_upd
+# import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentry_upd
 import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
 import fs.db.dbfailed_fileread_mod as freadfail
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
@@ -97,16 +97,16 @@ class FileSweeper:
     if self.restart_at_walkloopseq is None:
       self.restart_at_walkloopseq = 0
 
-  def exists_in_db_name_parent_n_size(self, name, parentpath, bytesize, mdatesize):
+  def exists_in_db_name_parent_n_size(self, name, parentpath, bytesize, mdatetime):
     sql = 'SELECT * from %(tablename)s WHERE name=? and parentpath=? and bytesize=?;'
     tuplevalues = (name, parentpath, bytesize)
     reslist = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     if len(reslist) > 0:
       self.n_file_exists_in_db += 1
-      print(self.n_processing_files, '/', self.n_file_exists_in_db, ' => file', name, 'EXISTS. Continuing.')
+      print(self.n_processing_files, '/', self.n_file_exists_in_db, ' => file', name, 'EXISTS in db. Continuing.')
       return True
-    sql = 'SELECT * from %(tablename)s WHERE bytesize=? and mdatesize=?;'
-    tuplevalues = (parentpath, bytesize, mdatesize)
+    sql = 'SELECT * from %(tablename)s WHERE bytesize=? and mdatetime=?;'
+    tuplevalues = (bytesize, mdatetime)
     reslist = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     if len(reslist) == 1:  # for this hypothesis it is better that repeats are not found, only 1 entry should be found
       print(self.n_processing_files, ' => file', name, 'EXISTS. Checking if an equivalent os-entry also exists.')
@@ -114,7 +114,8 @@ class FileSweeper:
       dirnode_supposed_in_dir = dn.DirNode.create_with_tuplerow(found_row, self.dbtree.fieldnames)
       supposed_path = dirnode_supposed_in_dir.get_abspath_with_mountpath(self.mountpath)
       # if supposed_path is not in os, update it in db and return True
-      # however, if it exists, it may be a repeat, sha1 will be recalculated later in program flow
+      # however, if it exists, it may be a repeat;
+      # if so, sha1 will be recalculated later in program flow and another script will report repeats
       if not os.path.isfile(supposed_path):
         sql = '''UPDATE %(tablename)s SET
           name=?,
@@ -190,11 +191,15 @@ class FileSweeper:
   def count_total_dirs_n_files_in_dirtree(self):
     self.total_files_in_dirtree = 0
     self.total_dirs_in_dirtree = 0
+    self.n_restricted_dirs = 0
     print('Counting all files in dirtree ' + self.mountpath)
     for ongoingfolder_abspath, folders, files in os.walk(self.mountpath):
-      self.total_dirs_in_dirtree += len(folders)
       if ongoingfolder_abspath == self.mountpath:  # this means not to count files in the tree's root folder
         continue
+      if dirf.is_any_dirname_in_path_startingwith_any_in_list(ongoingfolder_abspath, self.RESTRICTED_DIRNAMES_FOR_WALK):
+        self.n_restricted_dirs += 1
+        continue
+      self.total_dirs_in_dirtree += len(folders)
       self.total_files_in_dirtree += len(files)
     print('-' * 50)
     print('Number of files in dirtree %d' % self.total_files_in_dirtree)
@@ -210,7 +215,6 @@ class FileSweeper:
       if ongoingfolder_abspath == self.mountpath:  # this means not to process the mount_abspath folder itself
         continue
       if dirf.is_any_dirname_in_path_startingwith_any_in_list(ongoingfolder_abspath, self.RESTRICTED_DIRNAMES_FOR_WALK):
-        self.n_restricted_dirs += 1
         continue
       self.dbinsert(ongoingfolder_abspath, files, middlepath)
 
@@ -245,8 +249,8 @@ class FileSweeper:
         having the same sha1 is unknown.
     """
     self.count_total_dirs_n_files_in_dirtree()
-    dbupdater = dbentry_upd.DBEntryUpdater(self.mountpath)
-    dbupdater.process(self.total_files_in_dirtree)
+    # dbupdater = dbentry_upd.DBEntryUpdater(self.mountpath)
+    # dbupdater.process(self.total_files_in_dirtree)
     self.walkup_dirtree_files()
     dbdeleter = dbentry_del.DBEntryWithoutCorrespondingOsEntryDeleter(self.mountpath)
     dbdeleter.process()
