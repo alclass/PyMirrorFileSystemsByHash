@@ -26,6 +26,7 @@ import fs.db.dbdirtree_mod as dbdt
 import fs.db.dbfailed_filecopy_mod as dbfailedcopy
 import fs.hashfunctions.hash_mod as hm
 import fs.strfs.strfunctions_mod as strf
+import fs.dirfilefs.dir_n_file_fs_mod as dirf
 import default_settings as defaults
 from commands.walkup_dirtree_files import FileSweeper
 import commands.resync_mod as rsync
@@ -305,11 +306,11 @@ class DoubleDirectionCopier:
     srcpath = src_dirnode.get_abspath_with_mountpath(src_dirtree.mount)
     if os.path.isfile(srcpath):
       trgpath = src_dirnode.get_abspath_with_mountpath(trg_dirtree.mount)
-      if not os.path.isfile(trgpath):
+      trgpath = dirf.rename_filename_if_its_already_taken_in_folder(trgpath)
+      if trgpath is not None:
         shutil.copy2(srcpath, trgpath)
-      else:
-        # must rename target for it maybe is not the same sha1
-        pass
+        return True
+    return False
 
   def copy_missing_files_to_trg(self, src_rows, src_dirtree, trg_dirtree):
     for src_row in src_rows:

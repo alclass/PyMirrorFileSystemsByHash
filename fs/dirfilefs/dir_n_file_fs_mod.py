@@ -32,3 +32,62 @@ def count_total_files_n_folders(mountpath):
       continue
     src_total_files += len(files)
   return src_total_files, src_total_dirs
+
+
+def rename_filename_if_its_already_taken_in_folder(filepath):
+  """
+  This function returns a filepath if it doesn't exist in its folder.
+  If it exists, the function adds an integer to the end of its name and repeats checking if the file doesn't exist.
+  If it doesn't, the function returns filepath with its new name.
+  After 1000 tries, all names already existing in folder, it returns None.
+
+  The function is useful for copying a file (that needs to be copied)
+    when another file with the same name exists in the same folder.
+  It must be noted that file equality is based on sha1-hash, not filename itself.
+  """
+  if not os.path.isfile(filepath):
+    return filepath
+  dirpath, filename = os.path.split(filepath)
+  name, ext = os.path.splitext(filename)
+  n = 2
+  while 1:
+    newfilename = name + ' ' + str(n) + ext
+    newfilepath = os.path.join(dirpath, newfilename)
+    if not os.path.isfile(newfilepath):
+      return newfilepath
+    n += 1
+    if n > 1000:  # limit this rename-try to 1000
+      break
+  return None
+
+
+def is_lowerstr_startingwith_any_in_list(name, starting_strs_list):
+  if name is None:
+    return False
+  try:
+    name = name.lower()
+  except AttributeError:
+    return False
+  for starting_str in starting_strs_list:
+    if len(name) < len(starting_str):
+      continue
+    cmpname = name[:len(starting_str)]
+    if cmpname == starting_str:
+      return True
+  return False
+
+
+def adhoc_test():
+  starting_strs_list = ['z-del', 'z-tri']
+  names = ['bla', 'z-Del', 'z-Triage', 'z-tri legal', "what's up", 'z Triage', 'tri legal']
+  for i, name in enumerate(names):
+    booLres = is_lowerstr_startingwith_any_in_list(name, starting_strs_list)
+    print(i+1, '[', name, '] starts with any', starting_strs_list, '=>', booLres)
+
+
+def process():
+  adhoc_test()
+
+
+if __name__ == '__main__':
+  process()
