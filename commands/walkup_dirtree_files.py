@@ -75,6 +75,7 @@ class FileSweeper:
     self.n_updated_dbentries = 0
     self.n_files_empty_sha1 = 0
     self.n_failed_filestat = 0
+    self.n_failed_sha1s = 0
     self.n_dbentries_ins_upd = 0
     self.n_dbentries_failed_ins_upd = 0
     self.all_nodes_with_osread_problem = []
@@ -97,41 +98,109 @@ class FileSweeper:
     if self.restart_at_walkloopseq is None:
       self.restart_at_walkloopseq = 0
 
-  def exists_in_db_name_parent_n_size(self, name, parentpath, bytesize, mdatetime):
-    sql = 'SELECT * from %(tablename)s WHERE name=? and parentpath=? and bytesize=?;'
-    tuplevalues = (name, parentpath, bytesize)
+  def exists_in_db_name_parent_size_n_date(self, name, parentpath, bytesize, mdatetime):
+    sql = 'SELECT * from %(tablename)s WHERE name=? and parentpath=? and bytesize=? and mdatetime=?;'
+    tuplevalues = (name, parentpath, bytesize, mdatetime)
     reslist = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     if len(reslist) > 0:
       self.n_file_exists_in_db += 1
-      print(self.n_processing_files, '/', self.n_file_exists_in_db, ' => file', name, 'EXISTS in db. Continuing.')
+      print(
+        'n_file_exists_in_db', self.n_file_exists_in_db, 'of', self.total_files_in_dirtree,
+        'DirNode exists in db with same name, parentpath, bytesize & mdatetime. Continuing.'
+      )
       return True
-    sql = 'SELECT * from %(tablename)s WHERE bytesize=? and mdatetime=?;'
-    tuplevalues = (bytesize, mdatetime)
-    reslist = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
-    if len(reslist) == 1:  # for this hypothesis it is better that repeats are not found, only 1 entry should be found
-      print(self.n_processing_files, ' => file', name, 'EXISTS. Checking if an equivalent os-entry also exists.')
-      found_row = reslist[0]
-      dirnode_supposed_in_dir = dn.DirNode.create_with_tuplerow(found_row, self.dbtree.fieldnames)
-      supposed_path = dirnode_supposed_in_dir.get_abspath_with_mountpath(self.mountpath)
-      # if supposed_path is not in os, update it in db and return True
-      # however, if it exists, it may be a repeat;
-      # if so, sha1 will be recalculated later in program flow and another script will report repeats
-      if not os.path.isfile(supposed_path):
-        sql = '''UPDATE %(tablename)s SET
-          name=?,
-          parentpath=?
-        WHERE
-          id=?;
-        '''
-        tuplevalues = (name, parentpath, dirnode_supposed_in_dir.get_db_id())
-        retval = self.dbtree.do_update_with_sql_n_tuplevalues(sql, tuplevalues)
-        if retval:
-          self.n_updated_dbentries += 1
-          print(self.n_updated_dbentries, name)
-          return True
     return False
 
-  def dbinsert(self, current_abspath, files, middlepath):
+  def get_id_or_none_from_name_n_parentpath(self, name, parentpath):
+    sql = 'SELECT * from %(tablename)s WHERE name=? and parentpath=?;'
+    tuplevalues = (name, parentpath)
+    reslist = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
+    r_id = None
+    if len(reslist) > 0:
+      row = reslist[0]
+      r_id = row[0]  # id is always index 0
+    return r_id
+
+  def update_db_entry_with_updated_file(self, _id, name, parentpath, sha1, bytesize, mdatetime):
+    sql = '''UPDATE %(tablename)s SET
+      name=?,
+      parentpath=?,
+      sha1=?,
+      bytesize=?,
+      mdatetime=?
+    WHERE
+      id=?;
+    '''
+    tuplevalues = (name, parentpath, sha1, bytesize, mdatetime, _id)
+    retval = self.dbtree.do_update_with_sql_n_tuplevalues(sql, tuplevalues)
+    if retval:
+      self.n_updated_dbentries += 1
+      print(self.n_updated_dbentries, name, parentpath)
+      return True
+    return False
+
+  def insert_db_entry_with_updated_file(self, name, parentpath, sha1, bytesize, mdatetime):
+    sql = 'INSERT into %(tablename)s (name, parentpath, sha1, bytesize, mdatetime) VALUES (?,?,?,?,?);'
+    tuplevalues = (name, parentpath, sha1, bytesize, mdatetime)
+    reslist = self.dbtree.do_insert_with_sql_n_tuplevalues(sql, tuplevalues)
+    if reslist:  # for this hypothesis it is better that repeats are not found, only 1 entry should be found
+      print(self.n_processing_files, ' => file', name, 'EXISTS. Checking if an equivalent os-entry also exists.')
+      return True
+    return False
+
+  def report_unreadable_file(self, dirnode):
+    self.all_nodes_with_osread_problem.append(dirnode)
+    self.n_dbentries_failed_ins_upd += 1
+    print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd, dirnode, '[going to register event]')
+    pdict = {
+      'name': dirnode.name,
+      'parentpath': dirnode.parentpath,
+      'bytesize': dirnode.bytesize,
+      'mdatetime': dirnode.mdatetime,
+      'event_dt': datetime.datetime.now(),
+    }
+    self.freadfailer.do_insert_or_update_with_dict_to_prep_tuplevalues(pdict)
+
+  def dbinsert_or_update_file_entry(self, name, parentpath, bytesize, mdatetime, filepath):
+    sha1 = hm.calc_sha1_from_file(filepath)
+    if sha1 == hm.EMPTY_SHA1_AS_BIN:
+      self.n_files_empty_sha1 += 1
+      print(
+        self.n_files_empty_sha1, 'of', self.total_files_in_dirtree,
+        'DirNodoe has the empty (zero) sha1. Continuing', name, parentpath
+      )
+      return
+    dirnode = dn.DirNode(name, parentpath, sha1, bytesize, mdatetime)
+    if sha1 is None:
+      self.n_failed_sha1s += 1
+      print(
+        self.n_failed_sha1s, 'of', self.total_files_in_dirtree, name,
+        ' >>>>>>>>>>>>>>>> failed sha1 calc (file probably unreadable). Continuing.'
+      )
+      self.report_unreadable_file(dirnode)
+      return
+    _id = self.get_id_or_none_from_name_n_parentpath(name, parentpath)
+    if _id is None:
+      # boolres = self.insert_db_entry_with_updated_file(name, parentpath, sha1, bytesize, mdatetime)
+      insert_update_result = self.dirtree.dbinsert_dirnode(dirnode)
+      if insert_update_result:
+        self.n_dbentries_ins_upd += 1
+        print(
+          'n_dbentries_ins_upd', self.n_dbentries_ins_upd, 'of', self.total_files_in_dirtree,
+          'INSERTED dirnode', dirnode
+        )
+      return
+    else:
+      boolres = self.update_db_entry_with_updated_file(_id, name, parentpath, sha1, bytesize, mdatetime)
+      if boolres:
+        self.n_dbentries_ins_upd += 1
+        print(
+          'n_dbentries_ins_upd', self.n_dbentries_ins_upd, 'of', self.total_files_in_dirtree, boolres,
+          'UPDATED id', _id
+        )
+      return
+
+  def dbinsert_files_if_needed(self, current_abspath, files, middlepath):
     for filename in files:
       self.n_processing_files += 1
       if self.n_processing_files < self.restart_at_walkloopseq:
@@ -146,47 +215,19 @@ class FileSweeper:
         filestat = os.stat(filepath)
       except OSError:
         self.n_failed_filestat += 1
-        print(self.n_failed_filestat, 'Could not filestat', filename)
+        print(
+          self.n_failed_filestat, 'of', self.total_files_in_dirtree,
+          'Could not filestat', filename
+        )
         continue
       bytesize = filestat.st_size
-      mdatetime = filestat.st_mtime  # file_attr_tuple[9]
+      mdatetime = filestat.st_mtime
       pydt = datetime.datetime.fromtimestamp(mdatetime)
+      print(self.n_processing_files, 'of', self.total_files_in_dirtree, name, parentpath)
       print('bytesize =', bytesize, hm.convert_to_size_w_unit(bytesize), ':: mdatetime =', mdatetime, pydt)
-      if self.exists_in_db_name_parent_n_size(name, parentpath, bytesize, mdatetime):
-        print(self.n_processing_files, 'of', self.total_files_in_dirtree,
-              'DirNode exists in db in the same position (path) or somewhere else (and updated). Continuing.')
+      if self.exists_in_db_name_parent_size_n_date(name, parentpath, bytesize, mdatetime):
         continue
-      print(self.n_processing_files, 'of', self.total_files_in_dirtree,
-            ' => calculating sha1 for', name, parentpath)
-      sha1 = hm.calc_sha1_from_file(filepath)
-      print('sha1 =', sha1)
-      dirnode = dn.DirNode(name, parentpath, sha1, bytesize, mdatetime)
-      if sha1 == hm.EMPTY_SHA1_AS_BIN:
-        self.n_files_empty_sha1 += 1
-        print('DirNodoe has the empty (zero) sha1. Continuing', dirnode.name, dirnode.parentpath)
-      if sha1 is not None:
-        insert_update_result = self.dirtree.dbinsert_dirnode(dirnode)
-        if insert_update_result:
-          self.n_dbentries_ins_upd += 1
-          print('n_dbentries_ins_upd', self.n_dbentries_ins_upd, dirnode)
-        else:
-          print(' >>>>>>>>>>>>>>>> sha1 is valid but db-insert returned false')
-      else:
-        # sha1 is None here (file is probably unreadable from disk)
-        self.report_unreadable_file(dirnode)
-
-  def report_unreadable_file(self, dirnode):
-    self.all_nodes_with_osread_problem.append(dirnode)
-    self.n_dbentries_failed_ins_upd += 1
-    print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd, dirnode, '[going to register event]')
-    pdict = {
-      'name': dirnode.name,
-      'parentpath': dirnode.parentpath,
-      'bytesize': dirnode.bytesize,
-      'mdatetime': dirnode.mdatetime,
-      'event_dt': datetime.datetime.now(),
-    }
-    self.freadfailer.do_insert_or_update_with_dict_to_prep_tuplevalues(pdict)
+      self.dbinsert_or_update_file_entry(name, parentpath, bytesize, mdatetime, filepath)
 
   def count_total_dirs_n_files_in_dirtree(self):
     self.total_files_in_dirtree = 0
@@ -216,7 +257,7 @@ class FileSweeper:
         continue
       if dirf.is_any_dirname_in_path_startingwith_any_in_list(ongoingfolder_abspath, self.RESTRICTED_DIRNAMES_FOR_WALK):
         continue
-      self.dbinsert(ongoingfolder_abspath, files, middlepath)
+      self.dbinsert_files_if_needed(ongoingfolder_abspath, files, middlepath)
 
   def report_all_nodes_with_osread_problem(self):
     print('-='*20)
@@ -237,6 +278,7 @@ class FileSweeper:
     print('n_restricted_dirs', self.n_restricted_dirs, ':: those in ', self.RESTRICTED_DIRNAMES_FOR_WALK)
     print('n_files_empty_sha1', self.n_files_empty_sha1)
     print('n_failed_filestat', self.n_failed_filestat)
+    print('n_failed_filestat', self.n_failed_sha1s)
     print('n_dbentries_ins_upd', self.n_dbentries_ins_upd)
     print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd)
 

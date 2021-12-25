@@ -28,11 +28,7 @@ import fs.hashfunctions.hash_mod as hm
 import fs.strfs.strfunctions_mod as strf
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
 import default_settings as defaults
-from commands.walkup_dirtree_files import FileSweeper
-import commands.resync_mod as rsync
-# import commands.paths_endingwith_spaces_mod as spacepaths
 import commands.move_rename_target_based_on_source_mod as moverename
-import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentryupd
 
 
 class DoubleDirectionCopier:
@@ -294,28 +290,56 @@ class DoubleDirectionCopier:
     moverenamer = moverename.MoveRename(self.ori_dt.mountpath, self.bak_dt.mountpath)
     moverenamer.process()
 
-  def does_sha1_exist_in_trg(self, scr_dirnode, trg_dirtree):
-    sql = 'select sha1 from %(tablename)s where sha1=?;'
-    tuplevalues = (scr_dirnode.sha1, )
-    fetched_list = trg_dirtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
-    if fetched_list and len(fetched_list) > 0:
-      return True
-    return False
+  def do_copy_over(self, srcpath, src_dirnode, trgpath, trg_dirtree):
+    """
+    This method should only be called from copy_over() for its preparation happens there
+    """
+    folderpath, _ = os.path.split(trgpath)
+    if not os.path.isdir(folderpath):
+      os.makedirs(folderpath)
+    self.n_copied_files += 1
+    print(self.n_copied_files, 'copying to', trgpath)
+    shutil.copy2(srcpath, trgpath)
+    sql = '''
+      INSERT INTO %(tablename)s
+        (name, parentpath, sha1, bytesize, mdatetime)
+      VALUES 
+        (?,?,?,?,?);'''
+    tuplevalues = (
+      src_dirnode.name,
+      src_dirnode.parentpath,
+      src_dirnode.sha1,
+      src_dirnode.bytesize,
+      src_dirnode.mdatetime
+    )
+    _ = trg_dirtree.do_insert_with_sql_n_tuplevalues(sql, tuplevalues)
+    return True
 
   def copy_over(self, src_dirnode, src_dirtree, trg_dirtree):
-    srcpath = src_dirnode.get_abspath_with_mountpath(src_dirtree.mount)
-    if os.path.isfile(srcpath):
-      trgpath = src_dirnode.get_abspath_with_mountpath(trg_dirtree.mount)
-      trgpath = dirf.rename_filename_if_its_already_taken_in_folder(trgpath)
-      if trgpath is not None:
-        shutil.copy2(srcpath, trgpath)
-        return True
-    return False
+    srcpath = src_dirnode.get_abspath_with_mountpath(src_dirtree.mountpath)
+    if not os.path.isfile(srcpath):
+      return False
+    trgpath = src_dirnode.get_abspath_with_mountpath(trg_dirtree.mountpath)
+    if trgpath is None:
+      return False
+    if not os.path.isfile(trgpath):
+      return self.do_copy_over(srcpath, src_dirnode, trgpath, trg_dirtree)
+    # at this point, trgfile exists, so its sha1 must be checked before renaming trgfile
+    trg_sha1 = hm.calc_sha1_from_file(trgpath)
+    if trg_sha1 is None:
+      # there is a problem read (TO-DO: one solution might be to treat it with another script)
+      return False
+    if trg_sha1 == src_dirnode.sha1:
+      # target file is there though it's not in db
+      return False
+    # rename it
+    trgpath = dirf.rename_filename_if_its_already_taken_in_folder(trgpath)
+    return self.do_copy_over(srcpath, src_dirnode, trgpath, trg_dirtree)
 
   def copy_missing_files_to_trg(self, src_rows, src_dirtree, trg_dirtree):
     for src_row in src_rows:
       src_dirnode = dn.DirNode.create_with_tuplerow(src_row, src_dirtree.fieldnames)
-      if self.does_sha1_exist_in_trg(src_dirnode, trg_dirtree):
+      if trg_dirtree.does_sha1_exist_in_thisdirtree(src_dirnode):
         continue
       self.copy_over(src_dirnode, src_dirtree, trg_dirtree)
 
@@ -326,7 +350,6 @@ class DoubleDirectionCopier:
 
   def process(self):
     self.copy_onedirtree_to_another(self.ori_dt, self.bak_dt)
-    self.copy_onedirtree_to_another(self.bak_dt, self.ori_dt)
     self.report()
 
   def report(self):
@@ -358,8 +381,11 @@ class DoubleDirectionCopier:
 def process():
   """
   """
+
   src_mountpath, trg_mountpath = defaults.get_src_n_trg_mountpath_args_or_default()
   copier = DoubleDirectionCopier(src_mountpath, trg_mountpath)
+  copier.process()
+  copier = DoubleDirectionCopier(trg_mountpath, src_mountpath)
   copier.process()
 
 

@@ -148,6 +148,18 @@ class DBDirTree(dbb.DBBase):
     conn.close()
     print('Deleted/Committed', len(ids), 'records')
 
+  def does_sha1_exist_in_thisdirtree(self, scr_dirnode):
+    try:
+      sha1 = scr_dirnode.sha1
+    except AttributeError:
+      return False
+    sql = 'SELECT sha1 FROM %(tablename)s WHERE sha1=?;'
+    tuplevalues = (sha1, )
+    fetched_list = self.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
+    if fetched_list and len(fetched_list) > 0:
+      return True
+    return False
+
 
 def adhoc_select():
   db = DBDirTree()
