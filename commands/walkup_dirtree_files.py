@@ -49,7 +49,7 @@ import sys
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
 import fs.hashfunctions.hash_mod as hm
-# import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentry_upd
+import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentry_upd
 import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
 import fs.db.dbfailed_fileread_mod as freadfail
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
@@ -59,6 +59,7 @@ import default_settings as defaults
 class FileSweeper:
 
   RESTRICTED_DIRNAMES_FOR_WALK = ['z-del', 'z-tri']
+  FORBIBBEN_FIRST_LEVEL_DIRS = ['System Volume Information']
 
   def __init__(self, mountpath, treename='ori', restart_at_walkloopseq=None):
     """
@@ -67,11 +68,12 @@ class FileSweeper:
     some operations may occur in the same dirtree,
       in such cases 'bak' may refer to a subdirectory in the same dirtree as 'ori'
     """
-    self.total_dirs_in_dirtree = 0
-    self.total_files_in_dirtree = 0
-    self.n_processing_files = 0
+    self.total_dirs_in_os = 0
+    self.total_files_in_os = 0
+    self.total_files_in_db = 0
+    self.total_unique_files_in_db = 0
+    self.n_processed_files = 0
     self.n_restricted_dirs = 0
-    self.n_file_exists_in_db = 0
     self.n_updated_dbentries = 0
     self.n_files_empty_sha1 = 0
     self.n_failed_filestat = 0
@@ -85,10 +87,24 @@ class FileSweeper:
       raise OSError(error_msg)
     self.dirtree = dt.DirTree(treename, self.mountpath)
     self.dbtree = self.dirtree.dbtree  # dbu.DBDirTree(mount_abspath)
+    self.calc_totals()
     self.restart_at_walkloopseq = restart_at_walkloopseq
     self.treat_restart_at_walkloopseq()
     # freadfailer will record the sha1 fileread failed attempts
     self.freadfailer = freadfail.DBFailFileReadReporter(self.dbtree.mountpath)
+
+  def calc_totals(self):
+    """
+    count_total_files_n_folders_with_norestriction(mountpath, restricted_dirnames, forbidden_first_level_dirs)
+    """
+    print('Counting files and dirs in db and os. Please wait.')
+    self.total_unique_files_in_db = self.dbtree.count_unique_sha1s_as_int()
+    self.total_files_in_db = self.dbtree.count_rows_as_int()
+    total_files, total_dirs = dirf.count_total_files_n_folders_with_norestriction(
+      self.dirtree.mountpath, self.RESTRICTED_DIRNAMES_FOR_WALK, self.FORBIBBEN_FIRST_LEVEL_DIRS
+    )
+    self.total_files_in_os = total_files
+    self.total_dirs_in_os = total_dirs
 
   def treat_restart_at_walkloopseq(self):
     """
@@ -103,9 +119,9 @@ class FileSweeper:
     tuplevalues = (name, parentpath, bytesize, mdatetime)
     reslist = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     if len(reslist) > 0:
-      self.n_file_exists_in_db += 1
+      self.total_files_in_db += 1
       print(
-        'n_file_exists_in_db', self.n_file_exists_in_db, 'of', self.total_files_in_dirtree,
+        'n_file_exists_in_db', self.total_files_in_db, 'of', self.total_files_in_os,
         'DirNode exists in db with same name, parentpath, bytesize & mdatetime. Continuing.'
       )
       return True
@@ -144,7 +160,7 @@ class FileSweeper:
     tuplevalues = (name, parentpath, sha1, bytesize, mdatetime)
     reslist = self.dbtree.do_insert_with_sql_n_tuplevalues(sql, tuplevalues)
     if reslist:  # for this hypothesis it is better that repeats are not found, only 1 entry should be found
-      print(self.n_processing_files, ' => file', name, 'EXISTS. Checking if an equivalent os-entry also exists.')
+      print(self.n_processed_files, ' => file', name, 'EXISTS. Checking if an equivalent os-entry also exists.')
       return True
     return False
 
@@ -166,7 +182,7 @@ class FileSweeper:
     if sha1 == hm.EMPTY_SHA1_AS_BIN:
       self.n_files_empty_sha1 += 1
       print(
-        self.n_files_empty_sha1, 'of', self.total_files_in_dirtree,
+        self.n_files_empty_sha1, 'of', self.total_files_in_os,
         'DirNodoe has the empty (zero) sha1. Continuing', name, parentpath
       )
       return
@@ -174,7 +190,7 @@ class FileSweeper:
     if sha1 is None:
       self.n_failed_sha1s += 1
       print(
-        self.n_failed_sha1s, 'of', self.total_files_in_dirtree, name,
+        self.n_failed_sha1s, 'of', self.total_files_in_os, name,
         ' >>>>>>>>>>>>>>>> failed sha1 calc (file probably unreadable). Continuing.'
       )
       self.report_unreadable_file(dirnode)
@@ -186,7 +202,7 @@ class FileSweeper:
       if insert_update_result:
         self.n_dbentries_ins_upd += 1
         print(
-          'n_dbentries_ins_upd', self.n_dbentries_ins_upd, 'of', self.total_files_in_dirtree,
+          'n_dbentries_ins_upd', self.n_dbentries_ins_upd, 'of', self.total_files_in_os,
           'INSERTED dirnode', dirnode
         )
       return
@@ -195,16 +211,16 @@ class FileSweeper:
       if boolres:
         self.n_dbentries_ins_upd += 1
         print(
-          'n_dbentries_ins_upd', self.n_dbentries_ins_upd, 'of', self.total_files_in_dirtree, boolres,
+          'n_dbentries_ins_upd', self.n_dbentries_ins_upd, 'of', self.total_files_in_os, boolres,
           'UPDATED id', _id
         )
       return
 
   def dbinsert_files_if_needed(self, current_abspath, files, middlepath):
     for filename in files:
-      self.n_processing_files += 1
-      if self.n_processing_files < self.restart_at_walkloopseq:
-        print('Jumping', self.n_processing_files, 'until', self.restart_at_walkloopseq)
+      self.n_processed_files += 1
+      if self.n_processed_files < self.restart_at_walkloopseq:
+        print('Jumping', self.n_processed_files, 'until', self.restart_at_walkloopseq)
         continue
       filepath = os.path.join(current_abspath, filename)
       name = filename
@@ -216,35 +232,27 @@ class FileSweeper:
       except OSError:
         self.n_failed_filestat += 1
         print(
-          self.n_failed_filestat, 'of', self.total_files_in_dirtree,
+          self.n_failed_filestat, 'of', self.total_files_in_os,
           'Could not filestat', filename
         )
         continue
       bytesize = filestat.st_size
       mdatetime = filestat.st_mtime
       pydt = datetime.datetime.fromtimestamp(mdatetime)
-      print(self.n_processing_files, 'of', self.total_files_in_dirtree, name, parentpath)
+      print(self.n_processed_files, 'of', self.total_files_in_os, name, parentpath)
       print('bytesize =', bytesize, hm.convert_to_size_w_unit(bytesize), ':: mdatetime =', mdatetime, pydt)
       if self.exists_in_db_name_parent_size_n_date(name, parentpath, bytesize, mdatetime):
         continue
       self.dbinsert_or_update_file_entry(name, parentpath, bytesize, mdatetime, filepath)
 
-  def count_total_dirs_n_files_in_dirtree(self):
-    self.total_files_in_dirtree = 0
-    self.total_dirs_in_dirtree = 0
-    self.n_restricted_dirs = 0
-    print('Counting all files in dirtree ' + self.mountpath)
-    for ongoingfolder_abspath, folders, files in os.walk(self.mountpath):
-      if ongoingfolder_abspath == self.mountpath:  # this means not to count files in the tree's root folder
-        continue
-      if dirf.is_any_dirname_in_path_startingwith_any_in_list(ongoingfolder_abspath, self.RESTRICTED_DIRNAMES_FOR_WALK):
-        self.n_restricted_dirs += 1
-        continue
-      self.total_dirs_in_dirtree += len(folders)
-      self.total_files_in_dirtree += len(files)
-    print('-' * 50)
-    print('Number of files in dirtree %d' % self.total_files_in_dirtree)
-    print('-'*50)
+  def is_forbidden_first_level_dir(self, ongoingfolder_abspath):
+    """
+    This method organizes parameters for issue its correspondent (static) function in module dirf
+    """
+    dirpath = ongoingfolder_abspath
+    restricted_dirnames = self.RESTRICTED_DIRNAMES_FOR_WALK
+    forbidden_first_level_dirs = self.FORBIBBEN_FIRST_LEVEL_DIRS
+    return dirf.is_forbidden_first_level_dir(dirpath, restricted_dirnames, forbidden_first_level_dirs)
 
   def walkup_dirtree_files(self):
     """
@@ -254,6 +262,8 @@ class FileSweeper:
       middlepath = ongoingfolder_abspath[len(self.mountpath):]
       middlepath = middlepath.lstrip('./')  # parentpath is '/' + middlepath (in some cases they are the same)
       if ongoingfolder_abspath == self.mountpath:  # this means not to process the mount_abspath folder itself
+        continue
+      if self.is_forbidden_first_level_dir(ongoingfolder_abspath):
         continue
       if dirf.is_any_dirname_in_path_startingwith_any_in_list(ongoingfolder_abspath, self.RESTRICTED_DIRNAMES_FOR_WALK):
         continue
@@ -269,16 +279,16 @@ class FileSweeper:
     print('Total', n_unreadable, ':: report_all_nodes_with_osread_problem')
 
   def report(self):
-    print('n_all_files_in_dirtree', self.total_files_in_dirtree)
-    print('total_files_in_dirtree', self.total_files_in_dirtree, ':: files in root-dirtree are not counted')
-    print('total_dirs_in_dirtree', self.total_dirs_in_dirtree)
-    print('n_processed_files', self.n_processing_files)
-    print('n_file_exists_in_db', self.n_file_exists_in_db)
+    self.calc_totals()
+    print('total_files_in_db', self.total_files_in_db)
+    print('total_files_in_os', self.total_files_in_os)
+    print('total_dirs_in_os', self.total_dirs_in_os)
+    print('n_processed_files', self.n_processed_files)
     print('n_updated_dbentries', self.n_updated_dbentries)
     print('n_restricted_dirs', self.n_restricted_dirs, ':: those in ', self.RESTRICTED_DIRNAMES_FOR_WALK)
     print('n_files_empty_sha1', self.n_files_empty_sha1)
     print('n_failed_filestat', self.n_failed_filestat)
-    print('n_failed_filestat', self.n_failed_sha1s)
+    print('n_failed_sha1s', self.n_failed_sha1s)
     print('n_dbentries_ins_upd', self.n_dbentries_ins_upd)
     print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd)
 
@@ -290,12 +300,12 @@ class FileSweeper:
         a small text file being change with same size and mdatetime [to study/test more)
         having the same sha1 is unknown.
     """
-    self.count_total_dirs_n_files_in_dirtree()
-    # dbupdater = dbentry_upd.DBEntryUpdater(self.mountpath)
-    # dbupdater.process(self.total_files_in_dirtree)
+    self.calc_totals()
     self.walkup_dirtree_files()
     dbdeleter = dbentry_del.DBEntryWithoutCorrespondingOsEntryDeleter(self.mountpath)
     dbdeleter.process()
+    print('Removing empty folders left if any.')
+    dirf.prune_dirtree_deleting_empty_folders(self.dirtree.mountpath)
     self.report_all_nodes_with_osread_problem()
     self.report()
 
@@ -322,6 +332,8 @@ def process():
   restart_at_position = get_arg_restart_at_position_or_zero()
   treename = 'ori'  # ori stands for origin instead of target
   sweeper = FileSweeper(src_mountpath, treename, restart_at_position)
+  moved_updater = dbentry_upd.DBEntryUpdater(src_mountpath)
+  moved_updater.process()
   sweeper.process()
   finish_time = datetime.datetime.now()
   elapsed_time = finish_time - start_time

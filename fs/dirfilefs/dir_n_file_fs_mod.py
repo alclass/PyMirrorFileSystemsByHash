@@ -22,6 +22,24 @@ def prune_dirtree_deleting_empty_folders(base_dirpath):
   return
 
 
+def count_total_files_n_folders_with_norestriction(mountpath, restricted_dirnames, forbidden_first_level_dirs):
+  src_total_files = 0
+  src_total_dirs = 0
+  for current_path, folders, files in os.walk(mountpath):
+    if current_path == mountpath:
+      # do not count files in root dir only count folders
+      continue
+    if is_forbidden_first_level_dir(current_path, restricted_dirnames, forbidden_first_level_dirs):
+      # do not count files or folder inside forbidden_first_level_dirs
+      continue
+    if is_any_dirname_in_path_startingwith_any_in_list(current_path, restricted_dirnames):
+      # do not count files or folder with paths having any restricted_dirnames (eg z-del or z-tri [for z-Triage])
+      continue
+    src_total_dirs += len(folders)
+    src_total_files += len(files)
+  return src_total_files, src_total_dirs
+
+
 def count_total_files_n_folders(mountpath):
   src_total_files = 0
   src_total_dirs = 0
@@ -84,6 +102,29 @@ def is_any_dirname_in_path_startingwith_any_in_list(fpath, starting_strs_list):
   for dirname in dirnames:
     if is_lowerstr_startingwith_any_in_list(dirname, starting_strs_list):
       return True
+  return False
+
+
+def is_forbidden_first_level_dir(dirpath, restricted_dirnames, forbidden_first_level_dirs):
+  """
+  if dirpath starts with /, the split() result will have an '' (empty string) as first element
+  if dirpath does not start with /, the split() result will have the top level dirname as first element
+  path.lstrip('/') will strip out any beginning slashes if any, assuring split()[0] gives the top level dirname in path
+  """
+  try:
+    ongoingfolder_abspath = dirpath.lstrip('/')
+    first_level_dir = ongoingfolder_abspath.split('/')[0]
+    if first_level_dir.startswith('.'):
+      return True
+    boolres = is_any_dirname_in_path_startingwith_any_in_list(first_level_dir, restricted_dirnames)
+    if boolres:
+      return True
+    if first_level_dir in forbidden_first_level_dirs:
+      return True
+  except AttributeError:
+    pass
+  except IndexError:
+    pass
   return False
 
 
