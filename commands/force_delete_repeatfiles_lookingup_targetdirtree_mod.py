@@ -2,33 +2,28 @@
 """
 force_delete_repeatfiles_lookingup_targetdirtree_mod.py
 
-This script takes two folder paths (source and target) and deletes file copies (repeats (*))
+This script takes two folder paths (source and target) and deletes file copies (ie file repeats (*))
   in the target dirtree.
 
 (*) repeats are based on the sha1-hash of its content
 
-Notice the main class here needs 4 parameters to do its job. This is an important different from
-  script:
-    force_delete_every_equal_sha1_in_targetdirtree_mod
+Notice the main class here needs 4 parameters (ori_mountpath, bak_mountpath, src_fulldirpath, trg_fulldirpath)
+  to do its job. This is an important difference from the script:
+    => force_delete_every_equal_sha1_in_targetdirtree_mod
   which only needs 2 parameters, ie src_dirtree (or src_mountpath) and trg_dirtree (or trg_mountpath)
 
 IMPORTANT:
-  1) all file deletions are always somehow dangerous but this script only deletes copies
-     (ie the original copy is not to be deleted in this script);
-  2) once a file is considered "source" its db-id prevents it from being deleted itself;
-
-/media/friend/D1 4T Bak B CS EEE M Sc So
-/media/friend/D1 4T Bak B CS EEE M Sc So/
-Soc Sci vi/Philosophy vi/Individual Philosophers vi/Aa Lang Individual Philosophers vi/
-Philosophie yu (von Radio) ytpls/Ant 7-v 27' 2014 Philosophie der Antike yu Philosophie ytpl
+  1) all file deletions are always somehow dangerous but this script only deletes "excess" copies
+     (ie the original file is not to be deleted in this script);
+  2) once a file is considered "source" (in the target dirtree), its db-id prevents it from being deleted itself;
 """
 import os
-# import shutil
 import sys
 import fs.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
 import fs.strfs.strfunctions_mod as strf
+# import shutil
 
 
 class ForceDeleterLookingDirUp:

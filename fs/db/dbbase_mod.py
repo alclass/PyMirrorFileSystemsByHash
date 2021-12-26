@@ -115,7 +115,7 @@ class DBBase:
   def delete_with_sql_n_tuplevalues(self, sql, tuplevalues):
     conn = self.get_connection()
     cursor = conn.cursor()
-    delete_result = cursor.execute(sql)
+    delete_result = cursor.execute(sql, tuplevalues)
     conn.commit()
     n_rows_deleted = delete_result.rowcount
     cursor.close()

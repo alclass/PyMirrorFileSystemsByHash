@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
 """
 mold_trg_based_on_src_mod.py
+
+This script (a little bit similar to mirror2trees.py) does two things:
+  1) it moves target-tree files to the relative position, in the target-tree itself, that exists in the source-tree;
+  2) it copies missing files in the target-tree that exists in the source-tree;
+
+One thing mirror2trees.py does in addition is the excess target files deletion under user confirmation.
+
+TO-DO:
+  integrate the two scripts (mirror2trees.py and this one [mold_trg_based_on_src_mod.py] to simplify this system.
 """
 import copy
 import os.path
 import shutil
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
-# import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentry_upd
 import default_settings as defaults
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
+# import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
 
 
 class TrgBasedOnSrcMolder:
@@ -86,28 +95,35 @@ class TrgBasedOnSrcMolder:
     return trg_dirnode
 
   def move_file_within_trg_to_its_src_relative_position_if_vacant(self, src_dirnode, trg_dirnode):
-    new_trg_dirnode = copy.copy(src_dirnode)
-    new_trg_dirnode.name = src_dirnode.name
-    new_trg_dirnode.parentpath = src_dirnode.parentpath
+    new_trg_dirnode = copy.copy(src_dirnode)  # new trg name and parentpath will be the ones from src
     oldfile = trg_dirnode.get_abspath_with_mountpath(self.bak_dt.mountpath)
     newfile = new_trg_dirnode.get_abspath_with_mountpath(self.bak_dt.mountpath)
     if oldfile == newfile:
+      # they are the same, no moving
       return False
     if not os.path.isfile(oldfile):
+      # origin file does not exist, no moving
       return False
     if os.path.isfile(newfile):
+      # target file exists, no moving
       return False
     # now a move can be tried
     basepath, _ = os.path.split(newfile)
     if not os.path.isdir(basepath):
+      # create target base dir when it does not exist
       os.makedirs(basepath)
     self.n_moved_files += 1
     print(
-      self.n_moved_files, 'of', self.total_srcfiles_in_os,
-      'moving within trg', new_trg_dirnode.name, new_trg_dirnode.parentpath
+      'Moving', self.n_moved_files, 'of', self.total_srcfiles_in_os,
+      'within target', new_trg_dirnode.name, new_trg_dirnode.parentpath
     )
     shutil.move(oldfile, newfile)
-    return True
+    name = new_trg_dirnode.name
+    parentpath = new_trg_dirnode.parentpath
+    boolres = trg_dirnode.update_db_name_n_parentpath(name, parentpath, self.bak_dt.dbtree)
+    if boolres:
+      return True
+    return new_trg_dirnode.insert_into_db(self.bak_dt.dbtree)
 
   def copy_over_src_to_trg(self, src_dirnode):
     src_filepath = src_dirnode.get_abspath_with_mountpath(self.ori_dt.mountpath)
@@ -122,9 +138,12 @@ class TrgBasedOnSrcMolder:
     if not os.path.isdir(basepath):
       os.makedirs(basepath)
     self.n_copied_files += 1
-    print(self.n_copied_files, 'of', self.total_srcfiles_in_os, 'copying', src_dirnode.name, src_dirnode.parentpath)
+    print(
+      'Copying', self.n_copied_files, 'of', self.total_srcfiles_in_os,
+      'source is', src_dirnode.name, src_dirnode.parentpath
+    )
     shutil.copy2(src_filepath, trg_filepath)
-    return True
+    return src_dirnode.insert_into_db(self.bak_dt.dbtree)
 
   def move_trg_file_if_applicable(self, src_row):
     src_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.dbtree.fieldnames)
@@ -162,6 +181,8 @@ class TrgBasedOnSrcMolder:
   def process(self):
     self.sweep_src_files_in_db()
     dirf.prune_dirtree_deleting_empty_folders(self.bak_dt.mountpath)
+    # trg_dbentries_excess_deleter = dbentry_del.DBEntryWithoutCorrespondingOsEntryDeleter(self.bak_dt.mountpath)
+    # trg_dbentries_excess_deleter.process()
     self.report()
 
 

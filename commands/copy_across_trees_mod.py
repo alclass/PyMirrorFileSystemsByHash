@@ -7,16 +7,20 @@ This script does basically three things:
   2) it copies to the target-tree missing files that exists in the source-tree;
   3) it deletes under confirmation excess files in target, ie files that exist in target but do not in source;
 
+Notice that script [mold_trg_based_on_src_mod.py] also does the two first actions above as a sort of "mold" operation.
+
 Things this script doesn't do:
-  1) this script DOESN'T do removals in source (note above that it removes under confirmation excess files in target);
+  1) this script DOESN'T do removals in source
+     (note above that it removes excess files in target under user confirmation);
   2) this script DOESN'T do the inverse of the three operations above;
-     (the user can run it inversely swapping the order of the two parameters: source_mountpath and target_mountpath).
+     the user can run it herself inversely swapping the order of the two parameters:
+     source_mountpath and target_mountpath.
 
 Other scripts in this system/app complete the mirroring effect, for example:
   - cleaning up entries that end with whitespaces;
   - treating duplicates in a directory tree (in fact this should be run before this mirror-back-up script);
   - syncronize os-entries with db-entries
-    (a GUI window manager is planned to the future to integrate db-sync with os-operations).
+    (TO-DO: a GUI window manager is planned for the future to integrate db-sync with os-operations).
 """
 import datetime
 import os.path
@@ -27,11 +31,11 @@ import fs.db.dbfailed_filecopy_mod as dbfailedcopy
 import fs.hashfunctions.hash_mod as hm
 import fs.strfs.strfunctions_mod as strf
 import default_settings as defaults
-from commands.walkup_dirtree_files import FileSweeper
-import commands.resync_mod as rsync
-# import commands.paths_endingwith_spaces_mod as spacepaths
 import commands.move_rename_target_based_on_source_mod as moverename
-import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentryupd
+# from commands.walkup_dirtree_files import FileSweeper
+# import commands.resync_mod as rsync
+# import commands.paths_endingwith_spaces_mod as spacepaths
+# import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentryupd
 
 
 class MirrorDirTree:
@@ -340,26 +344,12 @@ class MirrorDirTree:
 
   def process(self):
     # print('1 whitespace (more important are the trailing spaces) in names verifier')
-    # print('-'*40)
-    # space_verifier = spacepaths.PathsEndingWithSpacesVerifier(self.ori_dt.mountpath)
-    # space_verifier.process()
-    for mountpath in (self.ori_dt.mountpath, self.bak_dt.mountpath):
-      print('2 resync_tree', mountpath)
-      print('-' * 40)
-      rsync.resync_tree(mountpath)
     self.fetch_total_files_in_src_n_trg()
     self.fetch_total_unique_files_in_src_n_trg()
-    print('3 dbentry updater / verify_moving_files_in_target')
-    print('-'*40)
-    dbentryupdater = dbentryupd.DBEntryUpdater(self.ori_dt.mountpath)
-    dbentryupdater.process(self.total_srcfiles_in_db, self.total_unique_srcfiles)
-    dbentryupdater = dbentryupd.DBEntryUpdater(self.bak_dt.mountpath)
-    dbentryupdater.process(self.total_trgfiles_in_db, self.total_unique_trgfiles)
-    print('4 mirror_by_copying_across_dirtrees')
-    print('-'*40)
+    print('-'*70)
     self.mirror_by_copying_across_dirtrees()
-    print('5 erase excess')
-    print('-'*40)
+    print('After mirroring source to target, erase excess in target')
+    print('-'*70)
     self.erase_excess_of_src_in_trg()
     self.report()
 
@@ -387,14 +377,6 @@ class MirrorDirTree:
           '| total_of_repeat_trgfiles =', self.total_of_repeat_trgfiles)
     print("Script's Runtime:", elapsed_time, '| today/now = ', datetime.datetime.now())
     print('=_+_+_='*3, 'End of the CopyAcross Report', '=_+_+_='*3)
-
-
-def resync_trees(src_mountpath, trg_mountpath):
-  for mountpath in (src_mountpath, trg_mountpath):
-    sweeper = FileSweeper(mountpath)
-    sweeper.walkup_dirtree_files()
-    dbtree = dbdt.DBDirTree(mountpath)
-    dbtree.delete_rows_not_existing_on_dirtree(mountpath)
 
 
 def process():

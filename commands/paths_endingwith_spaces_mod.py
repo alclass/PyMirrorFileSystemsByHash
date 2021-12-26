@@ -52,7 +52,7 @@ class PathsEndingWithSpacesVerifier:
     if restart:
       self.n_restarts += 1
     for self.current_base_abspath, folders, files in os.walk(self.mountpath):
-      self.folders_walked +=1
+      self.folders_walked += 1
       print(self.folders_walked, self.current_base_abspath)
       entries = folders + files
       _ = self.treat_entries(entries)
@@ -101,6 +101,7 @@ def process():
   ori_mountpath, _ = get_args_or_default()  # bak_mountpath
   verifier = PathsEndingWithSpacesVerifier(ori_mountpath)
   verifier.process()
+
 
 if __name__ == '__main__':
   process()
