@@ -6,25 +6,42 @@ import os
 import default_settings as defaults
 
 
-def prune_dirtree_deleting_empty_folders(base_dirpath, seq=0):
-  entries = os.listdir(base_dirpath)
+def prune_dirtree_deleting_empty_folders(current_dirpath, n_visited=0, n_removed=0, n_failed=0):
+  """
+  This function deletes empty folders, starting from a dirpath and recursively visiting its subdirectory
+  """
+  entries = os.listdir(current_dirpath)
   for e in entries:
-    abspath = os.path.join(base_dirpath, e)
+    abspath = os.path.join(current_dirpath, e)
     if os.path.isfile(abspath):
       continue
     if os.path.isdir(abspath):
-      seq += 1
-      prune_dirtree_deleting_empty_folders(abspath, seq)
-  entries = os.listdir(base_dirpath)
+      n_visited += 1
+      # recurse here to a subdirectory
+      n_visited, n_removed, n_failed = prune_dirtree_deleting_empty_folders(abspath, n_visited, n_removed, n_failed)
+  entries = os.listdir(current_dirpath)
   if len(entries) == 0:
+    # the directory/folder is empty, it can be removed
     print('#'*50)
-    print(seq+1, 'Folder-deleting:', base_dirpath)
+    print('Total empty dirs removed', n_removed, 'removing:', current_dirpath)
     print('#'*50)
-    os.rmdir(base_dirpath)
-  return
+    try:
+      os.rmdir(current_dirpath)
+      n_removed += 1
+    except (IOError, OSError):
+      n_failed += 1
+  return n_visited, n_removed, n_failed
 
 
-def count_total_files_n_folders_with_norestriction(mountpath, restricted_dirnames, forbidden_first_level_dirs):
+def count_total_files_n_folders_with_norestriction(
+    mountpath,
+    restricted_dirnames=None,
+    forbidden_first_level_dirs=None
+  ):
+  if restricted_dirnames is None:
+    restricted_dirnames = defaults.RESTRICTED_DIRNAMES_FOR_WALK
+  if forbidden_first_level_dirs is None:
+    forbidden_first_level_dirs = defaults.FORBIBBEN_FIRST_LEVEL_DIRS
   src_total_files = 0
   src_total_dirs = 0
   for current_path, folders, files in os.walk(mountpath):
@@ -97,14 +114,23 @@ def is_lowerstr_startingwith_any_in_list(name, starting_strs_list):
   return False
 
 
-def is_any_dirname_in_path_startingwith_any_in_list(fpath, starting_strs_list):
+def is_any_dirname_in_path_startingwith_any_in_list(fpath, starting_strs_list=None):
   if fpath is None:
     return False
+  if starting_strs_list is None:
+    starting_strs_list = defaults.RESTRICTED_DIRNAMES_FOR_WALK
   dirnames = fpath.split(os.path.sep)
   for dirname in dirnames:
     if is_lowerstr_startingwith_any_in_list(dirname, starting_strs_list):
       return True
   return False
+
+
+def does_path_have_forbidden_dir(fpath, restricted_dirnames=None):
+  """
+  This function is the same as is_any_dirname_in_path_startingwith_any_in_list() with an alternative name
+  """
+  return is_any_dirname_in_path_startingwith_any_in_list(fpath, restricted_dirnames)
 
 
 def is_forbidden_dirpass(dirpath, restricted_dirnames=None, forbidden_first_level_dirs=None):

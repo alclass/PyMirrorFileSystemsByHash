@@ -58,9 +58,6 @@ import default_settings as defaults
 
 class FileSweeper:
 
-  RESTRICTED_DIRNAMES_FOR_WALK = ['z-del', 'z-tri']
-  FORBIBBEN_FIRST_LEVEL_DIRS = ['System Volume Information']
-
   def __init__(self, mountpath, treename='ori', restart_at_walkloopseq=None):
     """
     treename is generally 'ori' (source) or 'bak' (back-up)
@@ -78,6 +75,8 @@ class FileSweeper:
     self.n_files_empty_sha1 = 0
     self.n_failed_filestat = 0
     self.n_failed_sha1s = 0
+    self.n_empty_dirs_removed = 0
+    self.n_empty_dirs_fail_rm = 0
     self.n_dbentries_ins_upd = 0
     self.n_dbentries_failed_ins_upd = 0
     self.all_nodes_with_osread_problem = []
@@ -100,9 +99,7 @@ class FileSweeper:
     print('Counting files and dirs in db and os. Please wait.')
     self.total_unique_files_in_db = self.dbtree.count_unique_sha1s_as_int()
     self.total_files_in_db = self.dbtree.count_rows_as_int()
-    total_files, total_dirs = dirf.count_total_files_n_folders_with_norestriction(
-      self.dirtree.mountpath, self.RESTRICTED_DIRNAMES_FOR_WALK, self.FORBIBBEN_FIRST_LEVEL_DIRS
-    )
+    total_files, total_dirs = dirf.count_total_files_n_folders_with_norestriction(self.dirtree.mountpath)
     self.total_files_in_os = total_files
     self.total_dirs_in_os = total_dirs
 
@@ -245,15 +242,6 @@ class FileSweeper:
         continue
       self.dbinsert_or_update_file_entry(name, parentpath, bytesize, mdatetime, filepath)
 
-  def is_forbidden_dirpass(self, ongoingfolder_abspath):
-    """
-    This method organizes parameters for issue its correspondent (static) function in module dirf
-    """
-    dirpath = ongoingfolder_abspath
-    restricted_dirnames = self.RESTRICTED_DIRNAMES_FOR_WALK
-    forbidden_first_level_dirs = self.FORBIBBEN_FIRST_LEVEL_DIRS
-    return dirf.is_forbidden_dirpass(dirpath, restricted_dirnames, forbidden_first_level_dirs)
-
   def walkup_dirtree_files(self):
     """
 
@@ -263,7 +251,7 @@ class FileSweeper:
       middlepath = middlepath.lstrip('./')  # parentpath is '/' + middlepath (in some cases they are the same)
       if ongoingfolder_abspath == self.mountpath:  # this means not to process the mount_abspath folder itself
         continue
-      if self.is_forbidden_dirpass(ongoingfolder_abspath):
+      if dirf.is_forbidden_dirpass(ongoingfolder_abspath):
         continue
       self.dbinsert_files_if_needed(ongoingfolder_abspath, files, middlepath)
 
@@ -283,12 +271,17 @@ class FileSweeper:
     print('total_dirs_in_os', self.total_dirs_in_os)
     print('n_processed_files', self.n_processed_files)
     print('n_updated_dbentries', self.n_updated_dbentries)
-    print('n_restricted_dirs', self.n_restricted_dirs, ':: those in ', self.RESTRICTED_DIRNAMES_FOR_WALK)
+    print('n_restricted_dirs', self.n_restricted_dirs, ':: those in ', defaults.RESTRICTED_DIRNAMES_FOR_WALK)
     print('n_files_empty_sha1', self.n_files_empty_sha1)
     print('n_failed_filestat', self.n_failed_filestat)
     print('n_failed_sha1s', self.n_failed_sha1s)
     print('n_dbentries_ins_upd', self.n_dbentries_ins_upd)
     print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd)
+
+  def prune_empty_folders(self):
+    n_visited, n_removed, n_failed = dirf.prune_dirtree_deleting_empty_folders(self.mountpath)
+    self.n_empty_dirs_removed = n_removed
+    self.n_empty_dirs_fail_rm = n_failed
 
   def process(self):
     """
@@ -302,8 +295,11 @@ class FileSweeper:
     self.walkup_dirtree_files()
     dbdeleter = dbentry_del.DBEntryWithoutCorrespondingOsEntryDeleter(self.mountpath)
     dbdeleter.process()
+    self.prune_empty_folders()
+
     print('Removing empty folders left if any.')
     dirf.prune_dirtree_deleting_empty_folders(self.dirtree.mountpath)
+
     self.report_all_nodes_with_osread_problem()
     self.report()
 

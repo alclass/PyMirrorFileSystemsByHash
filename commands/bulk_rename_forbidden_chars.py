@@ -46,6 +46,7 @@ class BulkRenamer:
     self.dirtree = dt.DirTree('treename', self.mountpath)
     self.dbtree = self.dirtree.dbtree  # dbu.DBDirTree(mount_abspath)
     self.ongoingfolder_abspath = None
+    self.calc_totals()
 
   def calc_totals(self):
     """

@@ -37,6 +37,9 @@ class TrgBasedOnSrcMolder:
     self.n_copied_files = 0
     self.n_moved_files = 0
     self.n_failed_moves = 0
+    self.n_failed_copies = 0
+    self.n_empty_dirs_removed = 0
+    self.n_empty_dirs_fail_rm = 0
     self.calc_totals()
 
   def calc_totals(self):
@@ -51,16 +54,7 @@ class TrgBasedOnSrcMolder:
     total_files, total_dirs = dirf.count_total_files_n_folders(self.bak_dt.mountpath)
     self.total_trgfiles_in_os = total_files
     self.total_trgdirs_in_os = total_dirs
-
-  def print_counts(self):
-    print('total_unique_srcfiles:', self.total_unique_srcfiles)
-    print('total_unique_trgfiles:', self.total_unique_trgfiles)
-    print('total_srcfiles_in_db:', self.total_srcfiles_in_db)
-    print('total_trgfiles_in_db:', self.total_trgfiles_in_db)
-    print('total_srcfiles_in_os:', self.total_srcfiles_in_os)
-    print('total_srcdirs_in_os:', self.total_srcdirs_in_os)
-    print('total_trgfiles_in_os:', self.total_trgfiles_in_os)
-    print('total_trgdirs_in_os:', self.total_trgdirs_in_os)
+    self.print_counters()
 
   def find_sha1_in_trg_n_return_trg_dirnode(self, sha1, src_name, src_parentpath):
     if sha1 is None:
@@ -147,12 +141,18 @@ class TrgBasedOnSrcMolder:
       'Copying', self.n_copied_files, 'of', self.total_srcfiles_in_os,
       'source is', src_dirnode.name, src_dirnode.parentpath
     )
-    shutil.copy2(src_filepath, trg_filepath)
+    try:
+      shutil.copy2(src_filepath, trg_filepath)
+    except (OSError, IOError):
+      self.n_failed_copies += 1
+      return False
     return src_dirnode.insert_into_db(self.bak_dt.dbtree)
 
   def move_trg_file_if_applicable(self, src_row):
     src_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.dbtree.fieldnames)
     src_filepath = src_dirnode.get_abspath_with_mountpath(self.ori_dt.mountpath)
+    if dirf.does_path_have_forbidden_dir(src_filepath):
+      return False
     if not os.path.isfile(src_filepath):
       return False
     trg_dirnode = self.find_sha1_in_trg_n_return_trg_dirnode(src_dirnode.sha1, src_dirnode.name, src_dirnode.parentpath)
@@ -168,27 +168,43 @@ class TrgBasedOnSrcMolder:
 
   def process_src_rows(self, rows):
     for row in rows:
-      print(row[0], 'Processing:', row)
+      _id = row[0]  # id is always at index 0
+      print(_id, '/', self.total_srcfiles_in_db, 'Processing:', row)
       _ = self.move_trg_file_if_applicable(row)
 
   def sweep_src_files_in_db(self):
-    for i, generated_rows in enumerate(self.ori_dt.dbtree.do_select_all_w_limit_n_offset()):
+    for generated_rows in self.ori_dt.dbtree.do_select_all_w_limit_n_offset():
       for row in generated_rows:
-        # self.process_src_rows(rows)
         self.move_trg_file_if_applicable(row)
+
+  def print_counters(self):
+    print('total_unique_srcfiles:', self.total_unique_srcfiles)
+    print('total_unique_trgfiles:', self.total_unique_trgfiles)
+    print('total_srcfiles_in_db:', self.total_srcfiles_in_db)
+    print('total_trgfiles_in_db:', self.total_trgfiles_in_db)
+    print('total_srcfiles_in_os:', self.total_srcfiles_in_os)
+    print('total_srcdirs_in_os:', self.total_srcdirs_in_os)
+    print('total_trgfiles_in_os:', self.total_trgfiles_in_os)
+    print('total_trgdirs_in_os:', self.total_trgdirs_in_os)
 
   def report(self):
     print('=_+_+_='*3, 'TrgBasedOnSrcMolder Report', '=_+_+_='*3)
-    self.print_counts()
+    self.print_counters()
     print('n_moved_files:', self.n_moved_files)
     print('n_copied_files:', self.n_copied_files)
     print('n_failed_moves:', self.n_failed_moves)
+    print('n_failed_copies:', self.n_failed_copies)
+    print('n_empty_dirs_removed:', self.n_empty_dirs_removed)
+    print('n_empty_dirs_fail_rm:', self.n_empty_dirs_fail_rm)
+
+  def prune_empty_folders(self):
+    n_visited, n_removed, n_failed = dirf.prune_dirtree_deleting_empty_folders(self.bak_dt.mountpath)
+    self.n_empty_dirs_removed = n_removed
+    self.n_empty_dirs_fail_rm = n_failed
 
   def process(self):
     self.sweep_src_files_in_db()
-    dirf.prune_dirtree_deleting_empty_folders(self.bak_dt.mountpath)
-    # trg_dbentries_excess_deleter = dbentry_del.DBEntryWithoutCorrespondingOsEntryDeleter(self.bak_dt.mountpath)
-    # trg_dbentries_excess_deleter.process()
+    self.prune_empty_folders()
     self.report()
 
 
