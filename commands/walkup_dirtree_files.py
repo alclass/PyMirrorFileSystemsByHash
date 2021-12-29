@@ -245,14 +245,14 @@ class FileSweeper:
         continue
       self.dbinsert_or_update_file_entry(name, parentpath, bytesize, mdatetime, filepath)
 
-  def is_forbidden_first_level_dir(self, ongoingfolder_abspath):
+  def is_forbidden_dirpass(self, ongoingfolder_abspath):
     """
     This method organizes parameters for issue its correspondent (static) function in module dirf
     """
     dirpath = ongoingfolder_abspath
     restricted_dirnames = self.RESTRICTED_DIRNAMES_FOR_WALK
     forbidden_first_level_dirs = self.FORBIBBEN_FIRST_LEVEL_DIRS
-    return dirf.is_forbidden_first_level_dir(dirpath, restricted_dirnames, forbidden_first_level_dirs)
+    return dirf.is_forbidden_dirpass(dirpath, restricted_dirnames, forbidden_first_level_dirs)
 
   def walkup_dirtree_files(self):
     """
@@ -263,9 +263,7 @@ class FileSweeper:
       middlepath = middlepath.lstrip('./')  # parentpath is '/' + middlepath (in some cases they are the same)
       if ongoingfolder_abspath == self.mountpath:  # this means not to process the mount_abspath folder itself
         continue
-      if self.is_forbidden_first_level_dir(ongoingfolder_abspath):
-        continue
-      if dirf.is_any_dirname_in_path_startingwith_any_in_list(ongoingfolder_abspath, self.RESTRICTED_DIRNAMES_FOR_WALK):
+      if self.is_forbidden_dirpass(ongoingfolder_abspath):
         continue
       self.dbinsert_files_if_needed(ongoingfolder_abspath, files, middlepath)
 

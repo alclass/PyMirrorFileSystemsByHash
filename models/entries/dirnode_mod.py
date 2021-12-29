@@ -307,6 +307,10 @@ class DirNode:
                 % (self.name, self.parentpath)
     raise ValueError(error_msg)
 
+  def get_folderabspath_with_mountpath(self, mountpath):
+    middlepath = self.parentpath.lstrip('./')
+    return os.path.join(mountpath, middlepath)
+
   def get_abspath_with_mountpath(self, mountpath):
     """
     fpath (above) is in fact a middlepath. This method forms the absolute "full" path

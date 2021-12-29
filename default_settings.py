@@ -40,6 +40,8 @@ EXTENSIONS_TO_JUMP = ['.gif', '.htm', '.html', '.txt', '.pdf']
 EXTENSIONS_IN_SHA1_VERIFICATION = [
   '.mp4', '.mp3', '.mkv', '.avi', '.webm', '.m4a'
 ]
+RESTRICTED_DIRNAMES_FOR_WALK = ['z-del', 'z-tri']
+FORBIBBEN_FIRST_LEVEL_DIRS = ['System Volume Information']
 
 
 class Paths:

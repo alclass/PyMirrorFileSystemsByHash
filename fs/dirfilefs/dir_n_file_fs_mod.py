@@ -3,6 +3,7 @@
 dir_n_file_fs_mod.py
 """
 import os
+import default_settings as defaults
 
 
 def prune_dirtree_deleting_empty_folders(base_dirpath):
@@ -29,7 +30,7 @@ def count_total_files_n_folders_with_norestriction(mountpath, restricted_dirname
     if current_path == mountpath:
       # do not count files in root dir only count folders
       continue
-    if is_forbidden_first_level_dir(current_path, restricted_dirnames, forbidden_first_level_dirs):
+    if is_forbidden_dirpass(current_path, restricted_dirnames, forbidden_first_level_dirs):
       # do not count files or folder inside forbidden_first_level_dirs
       continue
     if is_any_dirname_in_path_startingwith_any_in_list(current_path, restricted_dirnames):
@@ -105,12 +106,16 @@ def is_any_dirname_in_path_startingwith_any_in_list(fpath, starting_strs_list):
   return False
 
 
-def is_forbidden_first_level_dir(dirpath, restricted_dirnames, forbidden_first_level_dirs):
+def is_forbidden_dirpass(dirpath, restricted_dirnames=None, forbidden_first_level_dirs=None):
   """
   if dirpath starts with /, the split() result will have an '' (empty string) as first element
   if dirpath does not start with /, the split() result will have the top level dirname as first element
   path.lstrip('/') will strip out any beginning slashes if any, assuring split()[0] gives the top level dirname in path
   """
+  if restricted_dirnames is None:
+    restricted_dirnames = defaults.RESTRICTED_DIRNAMES_FOR_WALK
+  if forbidden_first_level_dirs is None:
+    forbidden_first_level_dirs = defaults.FORBIBBEN_FIRST_LEVEL_DIRS
   try:
     ongoingfolder_abspath = dirpath.lstrip('/')
     first_level_dir = ongoingfolder_abspath.split('/')[0]

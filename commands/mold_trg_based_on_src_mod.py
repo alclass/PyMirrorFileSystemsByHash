@@ -36,6 +36,7 @@ class TrgBasedOnSrcMolder:
     self.total_trgdirs_in_os = 0
     self.n_copied_files = 0
     self.n_moved_files = 0
+    self.n_failed_moves = 0
     self.calc_totals()
 
   def calc_totals(self):
@@ -117,7 +118,11 @@ class TrgBasedOnSrcMolder:
       'Moving', self.n_moved_files, 'of', self.total_srcfiles_in_os,
       'within target', new_trg_dirnode.name, new_trg_dirnode.parentpath
     )
-    shutil.move(oldfile, newfile)
+    try:
+      shutil.move(oldfile, newfile)
+    except OSError:
+      self.n_failed_moves += 1
+      return False
     name = new_trg_dirnode.name
     parentpath = new_trg_dirnode.parentpath
     boolres = trg_dirnode.update_db_name_n_parentpath(name, parentpath, self.bak_dt.dbtree)
@@ -177,6 +182,7 @@ class TrgBasedOnSrcMolder:
     self.print_counts()
     print('n_moved_files:', self.n_moved_files)
     print('n_copied_files:', self.n_copied_files)
+    print('n_failed_moves:', self.n_failed_moves)
 
   def process(self):
     self.sweep_src_files_in_db()
