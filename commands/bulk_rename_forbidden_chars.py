@@ -17,7 +17,10 @@ def name_change_to(filename):
     return None
   name, ext = os.path.splitext(filename)
   newname = name.lstrip(' \t').rstrip(' \t\r\n').replace(':', ';')
-  newfilename = newname + ext
+  newext = ext.lstrip(' \t').rstrip(' \t\r\n').replace(':', ';')
+  if not newext.startswith('.'):
+    newext = '.' + newext
+  newfilename = newname + newext
   return newfilename
 
 
@@ -131,11 +134,9 @@ class BulkRenamer:
       if not _id:
         print('Cannot rename, id is None', _id, self.n_processed_files, '/', self.total_files_in_os)
         return None
-    name, ext = os.path.splitext(filename)
-    filtered_name = name_change_to(name)
-    if name == filtered_name:
+    newfilename = name_change_to(filename)
+    if newfilename == filename:
       return
-    newfilename = filtered_name + ext
     self.do_rename(filename, newfilename, _id)
 
   def verify_filenames_for_rename(self, files):
