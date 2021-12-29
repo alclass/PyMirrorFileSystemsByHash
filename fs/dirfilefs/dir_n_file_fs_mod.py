@@ -6,18 +6,19 @@ import os
 import default_settings as defaults
 
 
-def prune_dirtree_deleting_empty_folders(base_dirpath):
+def prune_dirtree_deleting_empty_folders(base_dirpath, seq=0):
   entries = os.listdir(base_dirpath)
   for e in entries:
     abspath = os.path.join(base_dirpath, e)
     if os.path.isfile(abspath):
       continue
     if os.path.isdir(abspath):
-      prune_dirtree_deleting_empty_folders(abspath)
+      seq += 1
+      prune_dirtree_deleting_empty_folders(abspath, seq)
   entries = os.listdir(base_dirpath)
   if len(entries) == 0:
     print('#'*50)
-    print('Folder-deleting:', base_dirpath)
+    print(seq+1, 'Folder-deleting:', base_dirpath)
     print('#'*50)
     os.rmdir(base_dirpath)
   return

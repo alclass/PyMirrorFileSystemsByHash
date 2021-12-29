@@ -6,9 +6,19 @@ import datetime
 import os.path
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
+import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
 import fs.hashfunctions.hash_mod as hm
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
 import default_settings as defaults
+
+
+def name_change_to(filename):
+  if filename is None:
+    return None
+  name, ext = os.path.splitext(filename)
+  newname = name.lstrip(' \t').rstrip(' \t\r\n').replace(':', ';')
+  newfilename = newname + ext
+  return newfilename
 
 
 class BulkRenamer:
@@ -23,7 +33,7 @@ class BulkRenamer:
     self.n_processed_files = 0
     self.n_to_rename = 0
     self.n_renamed = 0
-    self.rename_tuplelist = []
+    self.rename_ids = []
     self.n_restricted_dirs = 0
     self.n_updated_dbentries = 0
     self.n_files_empty_sha1 = 0
@@ -83,9 +93,8 @@ class BulkRenamer:
 
   def do_rename(self, filename, newfilename, _id):
     self.n_to_rename += 1
-    print(self.n_to_rename, '/', self.total_files_in_os, _id, 'name was renamed', newfilename)
-    rename_tuple = (_id, newfilename)
-    self.rename_tuplelist.append(rename_tuple)
+    print(self.n_to_rename, '/', self.total_files_in_os, 'id', _id, filename, 'name was renamed', newfilename)
+    self.rename_ids.append(_id)
 
   def get_files_id_in_db(self, filename):
     """
@@ -119,10 +128,10 @@ class BulkRenamer:
     if not _id:
       _id = self.insert_os_entry_into_db_n_get_id(filename)
       if not _id:
-        print('Cannot rename, id is None', _id)
+        print('Cannot rename, id is None', _id, self.n_processed_files, '/', self.total_files_in_os)
         return None
     name, ext = os.path.splitext(filename)
-    filtered_name = name.lstrip(' \t').rstrip(' \t\r\n').replace(':', ';')
+    filtered_name = name_change_to(name)
     if name == filtered_name:
       return
     newfilename = filtered_name + ext
@@ -131,26 +140,26 @@ class BulkRenamer:
   def verify_filenames_for_rename(self, files):
     for filename in files:
       self.n_processed_files += 1
-      print(self.n_processed_files, 'verifying', filename)
+      print(self.n_processed_files, '/', self.total_files_in_os, 'verifying', filename)
       self.process_filename(filename)
 
   def get_dbentry_dirnode_by_id(self, _id):
     fetched_list = self.dbtree.fetch_node_by_id(_id)
     if fetched_list and len(fetched_list) == 1:
-      row =  fetched_list[0]
+      row = fetched_list[0]
       dirnode = dn.DirNode.create_with_tuplerow(row, self.dbtree.fieldnames)
       return dirnode
     return None
 
   def confirm_renames(self):
-    total_ren = len(self.rename_tuplelist)
+    total_ren = len(self.rename_ids)
     if total_ren == 0:
       print('*** NO renames ***')
       return False
     print('************ confirm_renames ************')
-    for i, rename_tuple in enumerate(self.rename_tuplelist):
-      _id, newfilename = rename_tuple
+    for i, _id in enumerate(self.rename_ids):
       dirnode = self.get_dbentry_dirnode_by_id(_id)
+      newfilename = name_change_to(dirnode.name)
       print(i+1, '/', total_ren, 'id', _id, '[', dirnode.name, '] to [',  newfilename, ']')
     screen_msg = 'Confirm the %d rename(s) above? (*Y/n) ' % total_ren
     ans = input(screen_msg)
@@ -159,11 +168,11 @@ class BulkRenamer:
     return False
 
   def do_renames(self):
-    total_ren = len(self.rename_tuplelist)
-    for i, rename_tuple in enumerate(self.rename_tuplelist):
+    total_ren = len(self.rename_ids)
+    for i, _id in enumerate(self.rename_ids):
       seq = i + 1
-      _id, newfilename = rename_tuple
       dirnode = self.get_dbentry_dirnode_by_id(_id)
+      newfilename = name_change_to(dirnode.name)
       if dirnode is None:
         print(seq, '/', total_ren, '/', self.total_files_in_os, 'id', _id, 'dirnode is None')
         continue
@@ -171,6 +180,8 @@ class BulkRenamer:
       folderpath = dirnode.get_folderabspath_with_mountpath(self.mountpath)
       newfilepath = os.path.join(folderpath, newfilename)
       filepath = dirnode.get_abspath_with_mountpath(self.mountpath)
+      if filepath == newfilepath:
+        continue
       if not os.path.isfile(filepath):
         continue
       if os.path.isfile(newfilepath):
@@ -227,6 +238,8 @@ def process():
   src_mountpath, _ = defaults.get_src_n_trg_mountpath_args_or_default()
   renamer = BulkRenamer(src_mountpath)
   renamer.process()
+  dbentry_eraser = dbentry_del.DBEntryWithoutCorrespondingOsEntryDeleter(src_mountpath)
+  dbentry_eraser.process()
   finish_time = datetime.datetime.now()
   elapsed_time = finish_time - start_time
   # ------------------
