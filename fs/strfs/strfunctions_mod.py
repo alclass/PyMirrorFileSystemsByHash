@@ -2,6 +2,7 @@
 """
 strfunctions_mod.py
 """
+import os
 
 
 def prepend_slash_if_needed(middlepath):
@@ -44,6 +45,21 @@ def any_dir_in_path_startswith(fpath, str_startswith):
     if foldername.startswith(str_startswith):
       return True
   return False
+
+
+def clean_rename_filename_to(filename):
+  if filename is None:
+    return None
+  name, ext = os.path.splitext(filename)
+  newname = name.lstrip(' \t').rstrip(' \t\r\n').replace(':', ';')
+  newext = ext.lstrip(' \t').rstrip(' \t\r\n').replace(':', ';')
+  if newext is None or newext == '' or newext == '.':
+    newfilename = newname
+    return newfilename
+  if not newext.startswith('.'):
+    newext = '.' + newext
+  newfilename = newname + newext
+  return newfilename
 
 
 # noinspection PyTypeChecker

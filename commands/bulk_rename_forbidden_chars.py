@@ -13,18 +13,6 @@ import fs.strfs.strfunctions_mod as strf
 import default_settings as defaults
 
 
-def name_change_to(filename):
-  if filename is None:
-    return None
-  name, ext = os.path.splitext(filename)
-  newname = name.lstrip(' \t').rstrip(' \t\r\n').replace(':', ';')
-  newext = ext.lstrip(' \t').rstrip(' \t\r\n').replace(':', ';')
-  if not newext.startswith('.'):
-    newext = '.' + newext
-  newfilename = newname + newext
-  return newfilename
-
-
 class BulkRenamer:
 
   def __init__(self, mountpath):
@@ -129,7 +117,7 @@ class BulkRenamer:
       2) rstrip(' \t\r\n')
       3) replace(':', ';')
     """
-    newfilename = name_change_to(filename)
+    newfilename = strf.clean_rename_filename_to(filename)
     if newfilename == filename:
       # if filename does not need to be renamed, return rightaway (no need to db-fetch id)
       return
@@ -164,7 +152,7 @@ class BulkRenamer:
     print('************ confirm_renames ************')
     for i, _id in enumerate(self.rename_ids):
       dirnode = self.get_dbentry_dirnode_by_id(_id)
-      newfilename = name_change_to(dirnode.name)
+      newfilename = strf.clean_rename_filename_to(dirnode.name)
       print(i+1, '/', total_ren, 'id', _id, '[', dirnode.name, '] to [',  newfilename, ']')
     screen_msg = 'Confirm the %d rename(s) above? (*Y/n) ' % total_ren
     ans = input(screen_msg)
@@ -177,7 +165,7 @@ class BulkRenamer:
     for i, _id in enumerate(self.rename_ids):
       seq = i + 1
       dirnode = self.get_dbentry_dirnode_by_id(_id)
-      newfilename = name_change_to(dirnode.name)
+      newfilename = strf.clean_rename_filename_to(dirnode.name)
       if dirnode is None:
         print(seq, '/', total_ren, '/', self.total_files_in_os, 'id', _id, 'dirnode is None')
         continue
