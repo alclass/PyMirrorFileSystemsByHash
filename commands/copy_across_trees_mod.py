@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mirror2trees.py
+copy_across_trees_mod.py
 
 This script does basically three things:
   1) it moves target-tree files to the relative position, in the target-tree itself, that exists in the source-tree;
@@ -32,10 +32,6 @@ import fs.hashfunctions.hash_mod as hm
 import fs.strfs.strfunctions_mod as strf
 import default_settings as defaults
 import commands.move_rename_target_based_on_source_mod as moverename
-# from commands.walkup_dirtree_files import FileSweeper
-# import commands.resync_mod as rsync
-# import commands.paths_endingwith_spaces_mod as spacepaths
-# import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentryupd
 
 
 class MirrorDirTree:

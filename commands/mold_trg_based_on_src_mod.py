@@ -18,6 +18,7 @@ import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
+import fs.strfs.strfunctions_mod as strf
 # import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
 
 
@@ -110,7 +111,7 @@ class TrgBasedOnSrcMolder:
     self.n_moved_files += 1
     print(
       'Moving', self.n_moved_files, 'of', self.total_srcfiles_in_os,
-      'within target', new_trg_dirnode.name, new_trg_dirnode.parentpath
+      'within target', new_trg_dirnode.name, '@', strf.put_ellipsis_in_str_middle(new_trg_dirnode.parentpath, 50)
     )
     try:
       shutil.move(oldfile, newfile)
@@ -139,7 +140,7 @@ class TrgBasedOnSrcMolder:
     self.n_copied_files += 1
     print(
       'Copying', self.n_copied_files, 'of', self.total_srcfiles_in_os,
-      'source is', src_dirnode.name, src_dirnode.parentpath
+      'src', src_dirnode.name, '@', strf.put_ellipsis_in_str_middle(src_dirnode.parentpath, 50)
     )
     try:
       shutil.copy2(src_filepath, trg_filepath)
@@ -148,7 +149,7 @@ class TrgBasedOnSrcMolder:
       return False
     return src_dirnode.insert_into_db(self.bak_dt.dbtree)
 
-  def move_trg_file_if_applicable(self, src_row):
+  def move_trg_file_based_on_src_if_applicable(self, src_row):
     src_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.dbtree.fieldnames)
     src_filepath = src_dirnode.get_abspath_with_mountpath(self.ori_dt.mountpath)
     if dirf.does_path_have_forbidden_dir(src_filepath):
@@ -166,16 +167,15 @@ class TrgBasedOnSrcMolder:
       return False
     return self.move_file_within_trg_to_its_src_relative_position_if_vacant(src_dirnode, trg_dirnode)
 
-  def process_src_rows(self, rows):
-    for row in rows:
-      _id = row[0]  # id is always at index 0
-      print(_id, '/', self.total_srcfiles_in_db, 'Processing:', row)
-      _ = self.move_trg_file_if_applicable(row)
+  def process_src_rows(self, src_rows):
+    for src_row in src_rows:
+      _id = src_row[0]  # id is always at index 0
+      print(_id, '/', self.total_srcfiles_in_db, 'Processing:', src_row)
+      _ = self.move_trg_file_based_on_src_if_applicable(src_row)
 
   def sweep_src_files_in_db(self):
     for generated_rows in self.ori_dt.dbtree.do_select_all_w_limit_n_offset():
-      for row in generated_rows:
-        self.move_trg_file_if_applicable(row)
+      self.process_src_rows(generated_rows)
 
   def print_counters(self):
     print('total_unique_srcfiles:', self.total_unique_srcfiles)

@@ -9,6 +9,7 @@ import models.entries.dirnode_mod as dn
 import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
 import fs.hashfunctions.hash_mod as hm
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
+import fs.strfs.strfunctions_mod as strf
 import default_settings as defaults
 
 
@@ -128,21 +129,23 @@ class BulkRenamer:
       2) rstrip(' \t\r\n')
       3) replace(':', ';')
     """
+    newfilename = name_change_to(filename)
+    if newfilename == filename:
+      # if filename does not need to be renamed, return rightaway (no need to db-fetch id)
+      return
     _id = self.get_files_id_in_db(filename)
     if not _id:
       _id = self.insert_os_entry_into_db_n_get_id(filename)
       if not _id:
         print('Cannot rename, id is None', _id, self.n_processed_files, '/', self.total_files_in_os)
         return None
-    newfilename = name_change_to(filename)
-    if newfilename == filename:
-      return
     self.do_rename(filename, newfilename, _id)
 
   def verify_filenames_for_rename(self, files):
     for filename in files:
       self.n_processed_files += 1
-      print(self.n_processed_files, '/', self.total_files_in_os, 'verifying', filename)
+      screen_ongoing_path = strf.put_ellipsis_in_str_middle(self.ongoingfolder_abspath, 50)
+      print(self.n_processed_files, '/', self.total_files_in_os, 'verifying', filename, '@', screen_ongoing_path)
       self.process_filename(filename)
 
   def get_dbentry_dirnode_by_id(self, _id):

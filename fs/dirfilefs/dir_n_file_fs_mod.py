@@ -138,19 +138,21 @@ def is_forbidden_dirpass(dirpath, restricted_dirnames=None, forbidden_first_leve
   if dirpath starts with /, the split() result will have an '' (empty string) as first element
   if dirpath does not start with /, the split() result will have the top level dirname as first element
   path.lstrip('/') will strip out any beginning slashes if any, assuring split()[0] gives the top level dirname in path
+  if first_level_dir.startswith('.'):
+    return True
   """
-  if restricted_dirnames is None:
-    restricted_dirnames = defaults.RESTRICTED_DIRNAMES_FOR_WALK
-  if forbidden_first_level_dirs is None:
-    forbidden_first_level_dirs = defaults.FORBIBBEN_FIRST_LEVEL_DIRS
+  if dirpath is None:
+    return None
   try:
-    ongoingfolder_abspath = dirpath.lstrip('/')
-    first_level_dir = ongoingfolder_abspath.split('/')[0]
-    if first_level_dir.startswith('.'):
-      return True
-    boolres = is_any_dirname_in_path_startingwith_any_in_list(first_level_dir, restricted_dirnames)
+    ongoingfolder_abspath = dirpath.lstrip('/') # this assures topleveldir is the first element after split('/')
+    if restricted_dirnames is None:
+      restricted_dirnames = defaults.RESTRICTED_DIRNAMES_FOR_WALK
+    boolres = is_any_dirname_in_path_startingwith_any_in_list(ongoingfolder_abspath, restricted_dirnames)
     if boolres:
       return True
+    if forbidden_first_level_dirs is None:
+      forbidden_first_level_dirs = defaults.FORBIBBEN_FIRST_LEVEL_DIRS
+    first_level_dir = ongoingfolder_abspath.split('/')[0]
     if first_level_dir in forbidden_first_level_dirs:
       return True
   except AttributeError:
