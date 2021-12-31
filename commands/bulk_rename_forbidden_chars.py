@@ -137,7 +137,7 @@ class BulkRenamer:
       self.process_filename(filename)
 
   def get_dbentry_dirnode_by_id(self, _id):
-    fetched_list = self.dbtree.fetch_node_by_id(_id)
+    fetched_list = self.dbtree.fetch_rowlist_by_id(_id)
     if fetched_list and len(fetched_list) == 1:
       row = fetched_list[0]
       dirnode = dn.DirNode.create_with_tuplerow(row, self.dbtree.fieldnames)
@@ -231,6 +231,7 @@ def process():
   src_mountpath, _ = defaults.get_src_n_trg_mountpath_args_or_default()
   renamer = BulkRenamer(src_mountpath)
   renamer.process()
+  print('Running DBEntryWithoutCorrespondingOsEntryDeleter. Please wait.')
   dbentry_eraser = dbentry_del.DBEntryWithoutCorrespondingOsEntryDeleter(src_mountpath)
   dbentry_eraser.process()
   finish_time = datetime.datetime.now()

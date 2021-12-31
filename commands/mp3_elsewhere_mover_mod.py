@@ -53,7 +53,7 @@ class Mp3ElsewhereMover:
       # target file is already there, add source to delete_list (user may confirm deletion later on)
       print(self.n_files_processed, 'Adding mp3 to delete idlist', src_filepath)
       # TO-DO: consider having delete idlist in db if its size grows too large
-      self.delete_idlist.append(src_dirnode._id)
+      self.delete_idlist.append(src_dirnode.db_id)
       return
     trg_folder_abspath, _ = os.path.split(trg_filepath)
     if not os.path.isdir(trg_folder_abspath):

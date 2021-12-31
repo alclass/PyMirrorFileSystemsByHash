@@ -23,7 +23,6 @@ import fs.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
 import fs.strfs.strfunctions_mod as strf
-# import shutil
 
 
 class ForceDeleterLookingDirUp:
@@ -82,7 +81,7 @@ class ForceDeleterLookingDirUp:
 
   def gather_sha1s_in_srcdir(self):
     charsize = len(self.src_dirpath)
-    sql = 'select * from %(tablename)s where substr(parentpath, ' + str(charsize) + ')=?;'
+    sql = 'SELECT * FROM %(tablename)s WHERE substr(parentpath, ' + str(charsize) + ')=?;'
     tuplevalues = (self.src_dirpath, )
     fetched_list = self.ori_dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     self.n_processed_files += 1

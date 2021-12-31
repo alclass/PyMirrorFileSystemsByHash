@@ -146,7 +146,7 @@ class PresentInDBNotInDirTreeReporter:
 
   def report_files_in_db_not_in_os(self):
     for _id in self.ids_present_in_db_not_in_os:
-      fetched_list = self.dbtree.fetch_node_by_id(_id)
+      fetched_list = self.dbtree.fetch_rowlist_by_id(_id)
       if fetched_list is None or len(fetched_list) == 0:
         continue
       row = fetched_list[0]

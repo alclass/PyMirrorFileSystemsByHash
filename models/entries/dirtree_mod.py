@@ -6,8 +6,7 @@ import math
 import os.path
 import fs.hashfunctions.hash_mod as hm
 import fs.db.dbdirtree_mod as dbu
-
-from models.entries import dirnode_mod as dn
+import models.entries.dirnode_mod as dn
 
 LF = '\n'
 PREFIX_FOR_FILES_LINEPATH = 'F '

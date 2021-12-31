@@ -41,6 +41,7 @@ class MirrorDirTree:
     self.ori_dt = dbdt.DBDirTree(ori_mountpath)
     self.bak_dt = dbdt.DBDirTree(bak_mountpath)
     self.n_files_processed = 0
+    self.total_filerepeats = 0
     self.n_copied_files = 0
     self.n_failed_copy = 0
     self.n_moved_files = 0
@@ -235,6 +236,7 @@ class MirrorDirTree:
       fetched_list = self.ori_dt.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
       if fetched_list:
         n_of_filerepeats = int(fetched_list[0][0])
+        self.total_filerepeats += n_of_filerepeats
         if n_of_filerepeats > 1:
           print(
             self.n_files_processed, '/', self.total_srcfiles_in_db,
@@ -369,7 +371,7 @@ class MirrorDirTree:
     print('total_srcfiles_in_db =', self.total_srcfiles_in_db, '| total_trgfiles_in_db =', self.total_trgfiles_in_db)
     print('total_unique_srcfiles =', self.total_unique_srcfiles,
           '| total_unique_trgfiles =', self.total_unique_trgfiles)
-    print('total_of_repeat_srcfiles =', self.total_of_repeat_srcfiles,
+    print('total_of_repeat_srcfiles =', self.total_of_repeat_srcfiles, '| total_filerepeats', self.total_filerepeats,
           '| total_of_repeat_trgfiles =', self.total_of_repeat_trgfiles)
     print("Script's Runtime:", elapsed_time, '| today/now = ', datetime.datetime.now())
     print('=_+_+_='*3, 'End of the CopyAcross Report', '=_+_+_='*3)

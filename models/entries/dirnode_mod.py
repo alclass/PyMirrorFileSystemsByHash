@@ -160,11 +160,14 @@ class DirNode:
     idx = fieldnames.index('mdatetime')
     mdatetime = tuplerow[idx]
     dirnode = DirNode(name, parentpath, sha1, bytesize, mdatetime)
-    dirnode._id = _id
+    dirnode.db_id = _id
     return dirnode
 
   def get_db_id(self):
-    return self._id
+    return self.db_id
+
+  def set_db_id(self, db_id):
+    self.db_id = db_id
 
   @classmethod
   def get_root_cls(cls):
@@ -196,7 +199,7 @@ class DirNode:
         error_msg = 'Runtime error: parent %s is not of type DirNode' % parent
         raise RuntimeError(error_msg)
     """
-    self._id = None
+    self.db_id = None
     self.name = name
     self.parentpath = parentpath
     self._fpath = None
@@ -234,7 +237,7 @@ class DirNode:
     return _fieldnames_dict
 
   def update_db_name_n_parentpath(self, name, parentpath, dbtree):
-    if self._id is None:
+    if self.db_id is None:
       return False
     sql = '''UPDATE %(tablename)s SET
       name=?,
@@ -242,7 +245,7 @@ class DirNode:
     WHERE
       id=?;
     '''
-    tuplevalues = (name, parentpath, self._id)
+    tuplevalues = (name, parentpath, self.db_id)
     return dbtree.do_update_with_sql_n_tuplevalues(sql, tuplevalues)
 
   def update_db_with_fetched_row(self, fetched_row, dbtree):

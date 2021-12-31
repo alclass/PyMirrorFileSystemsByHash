@@ -59,6 +59,15 @@ def count_total_files_n_folders_with_norestriction(
   return src_total_files, src_total_dirs
 
 
+def count_total_files_n_folders_inc_root(mountpath):
+  src_total_files = 0
+  src_total_dirs = 0
+  for current_path, folders, files in os.walk(mountpath):
+    src_total_dirs += len(folders)
+    src_total_files += len(files)
+  return src_total_files, src_total_dirs
+
+
 def count_total_files_n_folders(mountpath):
   src_total_files = 0
   src_total_dirs = 0

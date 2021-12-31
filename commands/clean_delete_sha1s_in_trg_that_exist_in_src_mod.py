@@ -1,26 +1,13 @@
 #!/usr/bin/env python3
 """
-force_delete_repeatfiles_lookingup_targetdirtree_mod.py
+clean_delete_sha1s_in_trg_that_exist_in_src_mod.py
 
-This script takes two folder paths (source and target) and deletes file copies (repeats (*))
-  in the target dirtree.
+This script is NOT part of the mirroring back-up main logic of the system, on the contrary,
+  this script is an auxiliary functionality to remove files that exist in a disk from another disk,
+  this is a kind of excess cleaning in a disk that has files belonging to another orig & bak disks.
 
-(*) repeats are based on the sha1-hash of its content
-
-Notice the main class here needs 4 parameters to do its job. This is an important different from
-  script:
-    force_delete_every_equal_sha1_in_targetdirtree_mod
-  which only needs 2 parameters, ie src_dirtree (or src_mountpath) and trg_dirtree (or trg_mountpath)
-
-IMPORTANT:
-  1) all file deletions are always somehow dangerous but this script only deletes copies
-     (ie the original copy is not to be deleted in this script);
-  2) once a file is considered "source" its db-id prevents it from being deleted itself;
-
-/media/friend/D1 4T Bak B CS EEE M Sc So
-/media/friend/D1 4T Bak B CS EEE M Sc So/
-Soc Sci vi/Philosophy vi/Individual Philosophers vi/Aa Lang Individual Philosophers vi/
-Philosophie yu (von Radio) ytpls/Ant 7-v 27' 2014 Philosophie der Antike yu Philosophie ytpl
+PLEASE, TAKE CARE WITH THE USE OF THIS SCRIPT.
+  Reinforcing the information above, it's not for back-up, it's for excess clean-up.
 """
 import os.path
 
@@ -44,6 +31,8 @@ class TargetSameSha1ForceDeleter:
     self.n_processed_entries = 0
     self.n_processed_deletes = 0
     self.trg_delete_ids = []
+    self.n_failed_deletes = 0
+    self.n_deleted = 0
     self.ori_dbtree = dbdt.DBDirTree(ori_mountpath)
     self.bak_dbtree = dbdt.DBDirTree(bak_mountpath)
     self.src_total_files_in_db = 0
@@ -128,7 +117,7 @@ class TargetSameSha1ForceDeleter:
       error_msg = 'Program Error: erroneous logical call for delete_entry_in_os_n_in_db()' \
                   ' when delete depends on confirmation'
       raise ValueError(error_msg)
-    fetched_list = self.bak_dbtree.fetch_node_by_id(_id)
+    fetched_list = self.bak_dbtree.fetch_rowlist_by_id(_id)
     if fetched_list is None or len(fetched_list) == 0:
       return
     row = fetched_list[0]
@@ -139,7 +128,16 @@ class TargetSameSha1ForceDeleter:
       self.n_processed_trg_deletes += 1
       print(self.n_processed_trg_deletes, '/', trg_total_to_del, ' >>> DELETING', _id, dirnode.name)
       print(fpath)
-      os.remove(fpath)
+      try:
+        os.remove(fpath)
+        self.n_deleted += 1
+      except (OSError, IOError):
+        self.n_failed_deletes += 1
+        print(
+          'Failed del', self.n_failed_deletes, 'proc', self.n_processed_trg_deletes,
+          '/', trg_total_to_del, '/', self.trg_total_files, '>>> DELETING', _id, dirnode.name
+        )
+        return False
       self.bak_dbtree.delete_row_by_id(_id)
 
   def do_batch_deletion_if_confirmed(self):
@@ -159,7 +157,7 @@ class TargetSameSha1ForceDeleter:
   def print_out_all_files_to_delete(self):
     trg_del_total = len(self.trg_delete_ids)
     for i, _id in enumerate(self.trg_delete_ids):
-      fetched_rows = self.bak_dbtree.fetch_node_by_id(_id)
+      fetched_rows = self.bak_dbtree.fetch_rowlist_by_id(_id)
       if fetched_rows is None or len(fetched_rows) == 0:
         print('id', _id, 'is empty. Continuing')
         continue

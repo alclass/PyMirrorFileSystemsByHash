@@ -12,6 +12,7 @@ import os
 import fs.hashfunctions.hash_mod as hm
 import fs.db.dbbase_mod as dbb
 import fs.db.dbutil as dbu
+import models.entries.dirnode_mod as dn
 
 
 class DBDirTree(dbb.DBBase):
@@ -67,6 +68,48 @@ class DBDirTree(dbb.DBBase):
     cursor.close()
     conn.close()
     return result_tuple_list
+
+  def transform_row_to_dirnode(self, row):
+    try:
+      _id = row[0]  # id is always index 0
+      idx = self.fieldnames.index('name')
+      name = row[idx]
+      idx = self.fieldnames.index('parentpath')
+      parentpath = row[idx]
+      idx = self.fieldnames.index('sha1')
+      sha1 = row[idx]
+      idx = self.fieldnames.index('bytesize')
+      bytesize = row[idx]
+      idx = self.fieldnames.index('mdatetime')
+      mdatetime = row[idx]
+      dirnode = dn.DirNode(name, parentpath, sha1, bytesize, mdatetime)
+      dirnode.set_db_id(_id)
+      return dirnode
+    except (AttributeError, IndexError):
+      pass
+    return None
+
+  def fetch_dirnode_by_id(self, _id):
+    rowlist = self.fetch_rowlist_by_id(_id)
+    if rowlist and len(rowlist) == 1:
+      row = rowlist[0]
+      return self.transform_row_to_dirnode(row)
+    return None
+
+  def fetch_dirnode_with_name_n_parent(self, p_filename, p_parentpath):
+    dirnode = None
+    sql = 'SELECT * FROM %(tablename)s WHERE name=? and parentpath=?;' % {'tablename': self.tablename}
+    tuplevalues = (p_filename, p_parentpath)
+    conn = self.get_connection()
+    cursor = conn.cursor()
+    fetch_result = cursor.execute(sql, tuplevalues)
+    result_tuple_list = fetch_result.fetchall()
+    if result_tuple_list and len(result_tuple_list) == 1:
+      row = result_tuple_list[0]
+      return self.transform_row_to_dirnode(row)
+    cursor.close()
+    conn.close()
+    return dirnode
 
   def count_unique_sha1s_as_int(self):
     """

@@ -277,7 +277,7 @@ class DBBase:
     conn.close()
     return result_tuple_list
 
-  def fetch_node_by_id(self, _id):
+  def fetch_rowlist_by_id(self, _id):
     sql = 'select * from %(tablename)s where id=?;' % {'tablename': self.tablename}
     tuplevalues = (_id,)
     return self.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
