@@ -153,7 +153,7 @@ def is_forbidden_dirpass(dirpath, restricted_dirnames=None, forbidden_first_leve
   if dirpath is None:
     return None
   try:
-    ongoingfolder_abspath = dirpath.lstrip('/') # this assures topleveldir is the first element after split('/')
+    ongoingfolder_abspath = dirpath.lstrip('/')  # this assures topleveldir is the first element after split('/')
     if restricted_dirnames is None:
       restricted_dirnames = defaults.RESTRICTED_DIRNAMES_FOR_WALK
     boolres = is_any_dirname_in_path_startingwith_any_in_list(ongoingfolder_abspath, restricted_dirnames)
@@ -168,6 +168,20 @@ def is_forbidden_dirpass(dirpath, restricted_dirnames=None, forbidden_first_leve
     pass
   except IndexError:
     pass
+  return False
+
+
+def does_a_dirname_in_path_begins_with_a_restricted_prefix(ppath, restricted_prefixes=None):
+  """
+
+  """
+  if restricted_prefixes is None:
+    restricted_prefixes = defaults.RESTRICTED_DIRNAMES_FOR_WALK
+  pp = ppath.split('/')
+  for name in pp:
+    for restricted_dir_prefix in restricted_prefixes:
+      if name.startswith(restricted_dir_prefix):
+        return True
   return False
 
 
