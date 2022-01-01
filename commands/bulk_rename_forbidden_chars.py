@@ -42,12 +42,12 @@ class BulkRenamer:
 
   def calc_totals(self):
     """
-    count_total_files_n_folders_with_norestriction(mountpath, restricted_dirnames, forbidden_first_level_dirs)
+    count_total_files_n_folders_with_restriction(mountpath, restricted_dirnames, forbidden_first_level_dirs)
     """
     print('Counting files and dirs in db and os. Please wait.')
     self.total_unique_files_in_db = self.dbtree.count_unique_sha1s_as_int()
     self.total_files_in_db = self.dbtree.count_rows_as_int()
-    total_files, total_dirs = dirf.count_total_files_n_folders_with_norestriction(
+    total_files, total_dirs = dirf.count_total_files_n_folders_with_restriction(
       self.dirtree.mountpath, defaults.RESTRICTED_DIRNAMES_FOR_WALK, defaults.FORBIBBEN_FIRST_LEVEL_DIRS
     )
     self.total_files_in_os = total_files

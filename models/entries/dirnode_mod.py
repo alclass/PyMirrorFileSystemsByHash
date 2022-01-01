@@ -169,6 +169,11 @@ class DirNode:
   def set_db_id(self, db_id):
     self.db_id = db_id
 
+  def has_same_size_n_date(self, bytesize, mdatetime):
+    if self.bytesize == bytesize and self.mdatetime == mdatetime:
+      return True
+    return False
+
   @classmethod
   def get_root_cls(cls):
     if cls._root:

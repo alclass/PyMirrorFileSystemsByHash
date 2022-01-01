@@ -52,7 +52,7 @@ def clean_rename_filename_to(filename):
     return None
   name, ext = os.path.splitext(filename)
   newname = name.lstrip(' \t').rstrip(' \t\r\n').replace(':', ';')
-  newext = ext.lstrip(' \t').rstrip(' \t\r\n').replace(':', ';')
+  newext = ext.lstrip(' \t').rstrip(' \t\r\n').replace(':', ';').replace('?', '_')
   if newext is None or newext == '' or newext == '.':
     newfilename = newname
     return newfilename

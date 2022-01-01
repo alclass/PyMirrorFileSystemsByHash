@@ -53,6 +53,7 @@ import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentry_u
 import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
 import fs.db.dbfailed_fileread_mod as freadfail
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
+import fs.strfs.strfunctions_mod as strf
 import default_settings as defaults
 
 
@@ -69,6 +70,8 @@ class FileSweeper:
     self.total_files_in_os = 0
     self.total_files_in_db = 0
     self.total_unique_files_in_db = 0
+    self.n_found_files_name_n_parent_in_db = 0
+    self.n_found_files_size_n_date_in_db = 0
     self.n_processed_files = 0
     self.n_restricted_dirs = 0
     self.n_updated_dbentries = 0
@@ -80,6 +83,7 @@ class FileSweeper:
     self.n_dbentries_ins_upd = 0
     self.n_dbentries_failed_ins_upd = 0
     self.all_nodes_with_osread_problem = []
+    self.ongoingfolder_abspath = None
     self.mountpath = mountpath
     if not os.path.isdir(self.mountpath):
       error_msg = 'Missing file errror mount_abspath (%s) does not exist.'
@@ -94,12 +98,12 @@ class FileSweeper:
 
   def calc_totals(self):
     """
-    count_total_files_n_folders_with_norestriction(mountpath, restricted_dirnames, forbidden_first_level_dirs)
+    count_total_files_n_folders_with_restriction(mountpath, restricted_dirnames, forbidden_first_level_dirs)
     """
     print('Counting files and dirs in db and os. Please wait.')
     self.total_unique_files_in_db = self.dbtree.count_unique_sha1s_as_int()
     self.total_files_in_db = self.dbtree.count_rows_as_int()
-    total_files, total_dirs = dirf.count_total_files_n_folders_with_norestriction(self.dirtree.mountpath)
+    total_files, total_dirs = dirf.count_total_files_n_folders_with_restriction(self.dirtree.mountpath)
     self.total_files_in_os = total_files
     self.total_dirs_in_os = total_dirs
 
@@ -111,28 +115,29 @@ class FileSweeper:
     if self.restart_at_walkloopseq is None:
       self.restart_at_walkloopseq = 0
 
-  def exists_in_db_name_parent_size_n_date(self, name, parentpath, bytesize, mdatetime):
-    sql = 'SELECT * from %(tablename)s WHERE name=? and parentpath=? and bytesize=? and mdatetime=?;'
-    tuplevalues = (name, parentpath, bytesize, mdatetime)
-    reslist = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
-    if len(reslist) > 0:
-      self.total_files_in_db += 1
-      print(
-        'n_file_exists_in_db', self.total_files_in_db, 'of', self.total_files_in_os,
-        'DirNode exists in db with same name, parentpath, bytesize & mdatetime. Continuing.'
-      )
-      return True
-    return False
-
   def get_id_or_none_from_name_n_parentpath(self, name, parentpath):
     sql = 'SELECT * from %(tablename)s WHERE name=? and parentpath=?;'
     tuplevalues = (name, parentpath)
     reslist = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     r_id = None
-    if len(reslist) > 0:
+    if reslist or len(reslist) == 1:  # name and parent are UNIQUE in rows
       row = reslist[0]
       r_id = row[0]  # id is always index 0
+    elif len(reslist) > 1:
+      # this is considered a logical error in the database,
+      # if it happens, table schema should be inspected, there should be an "index(name, parent) UNIQUE" in the schema
+      error_msg = 'Unicity of name and parent in db is broken. There were %d found rows with same name and parent.' \
+          % len(reslist)
+      raise ValueError(error_msg)
     return r_id
+
+  def get_dirnode_if_name_n_parent_exists_in_db_or_none(self, name, parentpath):
+    _id = self.get_id_or_none_from_name_n_parentpath(name, parentpath)
+    if _id is None:
+      return None
+    self.n_found_files_name_n_parent_in_db += 1
+    dirnode = self.dbtree.fetch_dirnode_by_id(_id)
+    return dirnode
 
   def update_db_entry_with_updated_file(self, _id, name, parentpath, sha1, bytesize, mdatetime):
     sql = '''UPDATE %(tablename)s SET
@@ -152,14 +157,30 @@ class FileSweeper:
       return True
     return False
 
+  def update_db_entry_with_dirnode(self, dirnode):
+    return self.update_db_entry_with_updated_file(
+        dirnode.get_db_id(),
+        dirnode.name,
+        dirnode.parentpath,
+        dirnode.sha1,
+        dirnode.bytesize,
+        dirnode.mdatetime
+    )
+
   def insert_db_entry_with_updated_file(self, name, parentpath, sha1, bytesize, mdatetime):
     sql = 'INSERT into %(tablename)s (name, parentpath, sha1, bytesize, mdatetime) VALUES (?,?,?,?,?);'
     tuplevalues = (name, parentpath, sha1, bytesize, mdatetime)
-    reslist = self.dbtree.do_insert_with_sql_n_tuplevalues(sql, tuplevalues)
-    if reslist:  # for this hypothesis it is better that repeats are not found, only 1 entry should be found
-      print(self.n_processed_files, ' => file', name, 'EXISTS. Checking if an equivalent os-entry also exists.')
-      return True
-    return False
+    insert_result = self.dbtree.do_insert_with_sql_n_tuplevalues(sql, tuplevalues)
+    return insert_result
+
+  def insert_db_entry_with_dirnode(self, dirnode):
+    return self.insert_db_entry_with_updated_file(
+        dirnode.name,
+        dirnode.parentpath,
+        dirnode.sha1,
+        dirnode.bytesize,
+        dirnode.mdatetime
+    )
 
   def report_unreadable_file(self, dirnode):
     self.all_nodes_with_osread_problem.append(dirnode)
@@ -213,7 +234,18 @@ class FileSweeper:
         )
       return
 
-  def dbinsert_files_if_needed(self, current_abspath, files, middlepath):
+  def print_screen_msg_for_file_processing(self, dirnode, screen_msg_update_insert_or_none):
+    print(
+      self.n_processed_files, '/', self.total_files_in_os,
+      'file', screen_msg_update_insert_or_none,
+      dirnode.name, '@', strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50)
+    )
+
+  def dbinsert_files_if_needed(self, files):
+    current_abspath = self.ongoingfolder_abspath
+    middlepath = current_abspath[len(self.mountpath):]
+    middlepath = middlepath.lstrip('./')
+    parentpath = '/' + middlepath
     for filename in files:
       self.n_processed_files += 1
       if self.n_processed_files < self.restart_at_walkloopseq:
@@ -221,9 +253,6 @@ class FileSweeper:
         continue
       filepath = os.path.join(current_abspath, filename)
       name = filename
-      parentpath = middlepath
-      if not parentpath.startswith('/'):
-        parentpath = '/' + parentpath
       try:
         filestat = os.stat(filepath)
       except OSError:
@@ -238,22 +267,30 @@ class FileSweeper:
       pydt = datetime.datetime.fromtimestamp(mdatetime)
       print(self.n_processed_files, 'of', self.total_files_in_os, name, parentpath)
       print('bytesize =', bytesize, hm.convert_to_size_w_unit(bytesize), ':: mdatetime =', mdatetime, pydt)
-      if self.exists_in_db_name_parent_size_n_date(name, parentpath, bytesize, mdatetime):
+      dirnode = self.get_dirnode_if_name_n_parent_exists_in_db_or_none(name, parentpath)
+      if dirnode:
+        if dirnode.has_same_size_n_date(bytesize, mdatetime):
+          screen_msg_update_insert_or_none = 'DB-EXISTS'
+          self.print_screen_msg_for_file_processing(dirnode, screen_msg_update_insert_or_none)
+          continue
+        screen_msg_update_insert_or_none = 'DB-UPDATED'
+        _ = self.update_db_entry_with_dirnode(dirnode)  # name and parent exists but size and/or date are different
+        self.print_screen_msg_for_file_processing(dirnode, screen_msg_update_insert_or_none)
         continue
-      self.dbinsert_or_update_file_entry(name, parentpath, bytesize, mdatetime, filepath)
+      _ = self.insert_db_entry_with_dirnode(dirnode)  # row does not exist, insert it
+      screen_msg_update_insert_or_none = 'DB-INSERTED'
+      self.print_screen_msg_for_file_processing(dirnode, screen_msg_update_insert_or_none)
 
   def walkup_dirtree_files(self):
     """
 
     """
-    for ongoingfolder_abspath, dirs, files in os.walk(self.mountpath):
-      middlepath = ongoingfolder_abspath[len(self.mountpath):]
-      middlepath = middlepath.lstrip('./')  # parentpath is '/' + middlepath (in some cases they are the same)
-      if ongoingfolder_abspath == self.mountpath:  # this means not to process the mount_abspath folder itself
+    for self.ongoingfolder_abspath, dirs, files in os.walk(self.mountpath):
+      if self.ongoingfolder_abspath == self.mountpath:  # this means not to process the mount_abspath folder itself
         continue
-      if dirf.is_forbidden_dirpass(ongoingfolder_abspath):
+      if dirf.is_forbidden_dirpass(self.ongoingfolder_abspath):
         continue
-      self.dbinsert_files_if_needed(ongoingfolder_abspath, files, middlepath)
+      self.dbinsert_files_if_needed(files)
 
   def report_all_nodes_with_osread_problem(self):
     print('-='*20)
@@ -270,6 +307,8 @@ class FileSweeper:
     print('total_files_in_os', self.total_files_in_os)
     print('total_dirs_in_os', self.total_dirs_in_os)
     print('n_processed_files', self.n_processed_files)
+    print('n_processed_files', self.n_found_files_name_n_parent_in_db)
+    print('n_found_files_size_n_date_in_db', self.n_found_files_size_n_date_in_db)
     print('n_updated_dbentries', self.n_updated_dbentries)
     print('n_restricted_dirs', self.n_restricted_dirs, ':: those in ', defaults.RESTRICTED_DIRNAMES_FOR_WALK)
     print('n_files_empty_sha1', self.n_files_empty_sha1)
@@ -325,9 +364,9 @@ def process():
   src_mountpath, _ = defaults.get_src_n_trg_mountpath_args_or_default()
   restart_at_position = get_arg_restart_at_position_or_zero()
   treename = 'ori'  # ori stands for origin instead of target
-  sweeper = FileSweeper(src_mountpath, treename, restart_at_position)
   moved_updater = dbentry_upd.DBEntryUpdater(src_mountpath)
   moved_updater.process()
+  sweeper = FileSweeper(src_mountpath, treename, restart_at_position)
   sweeper.process()
   finish_time = datetime.datetime.now()
   elapsed_time = finish_time - start_time

@@ -2,7 +2,7 @@
 """
 resync_mod.py
 This script runs:
- 1) thw walkup_dirtree (to resync os-entries with db-entries) and
+ 1) thw walkup_dirtree_to_verify_possible_moveupdates (to resync os-entries with db-entries) and
  2) delete_rows_not_existing_on_dirtree() which deletes db-entries with no corresponding os-entries
 """
 import fs.db.dbdirtree_mod as dbdt

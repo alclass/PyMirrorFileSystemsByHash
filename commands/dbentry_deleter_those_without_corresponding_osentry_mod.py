@@ -30,6 +30,7 @@ import datetime
 import os.path
 import fs.db.dbdirtree_mod as dbt
 import fs.dirfilefs.dir_n_file_fs_mod as dirfil
+import fs.strfs.strfunctions_mod as strf
 import default_settings as defaults
 import models.entries.dirnode_mod as dn
 SQL_SELECT_LIMIT_DEFAULT = 50
@@ -42,28 +43,37 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
   """
 
   def __init__(self, mountpath):
-    """
-    """
     self.n_deleted_dbentries = 0
-    # this below is zeroed at every pass thru outside loop (the one with sql-limit/offset)
-    # its counting ajusts the db-select-offset
-    self.n_deleted_in_loop = 0
     self.n_processed_in_db = 0
+    self.total_files_os = 0
+    self.total_dirs_os = 0
+    self.total_files_in_db = 0
     self.n_updates = 0
     self.mountpath = mountpath
     self.dbtree = dbt.DBDirTree(self.mountpath)
-    self.n_files_in_db = self.dbtree.count_rows_as_int()
+    self.count_totals()
+    # this below is zeroed at every pass thru outside loop (the one with sql-limit/offset)
+    # its counting ajusts the db-select-offset (it's here for the IDE to reflect it)
+    self.n_deleted_in_loop = 0
+
+  def count_totals(self):
+    self.total_files_in_db = self.dbtree.count_rows_as_int()
+    self.total_files_os, self.total_dirs_os = dirfil.count_total_files_n_folders(self.mountpath)
 
   def delete_dbentry_if_theres_no_equivalent_os_entry(self, row):
     self.n_processed_in_db += 1
     dirnode = dn.DirNode.create_with_tuplerow(row, self.dbtree.fieldnames)
     filepath = dirnode.get_abspath_with_mountpath(self.mountpath)
     if not os.path.isfile(filepath):
-      del_result = self.dbtree.delete_row_by_id(dirnode.get_db_id())
+      _ = self.dbtree.delete_row_by_id(dirnode.get_db_id())  # del_result
       self.n_deleted_dbentries += 1
       self.n_deleted_in_loop += 1
       print(' *-=-' * 4, 'DELETE DBENTRY', ' *-=-' * 4)
-      print(del_result, self.n_deleted_dbentries, 'deleted dbentry for', dirnode.get_db_id(), dirnode.name)
+      print(
+        self.n_deleted_dbentries, '/', self.n_processed_in_db, '/', self.total_files_in_db,
+        'deleted dbentry for', dirnode.get_db_id(),
+        dirnode.name, strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50)
+      )
 
   def fetch_dbentries_n_check_their_osentries(self):
     offset = 0
@@ -86,7 +96,7 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
     print('DBEntryWithoutCorrespondingOsEntryDeleter Report')
     print('='*40)
     print('Mountpath is', self.mountpath)
-    print('n_files', self.n_files_in_db)
+    print('n_files', self.total_files_in_db)
     print('n_processed', self.n_processed_in_db)
     print('n_deleted_dbentries', self.n_deleted_dbentries)
     print('End of Processing')
@@ -172,7 +182,7 @@ def process():
   finish_time = datetime.datetime.now()
   print('finish_time', finish_time)
   elapsed_time = finish_time - start_time
-  print('elapsed_time', elapsed_time)
+  print('elapsed_time', elapsed_time, finish_time)
 
 
 if __name__ == '__main__':

@@ -18,6 +18,9 @@ This supposition is based on the following reasoning:
 import os
 import fs.db.dbdirtree_mod as dbdt
 import default_settings as defaults
+import fs.dirfilefs.dir_n_file_fs_mod as dirf
+import fs.strfs.strfunctions_mod as strf
+import models.entries.dirnode_mod as dn
 
 
 class DBEntryUpdater:
@@ -26,15 +29,25 @@ class DBEntryUpdater:
     self.dbtree = dbdt.DBDirTree(mountpath)
     self.current_abspath = None
     self.n_dbupdates = 0
+    self.n_failed_filestats = 0
     self.n_processed_files = 0
-    self.n_files_in_db = 0
-    self.n_files_in_dirtree = 0
-    self.n_unique_sha1s = 0
-    self.n_dirs = 0
+    self.n_processed_dirs = 0
+    self.total_files_in_db = 0
+    self.total_files_in_os = 0
+    self.total_dirs_in_os = 0
+    self.total_unique_sha1s = 0
+    self.count_total_files_n_dirs_in_os()
+
+  def count_total_files_n_dirs_in_os(self):
+    total_files, total_dirs = dirf.count_total_files_n_folders_with_restriction(self.dbtree.mountpath)
+    self.total_files_in_os = total_files
+    self.total_dirs_in_os = total_dirs
+    self.total_files_in_db = self.dbtree.count_rows_as_int()
+    self.total_unique_sha1s = self.dbtree.count_unique_sha1s_as_int()
 
   def verify_if_an_update_can_happen(
       self,
-      row_found, filename, middlepath
+      row_found, filename, parentpath_to_be
     ):
     """
     bytesize, mdatetime are not used here but row_found had these two equal
@@ -52,7 +65,8 @@ class DBEntryUpdater:
     name = row_found[idx]
     idx = self.dbtree.fieldnames.index('parentpath')
     parentpath = row_found[idx]
-    folderpath = os.path.join(self.dbtree.mountpath, parentpath.lstrip('/'))
+    middlepath = parentpath.lstrip('/')
+    folderpath = os.path.join(self.dbtree.mountpath, middlepath)
     filepath = os.path.join(folderpath, name)
     if os.path.isfile(filepath):
       return False
@@ -66,9 +80,7 @@ class DBEntryUpdater:
       id=?;
     '''
     print(sql)
-    if not middlepath.startswith('/'):
-      middlepath = '/' + middlepath
-    tuplevalues = (filename, middlepath, _id)
+    tuplevalues = (filename, parentpath_to_be, _id)
     update_result = self.dbtree.do_update_with_sql_n_tuplevalues(sql, tuplevalues)
     if update_result:
       self.n_dbupdates += 1
@@ -76,7 +88,7 @@ class DBEntryUpdater:
     return False
 
   def verify_if_many_exist_if_dbfound_exists_in_os_or_update_location(
-      self, fetched_list, filename, middlepath
+      self, fetched_list, filename, parentpath
     ):
     """
     middlepath is dirnode.parentpath (with the starting '/')
@@ -89,75 +101,71 @@ class DBEntryUpdater:
     if len(fetched_list) == 1:
       row_found = fetched_list[0]
       return self.verify_if_an_update_can_happen(
-        row_found, filename, middlepath
+        row_found, filename, parentpath
       )
     return False
 
-  def verify_file_by_its_bysize_n_mdatetime(self, filename, middlepath):
+  def verify_file_by_its_bysize_n_mdatetime(self, filename, parentpath):
     filepath = os.path.join(self.current_abspath, filename)
     try:
       filestat = os.stat(filepath)
     except OSError:
+      self.n_failed_filestats += 1
       return False
     bytesize = filestat.st_size
     mdatetime = filestat.st_mtime
-    print(self.n_processed_files, '/', self.n_files_in_dirtree, 'bytesize', bytesize, 'mdatetime', mdatetime)
+    print(self.n_processed_files, '/', self.total_files_in_os, 'bytesize', bytesize, 'mdatetime', mdatetime)
     sql = 'SELECT * FROM %(tablename)s WHERE bytesize=? AND mdatetime=?;'
     tuplevalues = (bytesize, mdatetime)
     fetched_list = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
     if len(fetched_list) > 0:
       return self.verify_if_many_exist_if_dbfound_exists_in_os_or_update_location(
-        fetched_list, filename, middlepath
+        fetched_list, filename, parentpath
       )
     else:
-      print(self.n_processed_files, '/', self.n_files_in_dirtree, filename, 'was not found by bytesize and mdatetime')
+      print(self.n_processed_files, '/', self.total_files_in_os, filename, 'was not found by bytesize and mdatetime')
     return False
 
-  def does_osfile_exist_in_db(self, filename, parentpath):
+  def get_dirnode_or_none_with_name_n_parent(self, filename, parentpath):
     """
-    parentpath is middlepath which is fullpath minus mountpath
     """
     sql = 'SELECT * FROM %(tablename)s WHERE name=? AND parentpath=?;'
     tuplevalues = (filename, parentpath)
     fetched_list = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
-    if len(fetched_list) > 0:
-      print(self.n_processed_files, '/', self.n_files_in_dirtree, 'file:', filename, 'is in db. Continuing.')
-      return True
-    return False
+    if fetched_list or len(fetched_list) == 1:
+      row = fetched_list[0]
+      dirnode = dn.DirNode.create_with_tuplerow(row, self.dbtree.fieldnames)
+      print(
+        self.n_processed_files, '/', self.total_files_in_os,
+        'file EXISTS in db:', filename, '@', strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50),
+        ' Continuing.'
+      )
+      return dirnode
+    return None
 
   def verify_files_possibly_moved_n_dbupdate(self, files):
+    middlepath = self.current_abspath[len(self.dbtree.mountpath):]
+    if middlepath.startswith('/'):
+      middlepath = middlepath.lstrip('/')
+    parentpath = '/' + middlepath
     for filename in files:
       self.n_processed_files += 1
-      middlepath = self.current_abspath[len(self.dbtree.mountpath):]
-      if not middlepath.startswith('/'):
-        middlepath = '/' + middlepath
-      if self.does_osfile_exist_in_db(filename, middlepath):
+      dirnode = self.get_dirnode_or_none_with_name_n_parent(filename, parentpath)
+      if dirnode is not None:
         continue
       # file may have been moved, try find it via bytesize and mdatetime
-      self.verify_file_by_its_bysize_n_mdatetime(filename, middlepath)
+      self.verify_file_by_its_bysize_n_mdatetime(filename, parentpath)
 
-  def walkup_to_count_files(self):
-    self.n_files_in_dirtree = 0
-    self.n_dirs = 0
-    is_root_dir_looppass = True
+  def walkup_dirtree_to_verify_possible_moveupdates(self):
     for self.current_abspath, folders, files in os.walk(self.dbtree.mountpath):
-      if is_root_dir_looppass:
-        # do not count files in rootdir
-        is_root_dir_looppass = False
+      if self.current_abspath == self.dbtree.mountpath:
         continue
-      self.n_files_in_dirtree += len(files)
-      self.n_dirs += len(folders)
-
-  def walkup_dirtree(self):
-    n_seq_dir = 0
-    is_root_dir_looppass = True
-    for self.current_abspath, folders, files in os.walk(self.dbtree.mountpath):
-      if is_root_dir_looppass:
-        # do not count files in rootdir
-        is_root_dir_looppass = False
+      if dirf.is_forbidden_dirpass(self.current_abspath):
         continue
-      n_seq_dir += 1
-      print(n_seq_dir, self.current_abspath)
+      self.n_processed_dirs += 1
+      print(
+        'dir', self.n_processed_dirs, '/', self.total_dirs_in_os, self.current_abspath
+      )
       self.verify_files_possibly_moved_n_dbupdate(files)
 
   def report(self):
@@ -165,27 +173,27 @@ class DBEntryUpdater:
     print('DBEntryUpdater Report:')
     print('='*40)
     print('dirtree:', self.dbtree.mountpath)
-    print('n_dirs', self.n_dirs)
-    print('n_files_in_db', self.n_files_in_db)
-    print('n_files_in_dirtree', self.n_files_in_dirtree, '(obs: rootdir files do not count.)')
+    print('total_files_in_db', self.total_files_in_db)
+    print('total_files_in_os', self.total_files_in_os)
+    print('total_dirs_in_os', self.total_dirs_in_os, '(obs: rootdir files do not count.)')
+    print('n_processed_dirs', self.n_processed_dirs)
     print('n_processed_files', self.n_processed_files)
-    print('n_unique_sha1s', self.n_unique_sha1s)
+    print('n_failed_filestats', self.n_failed_filestats)
+    print('n_unique_sha1s', self.total_unique_sha1s)
     print('n_dbupdates', self.n_dbupdates, "(meaning files that were moved before and got unsync'd, now db-sync'd)")
 
   def set_totals_in_db(self, n_files_in_db=None, n_unique_sha1s=None):
     if n_files_in_db is not None:
-      self.n_files_in_db = n_files_in_db
+      self.total_files_in_db = n_files_in_db
     else:
-      self.n_files_in_db = self.dbtree.count_rows_as_int()
+      self.total_files_in_db = self.dbtree.count_rows_as_int()
     if n_unique_sha1s is not None:
-      self.n_unique_sha1s = n_unique_sha1s
+      self.total_unique_sha1s = n_unique_sha1s
     else:
-      self.n_unique_sha1s = self.dbtree.count_unique_sha1s_as_int()
+      self.total_unique_sha1s = self.dbtree.count_unique_sha1s_as_int()
 
-  def process(self, n_files_in_db=None, n_unique_sha1s=None):
-    self.set_totals_in_db(n_files_in_db, n_unique_sha1s)
-    self.walkup_to_count_files()
-    self.walkup_dirtree()
+  def process(self):
+    self.walkup_dirtree_to_verify_possible_moveupdates()
     self.report()
 
 

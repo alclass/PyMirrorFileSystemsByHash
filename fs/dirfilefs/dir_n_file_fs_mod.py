@@ -33,7 +33,7 @@ def prune_dirtree_deleting_empty_folders(current_dirpath, n_visited=0, n_removed
   return n_visited, n_removed, n_failed
 
 
-def count_total_files_n_folders_with_norestriction(
+def count_total_files_n_folders_with_restriction(
     mountpath,
     restricted_dirnames=None,
     forbidden_first_level_dirs=None
@@ -42,11 +42,12 @@ def count_total_files_n_folders_with_norestriction(
     restricted_dirnames = defaults.RESTRICTED_DIRNAMES_FOR_WALK
   if forbidden_first_level_dirs is None:
     forbidden_first_level_dirs = defaults.FORBIBBEN_FIRST_LEVEL_DIRS
-  src_total_files = 0
-  src_total_dirs = 0
+  total_files = 0
+  total_dirs = 0
   for current_path, folders, files in os.walk(mountpath):
     if current_path == mountpath:
       # do not count files in root dir only count folders
+      total_dirs += len(folders)
       continue
     if is_forbidden_dirpass(current_path, restricted_dirnames, forbidden_first_level_dirs):
       # do not count files or folder inside forbidden_first_level_dirs
@@ -54,9 +55,9 @@ def count_total_files_n_folders_with_norestriction(
     if is_any_dirname_in_path_startingwith_any_in_list(current_path, restricted_dirnames):
       # do not count files or folder with paths having any restricted_dirnames (eg z-del or z-tri [for z-Triage])
       continue
-    src_total_dirs += len(folders)
-    src_total_files += len(files)
-  return src_total_files, src_total_dirs
+    total_dirs += len(folders)
+    total_files += len(files)
+  return total_files, total_dirs
 
 
 def count_total_files_n_folders_inc_root(mountpath):
