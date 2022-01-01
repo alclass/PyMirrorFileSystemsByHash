@@ -7,7 +7,6 @@ These rows are probably derived from the action of moving files (*) into the res
 
 (*) script dbentry_updater_by_filemove_based_on_size_n_mdt_mod.py does that (at the moment).
 """
-import sys
 import fs.db.dbdirtree_mod as dbdt
 import default_settings as defaults
 import fs.dirfilefs.dir_n_file_fs_mod as dirfil
@@ -71,7 +70,7 @@ class RowsWithRestrictedPathsCleaner:
       print('No processing - defaults.RESTRICTED_DIRNAMES_FOR_WALK is empty.')
       return
     listvalues = []
-    sql = 'SELECT id FROM %(tablename)s WHERE '
+    sql = 'SELECT * FROM %(tablename)s WHERE '
     for restricted_dir_prefix in defaults.RESTRICTED_DIRNAMES_FOR_WALK:
       restricted_sql_value = '%' + restricted_dir_prefix + '%'
       listvalues.append(restricted_sql_value)
