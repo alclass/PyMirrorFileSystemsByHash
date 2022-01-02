@@ -30,9 +30,9 @@ import datetime
 import os.path
 import fs.db.dbdirtree_mod as dbt
 import fs.dirfilefs.dir_n_file_fs_mod as dirfil
-import fs.strfs.strfunctions_mod as strf
+# import fs.strfs.strfunctions_mod as strf
 import default_settings as defaults
-import models.entries.dirnode_mod as dn
+# import models.entries.dirnode_mod as dn
 SQL_SELECT_LIMIT_DEFAULT = 50
 
 
@@ -60,44 +60,46 @@ class DBEntryViaPPathWithoutCorrespondingOsDeleter:
     self.total_files_in_db = self.dbtree.count_rows_as_int()
     self.total_files_os, self.total_dirs_os = dirfil.count_total_files_n_folders_with_restriction(self.mountpath)
 
-  def delete_dbentry_if_theres_no_equivalent_dir_entry(self, parentpath):
+  def do_delete_path_substr(self, parentpath):
+    n_chars = 1 + len(parentpath)
+    where_clause = ' WHERE SUBSTR(parentpath, 0, %d)=?;' % n_chars
+    sql = 'DELETE FROM %(tablename)s' + where_clause
+    tuplevalues = (parentpath, )
+    n_deletes = self.dbtree.delete_with_sql_n_tuplevalues(sql, tuplevalues)  # db_del_result
+    self.n_loop_deletes += 1
+    self.n_deleted_dbentries += n_deletes
+    print(self.n_loop_deletes, 'dirs', self.total_dirs_os, 'deleting entries thru path:', parentpath)
+    print('n_deletes', n_deletes, 'up til now total deleted_dbentries', self.n_deleted_dbentries)
+    return True
+
+  def drill_down_parentpath_checking_nonexisting_folders(self, parentpath, last_dirname=None):
     middlepath = parentpath
     middlepath = middlepath.lstrip('/')
     fpath = os.path.join(self.mountpath, middlepath)
-    if not os.path.isdir(fpath):
-      n_chars = 1 + len(parentpath)
-      where_clause = ' WHERE SUBSTR(parentpath, 0, %d)=?;' % n_chars
-      sql = 'DELETE FROM %(tablename)s' + where_clause
-      tuplevalues = (parentpath, )
-      n_deletes = self.dbtree.delete_with_sql_n_tuplevalues(sql, tuplevalues)  # db_del_result
-      self.n_loop_deletes += 1
-      self.n_deleted_dbentries += n_deletes
-      print(self.n_loop_deletes, 'dirs', self.total_dirs_os, 'deleting entries thru path:', parentpath)
-      print('n_deletes', n_deletes, 'up til now total deleted_dbentries', self.n_deleted_dbentries)
-      return True
-    return False
-
-  def is_parentpath_inside_an_already_processed(self, parentpath):
-    for acc_path in self.acc_parentpaths:
-      if parentpath.startswith(acc_path):
-        return True
+    if os.path.isdir(fpath):
+      if last_dirname is None:
+        return False
+      # last_dirname exists, recompose non-existing path/parentpath and return calling do_delete_path_substr()
+      backparentpath = os.path.join(parentpath, last_dirname)
+      return self.do_delete_path_substr(backparentpath)
+    # path does not exist, drilldown to see further down
+    downparentpath, topdirname = os.path.split(parentpath)
+    if (parentpath, topdirname) != ('/', ''):  # TO-DO: think about this case from which drilldown cannot continue
+      return self.drill_down_parentpath_checking_nonexisting_folders(downparentpath, topdirname)
     return False
 
   def fetch_dbentries_via_ppath_n_check_path_exists(self):
-    self.acc_parentpaths = []
     sql = 'SELECT DISTINCT parentpath FROM %(tablename)s ORDER BY parentpath;'
-    generated_rows = self.dbtree.do_select_with_sql_wo_tuplevalues_w_limit_n_offset(sql)
-    for rows in generated_rows:
-      for row in rows:
-        self.n_processed_paths += 1
-        parentpath = row[0]
-        if self.is_parentpath_inside_an_already_processed(parentpath):
-          print(self.n_processed_paths, '/', self.total_dirs_os, 'ALREADY processed path:', parentpath)
-          continue
-        print(self.n_processed_paths, '/', self.total_dirs_os, 'processing path:', parentpath)
-        has_deleted = self.delete_dbentry_if_theres_no_equivalent_dir_entry(parentpath)
-        if has_deleted:
-          self.acc_parentpaths.append(parentpath)
+    # generated_rows = self.dbtree.do_select_with_sql_wo_tuplevalues_w_limit_n_offset(sql)
+    # for rows in generated_rows:
+    rows = self.dbtree.do_select_with_sql_without_tuplevalues(sql)
+    for row in rows:
+      self.n_processed_paths += 1
+      parentpath = row[0]
+      print(self.n_processed_paths, '/', self.total_dirs_os, 'processing path:', parentpath)
+      has_deleted = self.drill_down_parentpath_checking_nonexisting_folders(parentpath)
+      if has_deleted:
+        return self.fetch_dbentries_via_ppath_n_check_path_exists()
 
   def process(self):
     dirfil.prune_dirtree_deleting_empty_folders(self.mountpath)

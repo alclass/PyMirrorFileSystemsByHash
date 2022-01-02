@@ -28,7 +28,7 @@ For example: suppose a back-up operation is started. An operation in this chain 
 """
 import datetime
 import os.path
-import commands.dbentry_deleter_via_ppath_those_without_corresponding_mod as dbdelviapath
+# import commands.dbentry_deleter_via_ppath_those_without_corresponding_mod as dbdelviapath
 import default_settings as defaults
 import fs.db.dbdirtree_mod as dbt
 import fs.dirfilefs.dir_n_file_fs_mod as dirfil
@@ -179,8 +179,8 @@ def process():
   mountpath, _ = defaults.get_src_n_trg_mountpath_args_or_default()
   print('start_time', start_time)
   # the first object tries to optimize performance, deleting "bulkly" if possible
-  dbviapath_deleter = dbdelviapath.DBEntryViaPPathWithoutCorrespondingOsDeleter(mountpath)
-  dbviapath_deleter.process()
+  # dbviapath_deleter = dbdelviapath.DBEntryViaPPathWithoutCorrespondingOsDeleter(mountpath)
+  # dbviapath_deleter.process()
   # this second object will delete one by one (hopeful the above delete will have saved a lot of "performance")
   dbentry_eraser = DBEntryWithoutCorrespondingOsEntryDeleter(mountpath)
   dbentry_eraser.process()
