@@ -51,6 +51,7 @@ class DBEntryViaPPathWithoutCorrespondingOsDeleter:
     self.n_deleted_dbentries = 0
     self.n_loop_deletes = 0
     self.n_processed_paths = 0
+    self.acc_parentpaths = []
     self.count_totals()
     # this below is zeroed at every pass thru outside loop (the one with sql-limit/offset)
     # its counting ajusts the db-select-offset (it's here for the IDE to reflect it)
@@ -76,18 +77,27 @@ class DBEntryViaPPathWithoutCorrespondingOsDeleter:
       return True
     return False
 
+  def is_parentpath_inside_an_already_processed(self, parentpath):
+    for acc_path in self.acc_parentpaths:
+      if parentpath.startswith(acc_path):
+        return True
+    return False
+
   def fetch_dbentries_via_ppath_n_check_path_exists(self):
+    self.acc_parentpaths = []
     sql = 'SELECT DISTINCT parentpath FROM %(tablename)s ORDER BY parentpath;'
     generated_rows = self.dbtree.do_select_with_sql_wo_tuplevalues_w_limit_n_offset(sql)
     for rows in generated_rows:
       for row in rows:
         self.n_processed_paths += 1
         parentpath = row[0]
+        if self.is_parentpath_inside_an_already_processed(parentpath):
+          print(self.n_processed_paths, '/', self.total_dirs_os, 'ALREADY processed path:', parentpath)
+          continue
         print(self.n_processed_paths, '/', self.total_dirs_os, 'processing path:', parentpath)
         has_deleted = self.delete_dbentry_if_theres_no_equivalent_dir_entry(parentpath)
         if has_deleted:
-          # restart generated_rows
-          return self.fetch_dbentries_via_ppath_n_check_path_exists()
+          self.acc_parentpaths.append(parentpath)
 
   def process(self):
     dirfil.prune_dirtree_deleting_empty_folders(self.mountpath)
