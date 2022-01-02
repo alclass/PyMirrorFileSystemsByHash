@@ -106,18 +106,20 @@ class DBBase:
     sql = 'DELETE FROM %(tablename)s;' % {'tablename': self.tablename}
     conn = self.get_connection()
     cursor = conn.cursor()
-    fetch_result = cursor.execute(sql)
+    delete_result = cursor.execute(sql)
+    n_rows_deleted = delete_result.rowcount  # debug at this point, another option conn.total_changes
     conn.commit()
     cursor.close()
     conn.close()
-    return fetch_result
+    return n_rows_deleted
 
   def delete_with_sql_n_tuplevalues(self, sql, tuplevalues):
+    sql = sql % {'tablename': self.tablename}
     conn = self.get_connection()
     cursor = conn.cursor()
     delete_result = cursor.execute(sql, tuplevalues)
     conn.commit()
-    n_rows_deleted = delete_result.rowcount
+    n_rows_deleted = delete_result.rowcount  # debug at this point, another option conn.total_changes
     cursor.close()
     conn.close()
     return n_rows_deleted
@@ -127,21 +129,23 @@ class DBBase:
     tuplevalues = (_id, )
     conn = self.get_connection()
     cursor = conn.cursor()
-    dbdel_result = cursor.execute(sql, tuplevalues)
+    delete_result = cursor.execute(sql, tuplevalues)
+    n_rows_deleted = delete_result.rowcount  # debug at this point, another option conn.total_changes
     conn.commit()
     cursor.close()
     conn.close()
-    return dbdel_result
+    return n_rows_deleted
 
   def delete_row_with_params(self, sql, tuplevalues):
     sql = sql % {'tablename': self.tablename}
     conn = self.get_connection()
     cursor = conn.cursor()
-    dbdel_result = cursor.execute(sql, tuplevalues)
+    delete_result = cursor.execute(sql, tuplevalues)
+    n_rows_deleted = delete_result.rowcount  # debug at this point, another option conn.total_changes
     conn.commit()
     cursor.close()
     conn.close()
-    return dbdel_result
+    return n_rows_deleted
 
   def fetch_row_by_id(self, _id):
     sql = 'select * from %(tablename)s WHERE id=?;' % {'tablename': self.tablename}
@@ -205,6 +209,9 @@ class DBBase:
     cursor.close()
     conn.close()
     return None  # the statement "yield" above returns each chunk of data limit/offset by limit/offset
+
+  def do_select_with_sql_wo_tuplevalues_w_limit_n_offset(self, sql, plimit=None, poffset=None):
+    return self.do_select_sql_n_tuplevalues_w_limit_n_offset(sql, None, plimit, poffset)
 
   def do_select_all_w_limit_n_offset(self, plimit=None, poffset=None):
     """

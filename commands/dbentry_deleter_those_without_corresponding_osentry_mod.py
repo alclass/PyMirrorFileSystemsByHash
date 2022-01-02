@@ -28,10 +28,11 @@ For example: suppose a back-up operation is started. An operation in this chain 
 """
 import datetime
 import os.path
+import commands.dbentry_deleter_via_ppath_those_without_corresponding_mod as dbdelviapath
+import default_settings as defaults
 import fs.db.dbdirtree_mod as dbt
 import fs.dirfilefs.dir_n_file_fs_mod as dirfil
 import fs.strfs.strfunctions_mod as strf
-import default_settings as defaults
 import models.entries.dirnode_mod as dn
 SQL_SELECT_LIMIT_DEFAULT = 50
 
@@ -58,7 +59,7 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
 
   def count_totals(self):
     self.total_files_in_db = self.dbtree.count_rows_as_int()
-    self.total_files_os, self.total_dirs_os = dirfil.count_total_files_n_folders(self.mountpath)
+    self.total_files_os, self.total_dirs_os = dirfil.count_total_files_n_folders_with_restriction(self.mountpath)
 
   def delete_dbentry_if_theres_no_equivalent_os_entry(self, row):
     self.n_processed_in_db += 1
@@ -96,8 +97,10 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
     print('DBEntryWithoutCorrespondingOsEntryDeleter Report')
     print('='*40)
     print('Mountpath is', self.mountpath)
-    print('n_files', self.total_files_in_db)
-    print('n_processed', self.n_processed_in_db)
+    print('total_files_in_db', self.total_files_in_db)
+    print('total_files_os', self.total_files_os)
+    print('total_dirs_os', self.total_dirs_os)
+    print('n_processed_in_db', self.n_processed_in_db)
     print('n_deleted_dbentries', self.n_deleted_dbentries)
     print('End of Processing')
 
@@ -175,8 +178,10 @@ def process():
   start_time = datetime.datetime.now()
   mountpath, _ = defaults.get_src_n_trg_mountpath_args_or_default()
   print('start_time', start_time)
-  # verifier = PresentOnFolderVerifier(mountpath)
-  # verifier.process()
+  # the first object tries to optimize performance, deleting "bulkly" if possible
+  dbviapath_deleter = dbdelviapath.DBEntryViaPPathWithoutCorrespondingOsDeleter(mountpath)
+  dbviapath_deleter.process()
+  # this second object will delete one by one (hopeful the above delete will have saved a lot of "performance")
   dbentry_eraser = DBEntryWithoutCorrespondingOsEntryDeleter(mountpath)
   dbentry_eraser.process()
   finish_time = datetime.datetime.now()

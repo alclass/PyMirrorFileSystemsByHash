@@ -46,8 +46,7 @@ def count_total_files_n_folders_with_restriction(
   total_dirs = 0
   for current_path, folders, files in os.walk(mountpath):
     if current_path == mountpath:
-      # do not count files in root dir only count folders
-      total_dirs += len(folders)
+      # do not count files in root dir/folder nor count itself as a dir/folder
       continue
     if is_forbidden_dirpass(current_path, restricted_dirnames, forbidden_first_level_dirs):
       # do not count files or folder inside forbidden_first_level_dirs
@@ -55,7 +54,7 @@ def count_total_files_n_folders_with_restriction(
     if is_any_dirname_in_path_startingwith_any_in_list(current_path, restricted_dirnames):
       # do not count files or folder with paths having any restricted_dirnames (eg z-del or z-tri [for z-Triage])
       continue
-    total_dirs += len(folders)
+    total_dirs += 1
     total_files += len(files)
   return total_files, total_dirs
 
@@ -112,13 +111,13 @@ def is_lowerstr_startingwith_any_in_list(name, starting_strs_list):
   if name is None:
     return False
   try:
-    name = name.lower()
+    lowername = name.lower()
   except AttributeError:
     return False
   for starting_str in starting_strs_list:
-    if len(name) < len(starting_str):
+    if len(lowername) < len(starting_str):
       continue
-    cmpname = name[:len(starting_str)]
+    cmpname = lowername[:len(starting_str)]
     if cmpname == starting_str:
       return True
   return False
