@@ -7,11 +7,11 @@ This script runs:
 """
 import fs.db.dbdirtree_mod as dbdt
 import default_settings as ds
-from commands.walkup_dirtree_files import FileSweeper
+from commands.walkup_dirtree_files_mod import FilesUpDirTreeWalker
 
 
 def resync_tree(mountpath):
-  sweeper = FileSweeper(mountpath)
+  sweeper = FilesUpDirTreeWalker(mountpath)
   sweeper.walkup_dirtree_files()
   dbtree = dbdt.DBDirTree(mountpath)
   dbtree.delete_rows_not_existing_on_dirtree(mountpath)

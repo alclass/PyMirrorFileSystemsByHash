@@ -57,7 +57,7 @@ import fs.strfs.strfunctions_mod as strf
 import default_settings as defaults
 
 
-class FileSweeper:
+class FilesUpDirTreeWalker:
 
   def __init__(self, mountpath, treename='ori', restart_at_walkloopseq=None):
     """
@@ -75,6 +75,7 @@ class FileSweeper:
     self.n_processed_files = 0
     self.n_restricted_dirs = 0
     self.n_updated_dbentries = 0
+    self.n_inserted = 0
     self.n_files_empty_sha1 = 0
     self.n_failed_filestat = 0
     self.n_failed_sha1s = 0
@@ -182,20 +183,10 @@ class FileSweeper:
         dirnode.mdatetime
     )
 
-  def report_unreadable_file(self, dirnode):
-    self.all_nodes_with_osread_problem.append(dirnode)
-    self.n_dbentries_failed_ins_upd += 1
-    print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd, dirnode, '[going to register event]')
-    pdict = {
-      'name': dirnode.name,
-      'parentpath': dirnode.parentpath,
-      'bytesize': dirnode.bytesize,
-      'mdatetime': dirnode.mdatetime,
-      'event_dt': datetime.datetime.now(),
-    }
-    self.freadfailer.do_insert_or_update_with_dict_to_prep_tuplevalues(pdict)
-
   def dbinsert_or_update_file_entry(self, name, parentpath, bytesize, mdatetime, filepath):
+    """
+    This method is not being called (TO-DO see if it can go elsewhere)
+    """
     sha1 = hm.calc_sha1_from_file(filepath)
     if sha1 == hm.EMPTY_SHA1_AS_BIN:
       self.n_files_empty_sha1 += 1
@@ -235,51 +226,81 @@ class FileSweeper:
       return
 
   def print_screen_msg_for_file_processing(self, dirnode, screen_msg_update_insert_or_none):
+    sha1 = dirnode.sha1 or '[no-sha1]'
     print(
-      self.n_processed_files, '/', self.total_files_in_os,
+      'ins', self.n_inserted, 'proc', self.n_processed_files, '/',
+      'tot', self.total_files_in_os,
       'file', screen_msg_update_insert_or_none,
-      dirnode.name, '@', strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50)
+      dirnode.name, sha1, '@', strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50)
     )
 
+  def dbinsert_file_if_needed(self, filename, parentpath):
+    self.n_processed_files += 1
+    if self.n_processed_files < self.restart_at_walkloopseq:
+      print('Jumping', self.n_processed_files, 'until', self.restart_at_walkloopseq)
+      return
+    filepath = os.path.join(self.ongoingfolder_abspath, filename)
+    name = filename
+    try:
+      filestat = os.stat(filepath)
+    except OSError:
+      self.n_failed_filestat += 1
+      print(
+        self.n_failed_filestat, 'of', self.total_files_in_os,
+        'Could not filestat', filename
+      )
+      return
+    bytesize = filestat.st_size
+    mdatetime = filestat.st_mtime
+    pydt = datetime.datetime.fromtimestamp(mdatetime)
+    print(self.n_processed_files, 'of', self.total_files_in_os, name, parentpath)
+    print('bytesize =', bytesize, hm.convert_to_size_w_unit(bytesize), ':: mdatetime =', mdatetime, pydt)
+    dirnode = self.get_dirnode_if_name_n_parent_exists_in_db_or_none(name, parentpath)
+    if dirnode:
+      if dirnode.has_same_size_n_date(bytesize, mdatetime):
+        screen_msg_update_insert_or_none = 'DB-EXISTS size & date'
+        self.print_screen_msg_for_file_processing(dirnode, screen_msg_update_insert_or_none)
+        return False
+      if dirnode.bytesize == bytesize:  # and bytesize > 1024*1024:
+        screen_msg_update_insert_or_none = 'DB-EXISTS size only (date unchecked)'
+        self.print_screen_msg_for_file_processing(dirnode, screen_msg_update_insert_or_none)
+        return False
+      screen_msg_update_insert_or_none = 'DB-UPDATED'
+      _ = self.update_db_entry_with_dirnode(dirnode)  # name and parent exists but size and/or date are different
+      self.print_screen_msg_for_file_processing(dirnode, screen_msg_update_insert_or_none)
+      return True
+    return self.calc_sha1_n_insert_db_entry_with_fields(
+      filename, parentpath, bytesize, mdatetime, filepath
+    )
+
+  def calc_sha1_n_insert_db_entry_with_fields(
+      self, name, parentpath, bytesize, mdatetime, filepath
+    ):
+    """
+    here name is filename, the same convention in db
+    """
+    try:
+      sha1 = hm.calc_sha1_from_file(filepath)
+    except IOError:
+      self.n_failed_sha1s += 1
+      print(
+        self.n_failed_sha1s, 'of', self.total_files_in_os,
+        'Could not sha1', name
+      )
+      return False
+    newdirnode = dn.DirNode(name, parentpath, sha1, bytesize, mdatetime)
+    _ = self.insert_db_entry_with_dirnode(newdirnode)  # row does not exist, insert it
+    self.n_inserted += 1
+    screen_msg_update_insert_or_none = 'DB-INSERTED'
+    self.print_screen_msg_for_file_processing(newdirnode, screen_msg_update_insert_or_none)
+    return True
+
   def dbinsert_files_if_needed(self, files):
-    current_abspath = self.ongoingfolder_abspath
-    middlepath = current_abspath[len(self.mountpath):]
+    middlepath = self.ongoingfolder_abspath[len(self.mountpath):]
     middlepath = middlepath.lstrip('./')
     parentpath = '/' + middlepath
     for filename in files:
-      self.n_processed_files += 1
-      if self.n_processed_files < self.restart_at_walkloopseq:
-        print('Jumping', self.n_processed_files, 'until', self.restart_at_walkloopseq)
-        continue
-      filepath = os.path.join(current_abspath, filename)
-      name = filename
-      try:
-        filestat = os.stat(filepath)
-      except OSError:
-        self.n_failed_filestat += 1
-        print(
-          self.n_failed_filestat, 'of', self.total_files_in_os,
-          'Could not filestat', filename
-        )
-        continue
-      bytesize = filestat.st_size
-      mdatetime = filestat.st_mtime
-      pydt = datetime.datetime.fromtimestamp(mdatetime)
-      print(self.n_processed_files, 'of', self.total_files_in_os, name, parentpath)
-      print('bytesize =', bytesize, hm.convert_to_size_w_unit(bytesize), ':: mdatetime =', mdatetime, pydt)
-      dirnode = self.get_dirnode_if_name_n_parent_exists_in_db_or_none(name, parentpath)
-      if dirnode:
-        if dirnode.has_same_size_n_date(bytesize, mdatetime):
-          screen_msg_update_insert_or_none = 'DB-EXISTS'
-          self.print_screen_msg_for_file_processing(dirnode, screen_msg_update_insert_or_none)
-          continue
-        screen_msg_update_insert_or_none = 'DB-UPDATED'
-        _ = self.update_db_entry_with_dirnode(dirnode)  # name and parent exists but size and/or date are different
-        self.print_screen_msg_for_file_processing(dirnode, screen_msg_update_insert_or_none)
-        continue
-      _ = self.insert_db_entry_with_dirnode(dirnode)  # row does not exist, insert it
-      screen_msg_update_insert_or_none = 'DB-INSERTED'
-      self.print_screen_msg_for_file_processing(dirnode, screen_msg_update_insert_or_none)
+      _ = self.dbinsert_file_if_needed(filename, parentpath)  # returns a boolean
 
   def walkup_dirtree_files(self):
     """
@@ -291,31 +312,6 @@ class FileSweeper:
       if dirf.is_forbidden_dirpass(self.ongoingfolder_abspath):
         continue
       self.dbinsert_files_if_needed(files)
-
-  def report_all_nodes_with_osread_problem(self):
-    print('-='*20)
-    print('report_all_nodes_with_osread_problem:')
-    print('-='*20)
-    for i, dirnode in enumerate(self.all_nodes_with_osread_problem):
-      print(i+1, dirnode)
-    n_unreadable = len(self.all_nodes_with_osread_problem)
-    print('Total', n_unreadable, ':: report_all_nodes_with_osread_problem')
-
-  def report(self):
-    self.calc_totals()
-    print('total_files_in_db', self.total_files_in_db)
-    print('total_files_in_os', self.total_files_in_os)
-    print('total_dirs_in_os', self.total_dirs_in_os)
-    print('n_processed_files', self.n_processed_files)
-    print('n_processed_files', self.n_found_files_name_n_parent_in_db)
-    print('n_found_files_size_n_date_in_db', self.n_found_files_size_n_date_in_db)
-    print('n_updated_dbentries', self.n_updated_dbentries)
-    print('n_restricted_dirs', self.n_restricted_dirs, ':: those in ', defaults.RESTRICTED_DIRNAMES_FOR_WALK)
-    print('n_files_empty_sha1', self.n_files_empty_sha1)
-    print('n_failed_filestat', self.n_failed_filestat)
-    print('n_failed_sha1s', self.n_failed_sha1s)
-    print('n_dbentries_ins_upd', self.n_dbentries_ins_upd)
-    print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd)
 
   def prune_empty_folders(self):
     n_visited, n_removed, n_failed = dirf.prune_dirtree_deleting_empty_folders(self.mountpath)
@@ -342,6 +338,45 @@ class FileSweeper:
     self.report_all_nodes_with_osread_problem()
     self.report()
 
+  def report_unreadable_file(self, dirnode):
+    self.all_nodes_with_osread_problem.append(dirnode)
+    self.n_dbentries_failed_ins_upd += 1
+    print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd, dirnode, '[going to register event]')
+    pdict = {
+      'name': dirnode.name,
+      'parentpath': dirnode.parentpath,
+      'bytesize': dirnode.bytesize,
+      'mdatetime': dirnode.mdatetime,
+      'event_dt': datetime.datetime.now(),
+    }
+    self.freadfailer.do_insert_or_update_with_dict_to_prep_tuplevalues(pdict)
+
+  def report_all_nodes_with_osread_problem(self):
+    print('-='*20)
+    print('report_all_nodes_with_osread_problem:')
+    print('-='*20)
+    for i, dirnode in enumerate(self.all_nodes_with_osread_problem):
+      print(i+1, dirnode)
+    n_unreadable = len(self.all_nodes_with_osread_problem)
+    print('Total', n_unreadable, ':: report_all_nodes_with_osread_problem')
+
+  def report(self):
+    self.calc_totals()
+    print('total_files_in_db', self.total_files_in_db)
+    print('total_files_in_os', self.total_files_in_os)
+    print('total_dirs_in_os', self.total_dirs_in_os)
+    print('n_processed_files', self.n_processed_files)
+    print('n_processed_files', self.n_found_files_name_n_parent_in_db)
+    print('n_found_files_size_n_date_in_db', self.n_found_files_size_n_date_in_db)
+    print('n_updated_dbentries', self.n_updated_dbentries)
+    print('n_updated_dbentries', self.n_inserted)
+    print('n_restricted_dirs', self.n_restricted_dirs, ':: those in ', defaults.RESTRICTED_DIRNAMES_FOR_WALK)
+    print('n_files_empty_sha1', self.n_files_empty_sha1)
+    print('n_failed_filestat', self.n_failed_filestat)
+    print('n_failed_sha1s', self.n_failed_sha1s)
+    print('n_dbentries_ins_upd', self.n_dbentries_ins_upd)
+    print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd)
+
 
 def get_arg_restart_at_position_or_zero():
   """
@@ -366,8 +401,8 @@ def process():
   treename = 'ori'  # ori stands for origin instead of target
   moved_updater = dbentry_upd.DBEntryUpdater(src_mountpath)
   moved_updater.process()
-  sweeper = FileSweeper(src_mountpath, treename, restart_at_position)
-  sweeper.process()
+  walker = FilesUpDirTreeWalker(src_mountpath, treename, restart_at_position)
+  walker.process()
   finish_time = datetime.datetime.now()
   elapsed_time = finish_time - start_time
   # ------------------

@@ -39,6 +39,7 @@ class DBEntryUpdater:
     self.count_total_files_n_dirs_in_os()
 
   def count_total_files_n_dirs_in_os(self):
+    print('@ count_total_files_n_dirs_in_os(). Please, wait.')
     total_files, total_dirs = dirf.count_total_files_n_folders_with_restriction(self.dbtree.mountpath)
     self.total_files_in_os = total_files
     self.total_dirs_in_os = total_dirs
@@ -157,6 +158,7 @@ class DBEntryUpdater:
       self.verify_file_by_its_bysize_n_mdatetime(filename, parentpath)
 
   def walkup_dirtree_to_verify_possible_moveupdates(self):
+    print('total os-files', self.total_files_in_db, '@ walkup_dirtree_to_verify_possible_moveupdates()')
     for self.current_abspath, folders, files in os.walk(self.dbtree.mountpath):
       if self.current_abspath == self.dbtree.mountpath:
         continue
