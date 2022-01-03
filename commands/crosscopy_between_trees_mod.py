@@ -21,6 +21,7 @@ Other scripts in this system/app complete the mirroring effect, for example:
 import datetime
 import os.path
 import shutil
+import sys
 import models.entries.dirnode_mod as dn
 import fs.db.dbdirtree_mod as dbdt
 import fs.db.dbfailed_filecopy_mod as dbfailedcopy
@@ -33,13 +34,15 @@ import commands.move_rename_target_based_on_source_mod as moverename
 
 class DoubleDirectionCopier:
 
-  def __init__(self, ori_mountpath, bak_mountpath):
+  def __init__(self, ori_mountpath, bak_mountpath, restart_at=None):
     self.start_time = datetime.datetime.now()
     self.ori_dt = dbdt.DBDirTree(ori_mountpath)
     self.bak_dt = dbdt.DBDirTree(bak_mountpath)
+    self.restart_at = restart_at
     self.n_files_processed = 0
     self.n_copied_files = 0
-    self.n_failed_copy = 0
+    self.n_failed_copies = 0
+    self.n_looped_rows = 0
     self.n_moved_files = 0
     self.n_deleted_files = 0
     self.n_file_not_backable = 0
@@ -158,7 +161,7 @@ class DoubleDirectionCopier:
       # TO-DO: occurrences of fail copies should be registered somewhere (in a report db or file)
       error_msg = '****************** Runtime Error: Copy of %s failed.' % trgfilepath
       print(error_msg)
-      self.n_failed_copy += 1
+      self.n_failed_copies += 1
       # raise ValueError(error_msg)
     return True
 
@@ -296,9 +299,16 @@ class DoubleDirectionCopier:
     """
     folderpath, _ = os.path.split(trgpath)
     if not os.path.isdir(folderpath):
-      os.makedirs(folderpath)
+      try:
+        os.makedirs(folderpath)
+      except OSError:
+        self.n_failed_copies += 1
+        return False
     self.n_copied_files += 1
-    print(self.n_copied_files, 'copying to', trgpath)
+    print('N-copies', self.n_copied_files, 'rows', self.n_looped_rows, 'total', self.total_srcfiles_in_db)
+    print('Ccpying:', src_dirnode.name)
+    print(' => ppath:', strf.put_ellipsis_in_str_middle(src_dirnode.parentpath, 120))
+    print(' => direction:', self.ori_dt.mountpath, '=>', self.bak_dt.mountpath)
     shutil.copy2(srcpath, trgpath)
     sql = '''
       INSERT INTO %(tablename)s
@@ -318,10 +328,14 @@ class DoubleDirectionCopier:
   def copy_over(self, src_dirnode, src_dirtree, trg_dirtree):
     srcpath = src_dirnode.get_abspath_with_mountpath(src_dirtree.mountpath)
     if not os.path.isfile(srcpath):
+      print(
+        self.n_looped_rows, '/', self.total_srcfiles_in_db, 'file does not exist in os',
+        strf.put_ellipsis_in_str_middle(srcpath, 50)
+      )
       return False
     trgpath = src_dirnode.get_abspath_with_mountpath(trg_dirtree.mountpath)
-    if trgpath is None:
-      return False
+    # if trgpath is None:
+    #   return False
     if not os.path.isfile(trgpath):
       return self.do_copy_over(srcpath, src_dirnode, trgpath, trg_dirtree)
     # at this point, trgfile exists, so its sha1 must be checked before renaming trgfile
@@ -332,14 +346,29 @@ class DoubleDirectionCopier:
     if trg_sha1 == src_dirnode.sha1:
       # target file is there though it's not in db
       return False
-    # rename it
+    # rename it and copy over, ie name is taken but sha1 is different
     trgpath = dirf.rename_filename_if_its_already_taken_in_folder(trgpath)
     return self.do_copy_over(srcpath, src_dirnode, trgpath, trg_dirtree)
 
   def copy_missing_files_to_trg(self, src_rows, src_dirtree, trg_dirtree):
     for src_row in src_rows:
+      self.n_looped_rows += 1
+      if self.restart_at and self.n_looped_rows < self.restart_at:
+        print('processing', self.n_looped_rows, 'restart at', self.restart_at)
+        continue
       src_dirnode = dn.DirNode.create_with_tuplerow(src_row, src_dirtree.fieldnames)
+      srcfilepath = src_dirnode.get_abspath_with_mountpath(self.ori_dt.mountpath)
+      if dirf.is_any_dirname_in_path_startingwith_any_in_list(srcfilepath):
+        print(
+          self.n_looped_rows, '/', self.total_srcfiles_in_db,
+          'file in FORBIDDEN path', srcfilepath
+        )
+        continue
       if trg_dirtree.does_sha1_exist_in_thisdirtree(src_dirnode):
+        print(
+          self.n_looped_rows, '/', self.total_srcfiles_in_db,
+          'sha1_exist_in_thisdirtree for', srcfilepath
+        )
         continue
       self.copy_over(src_dirnode, src_dirtree, trg_dirtree)
 
@@ -361,8 +390,9 @@ class DoubleDirectionCopier:
     print('total_of_repeat_srcfiles =', self.total_of_repeat_srcfiles,
           '| total_of_repeat_trgfiles =', self.total_of_repeat_trgfiles)
     print('n_files_processed =', self.n_files_processed, '| n_rows_deleted =', self.n_rows_deleted)
+    print('n_looped_rows =', self.n_looped_rows, '| zzzzz =', 1)
     print('n_copied_files =', self.n_copied_files, '| n_moved_files =', self.n_moved_files)
-    print('n_failed_copy =', self.n_failed_copy, '| n_deleted_files =', self.n_deleted_files)
+    print('n_failed_copies =', self.n_failed_copies, '| n_deleted_files =', self.n_deleted_files)
     print('n_file_not_backable (.part, z-del etc) =', self.n_file_not_backable)
     end_time = datetime.datetime.now()
     elapsed_time = end_time - self.start_time
@@ -378,14 +408,22 @@ class DoubleDirectionCopier:
     print('=_+_+_='*3, 'End of the CopyAcross Report', '=_+_+_='*3)
 
 
+def get_cli_arg_restart_at_if_any():
+  for arg in sys.argv:
+    if arg.startswith('-r='):
+      return int(arg[len('-r='):])
+  return None
+
+
 def process():
   """
   """
 
   src_mountpath, trg_mountpath = defaults.get_src_n_trg_mountpath_args_or_default()
-  copier = DoubleDirectionCopier(src_mountpath, trg_mountpath)
+  restart_at = get_cli_arg_restart_at_if_any()
+  copier = DoubleDirectionCopier(src_mountpath, trg_mountpath, restart_at)
   copier.process()
-  copier = DoubleDirectionCopier(trg_mountpath, src_mountpath)
+  copier = DoubleDirectionCopier(trg_mountpath, src_mountpath, restart_at)
   copier.process()
 
 

@@ -125,7 +125,7 @@ class Mp3ElsewhereMover:
     """
     self.n_files_processed = 0
     self.n_copied_files = 0
-    self.n_failed_copy = 0
+    self.n_failed_copies = 0
     self.n_moved_files = 0
     self.n_deleted_files = 0
     self.total_srcfiles_in_db = 0
@@ -138,7 +138,7 @@ class Mp3ElsewhereMover:
     print('n_mp3s', self.n_mp3s)
     print('n_moved_files', self.n_moved_files)
     print('n_deleted_files', self.n_deleted_files)
-    print('n_failed_copy', self.n_failed_copy)
+    print('n_failed_copies', self.n_failed_copy)
     print('   >>>>>> End of Mp3ElsewhereMover Report: >>>>>>')
 
 

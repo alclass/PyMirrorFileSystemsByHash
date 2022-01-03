@@ -361,7 +361,7 @@ class MirrorDirTree:
           '| total_of_repeat_trgfiles =', self.total_of_repeat_trgfiles)
     print('n_files_processed =', self.n_files_processed, '| n_rows_deleted =', self.n_rows_deleted)
     print('n_copied_files =', self.n_copied_files, '| n_moved_files =', self.n_moved_files)
-    print('n_failed_copy =', self.n_failed_copy, '| n_deleted_files =', self.n_deleted_files)
+    print('n_failed_copies =', self.n_failed_copy, '| n_deleted_files =', self.n_deleted_files)
     print('n_file_not_backable (.part, z-del etc) =', self.n_file_not_backable)
     end_time = datetime.datetime.now()
     elapsed_time = end_time - self.start_time
