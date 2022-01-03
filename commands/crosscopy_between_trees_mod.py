@@ -306,7 +306,7 @@ class DoubleDirectionCopier:
         return False
     self.n_copied_files += 1
     print('N-copies', self.n_copied_files, 'rows', self.n_looped_rows, 'total', self.total_srcfiles_in_db)
-    print('Ccpying:', src_dirnode.name)
+    print('Copying file:', src_dirnode.name)
     print(' => ppath:', strf.put_ellipsis_in_str_middle(src_dirnode.parentpath, 120))
     print(' => direction:', self.ori_dt.mountpath, '=>', self.bak_dt.mountpath)
     shutil.copy2(srcpath, trgpath)
@@ -408,22 +408,27 @@ class DoubleDirectionCopier:
     print('=_+_+_='*3, 'End of the CopyAcross Report', '=_+_+_='*3)
 
 
-def get_cli_arg_restart_at_if_any():
+def get_cli_arg_r1_r2_restart_at_if_any():
+  r1, r2 = (None, None)
   for arg in sys.argv:
-    if arg.startswith('-r='):
-      return int(arg[len('-r='):])
-  return None
+    if arg.startswith('-r1='):
+      r1 = int(arg[len('-r1='):])
+    elif arg.startswith('-r2='):
+      r2 = int(arg[len('-r2='):])
+    if (r1, r2) != (None, None):
+      break
+  return r1, r2
 
 
 def process():
   """
   """
-
   src_mountpath, trg_mountpath = defaults.get_src_n_trg_mountpath_args_or_default()
-  restart_at = get_cli_arg_restart_at_if_any()
-  copier = DoubleDirectionCopier(src_mountpath, trg_mountpath, restart_at)
-  copier.process()
-  copier = DoubleDirectionCopier(trg_mountpath, src_mountpath, restart_at)
+  r1_restart_at, r2_restart_at = get_cli_arg_r1_r2_restart_at_if_any()
+  if r2_restart_at is None:
+    copier = DoubleDirectionCopier(src_mountpath, trg_mountpath, r1_restart_at)
+    copier.process()
+  copier = DoubleDirectionCopier(trg_mountpath, src_mountpath, r2_restart_at)
   copier.process()
 
 
