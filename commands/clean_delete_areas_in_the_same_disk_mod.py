@@ -236,15 +236,21 @@ class CleanDeleterThruSubtreeInSameDisk:
       self.n_processed_files += 1
       filepath = os.path.join(self.curr_cleandel_dirpath, filename)
       if not os.path.isfile(filepath):
-        print(self.n_processed_files, '/', self.total_files_os, filename, 'does not exist in dir. Continuing.')
+        print('///', self.n_processed_files, '/', self.total_files_os, filename, 'DOES NOT EXIST in dir. Continuing.')
         continue
       # middlepath = self.dirpath_to_cleandel
       dirnode = self.fetch_dirnode_from_file_n_path(filename)
       if dirnode is None:
-        print(self.n_processed_files, '/', self.total_files_os, filename, 'does not exist in db. Continuing.')
+        print('///', self.n_processed_files, '/', self.total_files_os, filename, 'DOES NOT EXIST in db. Continuing.')
         continue
       if self.does_sha1_exist_elsewhere_in_the_non_clean_area(dirnode):
+        print(
+          '++++++++', self.n_processed_files, '/', self.total_files_os,
+          filename, '@', strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50)
+        )
         self.clean_del_ids.append(dirnode.get_db_id())
+        continue
+      print('~~~~~~~~ Just continue:', self.n_processed_files, '/', self.total_files_os, filename)
 
   def walk_thru_toclean_dirtree_db_entries(self):
     for self.curr_cleandel_dirpath, folders, files in os.walk(self.dirpath_to_cleandel):

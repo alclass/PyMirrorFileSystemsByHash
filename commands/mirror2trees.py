@@ -92,7 +92,7 @@ class MirrorDirTree:
         raise ValueError(error_msg)
 
   def mirror_by_copying_across_dirtrees(self):
-    print('mirror_by_copying_across_dirtrees')
+    print('move_files_if_ext')
     print('='*40)
     for i, src_rowlist in enumerate(self.ori_dt.dbtree.do_select_all_w_limit_n_offset()):
       _ = len(src_rowlist)

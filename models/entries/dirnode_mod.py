@@ -297,27 +297,43 @@ class DirNode:
   @property
   def fpath(self):
     """
-    fpath is in fact a middlepath. To form the absolute "full" path see next method get_abspath_with_mountpath()
+    fpath is in fact a middlepath starting with '/'.
+    To form the absolute "full" path see next method get_abspath_with_mountpath(mountpath)
+      ie the full abspath depends on the mountpath.
+
+    Two obs:
+      1) if name is '/' (or None), both name and parentpath will be set to '/' and None respectively;
+      2) the os.path.join(parentpath, name) will happen on the condition that both have types in
+         [str, bytes, os.PathLike], otherwise a Value Error exception will be raised.
+      On the same note, the client script must fill in parentpath and name attributes appropriately,
+        mainly when these come from db using the fieldnames.index() approach.
     """
+    # 1st case: return self._fpath rightaway if it's not None
     if self._fpath is not None:
       return self._fpath
-    if self.parentpath is None and self.name == '/':
-      self._fpath = '/'
-      return self._fpath
-    if self.name is None and self.parentpath is None:
-      self._fpath = '/'
+    # 2nd case: if name is None or '/' (root), _fpath should also be '/' (on the way, guarantee that parentpath is None)
+    if self.name is None or self.name == '/':
       self.name = '/'
+      self.parentpath = None
+      self._fpath = '/'
       return self._fpath
-    if self.name is not None and self.parentpath is not None:
-      self._fpath = os.path.join(self.parentpath, self.name)
-      return self._fpath
+    # 3rd case: if name is None, set name to '/' (root) and recall the method itself
+    if type(self.name) in [str, bytes, os.PathLike]:
+      if type(self.parentpath) in [str, bytes, os.PathLike]:
+        self._fpath = os.path.join(self.parentpath, self.name)
+        return self._fpath
     error_msg = 'Runtime (logical) error: program cannot derive path from name (%s) and parentpath (%s).' \
                 % (self.name, self.parentpath)
     raise ValueError(error_msg)
 
   def get_folderabspath_with_mountpath(self, mountpath):
-    middlepath = self.parentpath.lstrip('./')
-    return os.path.join(mountpath, middlepath)
+    try:
+      middlepath = self.parentpath.lstrip('./')
+      return os.path.join(mountpath, middlepath)
+    except (AttributeError, TypeError):
+      error_msg = 'Error (attr or type ) in get_folderabspath_with_mountpath(): self.parentpath = [%s]' \
+                  ' and mountpath is [%s]' % (str(self.parentpath), str(mountpath))
+      raise ValueError(error_msg)
 
   def get_abspath_with_mountpath(self, mountpath):
     """

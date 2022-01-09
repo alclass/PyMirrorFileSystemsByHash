@@ -4,6 +4,7 @@ dir_n_file_fs_mod.py
 """
 import os
 import default_settings as defaults
+import itertools
 
 
 def prune_dirtree_deleting_empty_folders(current_dirpath, n_visited=0, n_removed=0, n_failed=0):
@@ -185,6 +186,13 @@ def does_a_dirname_in_path_begins_with_a_restricted_prefix(ppath, restricted_pre
   return False
 
 
+def filter_in_files_with_exts(files, extensionlist):
+  files_n_exts_product = itertools.product(files, extensionlist)
+  filtered_files = list(filter(lambda t: t[0].endswith(t[1]), files_n_exts_product))
+  filtered_files = [filename for filename, ext in filtered_files]
+  return filtered_files
+
+
 def adhoc_test():
   starting_strs_list = ['z-del', 'z-tri']
   names = ['bla', 'z-Del', 'z-Triage', 'z-tri legal', "what's up", 'z Triage', 'tri legal']
@@ -202,8 +210,17 @@ def adhoc_test2():
     print(i+1, '[', fpath, '] starts with any', starting_strs_list, '=>', boolres)
 
 
+def adhoc_test3():
+  files = ['f1.txt', 'f2.doc', 'u1.url', 'f1.mp4', 'f2.txt']
+  exts = ['txt', 'url']
+  filtered_files = filter_in_files_with_exts(files, exts)
+  print(files, exts)
+  print(' => filter')
+  print(filtered_files)
+
+
 def process():
-  adhoc_test2()
+  adhoc_test3()
 
 
 if __name__ == '__main__':

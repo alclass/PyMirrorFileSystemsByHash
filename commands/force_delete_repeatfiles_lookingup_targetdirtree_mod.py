@@ -2,20 +2,32 @@
 """
 force_delete_repeatfiles_lookingup_targetdirtree_mod.py
 
-This script takes two folder paths (source and target) and deletes file copies (ie file repeats (*))
-  in the target dirtree.
+This script does the following:
+  1) it considers one only dirtree (not two as ori [origin] and bak [back-up], the whole dirtree is ori);
+  2) takes two folder paths (source and target), target can be inside source but not the other way around;
+     (if source were inside target, the logical consequence would be deletion of items
+      in source itself, if any, not desirable);
+  3) deletes file copies (ie file repeats (*)) inside the target dirtree, keeping the original in the source dirtree
+     (or subset source minus target if target is inside source).
 
 (*) repeats are based on the sha1-hash of its content
 
-Notice the main class here needs 4 parameters (ori_mountpath, bak_mountpath, src_fulldirpath, trg_fulldirpath)
+Obs:
+  => this script DOES NOT DELETE repeats in the same folder as source's;
+     example:
+       if A.txt and B.txt are equals and exists in one source folder (or source minus target),
+       both will be kept. There is another script in this system for that.
+
+Notice the main class here needs 3 parameters (ori_mountpath, src_branchdir_abspath, trg_branchdir_abspath)
   to do its job. This is an important difference from the script:
     => force_delete_every_equal_sha1_in_targetdirtree_mod
   which only needs 2 parameters, ie src_dirtree (or src_mountpath) and trg_dirtree (or trg_mountpath)
 
-IMPORTANT:
+Also IMPORTANT:
   1) all file deletions are always somehow dangerous but this script only deletes "excess" copies
      (ie the original file is not to be deleted in this script);
-  2) once a file is considered "source" (in the target dirtree), its db-id prevents it from being deleted itself;
+  2) once a file is considered "source" (in the target dirtree),
+     its db-id prevents it from being deleted itself, a kind of an aditional protection mechanism;
 """
 import os
 import sys
@@ -23,20 +35,41 @@ import fs.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
 import fs.strfs.strfunctions_mod as strf
+import fs.dirfilefs.dir_n_file_fs_mod as dirf
 
 
 class ForceDeleterLookingDirUp:
 
-  def __init__(self, ori_mountpath, bak_mountpath, src_fulldirpath, trg_fulldirpath):
+  def __init__(self, ori_mountpath, src_branchdir_abspath, trg_branchdir_abspath):
     self.ori_dbtree = dbdt.DBDirTree(ori_mountpath)
-    self.bak_dbtree = dbdt.DBDirTree(bak_mountpath)
-    self.src_fulldirpath = src_fulldirpath
-    self.trg_fulldirpath = trg_fulldirpath
+    self.src_branchdir_abspath = src_branchdir_abspath
+    self.trg_branchdir_abspath = trg_branchdir_abspath
     self.verify_paths_source_inside_target_n_raise_if_error()
-    self.ids_n_sha1s = []
-    self.delete_ids = []
-    self.n_processed_files = 0
-    self.n_deletes = 0
+    self.src_sha1s = []
+    self.trg_ids_to_delete_upon_confirm = []
+    self.processed_sha1 = []
+    self.total_src_files_in_db = 0
+    self.total_src_files_in_os = 0
+    self.total_src_dirs_in_os = 0
+    self.total_sha1s_src_files_in_db = 0
+    self.n_src_processed_files = 0
+    self.n_trg_processed_files = 0
+    self.n_src_exists = 0
+    self.n_trg_exists = 0
+    self.n_processed_deletes = 0
+    self.n_trg_os_phys_files_deleted = 0
+    self.bool_del_confirmed = False
+    self.calc_totals()
+
+  def calc_totals(self):
+    t_src_osfiles, t_src_osdirs = dirf.count_total_files_n_folders_with_restriction(self.ori_dbtree.mountpath)
+    self.total_src_files_in_os, self.total_src_dirs_in_os = t_src_osfiles, t_src_osdirs
+    self.total_src_files_in_db = self.ori_dbtree.count_rows_as_int()
+    self.total_sha1s_src_files_in_db = self.ori_dbtree.count_unique_sha1s_as_int()
+
+  @property
+  def total_src_sha1s(self):
+    return len(self.src_sha1s)
 
   def verify_paths_source_inside_target_n_raise_if_error(self):
     """
@@ -53,82 +86,140 @@ class ForceDeleterLookingDirUp:
     """
     error_msgs = []
     # 1) it checks existence of source folder
-    if not os.path.isdir(self.src_fulldirpath):
-      error_msg = 'OSError: src_fulldirpath (%s) does not exist.' % self.src_fulldirpath
+    if not os.path.isdir(self.src_branchdir_abspath):
+      error_msg = 'OSError: src_fulldirpath (%s) does not exist.' % self.src_branchdir_abspath
       error_msgs.append(error_msg)
     # 2) it checks existence of target folder
-    if not os.path.isdir(self.trg_fulldirpath):
-      error_msg = 'OSError: trg_fulldirpath (%s) does not exist.' % self.trg_fulldirpath
+    if not os.path.isdir(self.trg_branchdir_abspath):
+      error_msg = 'OSError: trg_fulldirpath (%s) does not exist.' % self.trg_branchdir_abspath
       error_msgs.append(error_msg)
     # 3) it prevents the source folder from being inside the target folder
-    if self.src_fulldirpath.startswith(self.trg_fulldirpath):
-      error_msg = 'Context Error: src_fulldirpath (%s) is within trg (%s).' \
-                  % (self.src_fulldirpath, self.trg_fulldirpath)
+    if self.src_branchdir_abspath.startswith(self.trg_branchdir_abspath):
+      error_msg = 'Context Error: src_branchdir_abspath (%s) cannot be within (inside) trg_branchdir_abspath (%s).' \
+                  % (self.src_branchdir_abspath, self.trg_branchdir_abspath)
       error_msgs.append(error_msg)
     if len(error_msgs) > 0:
       error_msg = '\n'.join(error_msgs)
       raise OSError(error_msg)
 
   @property
-  def src_dirpath(self):
-    middlepath = self.src_fulldirpath[len(self.ori_dbtree.mountpath):]
+  def src_branchdir_parentpath(self):
+    middlepath = self.src_branchdir_abspath[len(self.ori_dbtree.mountpath):]
     return strf.prepend_slash_if_needed(middlepath)
 
   @property
-  def trg_dirpath(self):
-    middlepath = self.trg_fulldirpath[len(self.bak_dbtree.mountpath):]
+  def trg_branchdir_parentpath(self):
+    middlepath = self.trg_branchdir_abspath[len(self.ori_dbtree.mountpath):]
     return strf.prepend_slash_if_needed(middlepath)
 
-  def gather_sha1s_in_srcdir(self):
-    charsize = len(self.src_dirpath)
-    sql = 'SELECT * FROM %(tablename)s WHERE substr(parentpath, ' + str(charsize) + ')=?;'
-    tuplevalues = (self.src_dirpath, )
+  def gather_sha1s_from_srcdir_minus_trgdir(self):
+    src_charsize = 1 + len(self.src_branchdir_parentpath)
+    trg_charsize = 1 + len(self.trg_branchdir_parentpath)
+    sql = 'SELECT * FROM %(tablename)s'
+    sql += ' WHERE substr(parentpath, 0, ' + str(src_charsize) + ')=?'
+    sql += ' AND NOT substr(parentpath, 0, ' + str(trg_charsize) + ')=?;'
+    tuplevalues = (self.src_branchdir_parentpath, self.trg_branchdir_parentpath)
     fetched_list = self.ori_dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
-    self.n_processed_files += 1
+    sha1s_in_src_set = set()
     for row in fetched_list:
+      self.n_src_processed_files += 1
       dirnode = dn.DirNode.create_with_tuplerow(row, self.ori_dbtree.fieldnames)
-      if not dirnode.does_dirnode_exist_in_disk(self.ori_dbtree.mountpath):
-        continue
-      id_n_sha1 = (dirnode.get_db_id(), dirnode.sha1)
-      self.ids_n_sha1s.append(id_n_sha1)
+      if dirnode.does_dirnode_exist_in_disk(self.ori_dbtree.mountpath):
+        self.n_src_exists += 1
+        print(
+          'src fil exi', self.n_src_exists, 'proc', self.n_src_processed_files,
+          'tot', self.total_src_files_in_os,
+          '[', dirnode.name, '] @', '[', strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50), ']'
+          ' sha1 trg comp:', dirnode.sha1.hex()[:10] + '...'
+        )
+        sha1s_in_src_set.add(dirnode.sha1)
+    self.src_sha1s = list(sha1s_in_src_set)
 
-  def look_up_trg_dirup(self):
-    for id_n_sha1 in self.ids_n_sha1s:
-      charsize = len(self.trg_dirpath)
-      sql = 'select * from %(tablename)s where substr(parentpath, ' + str(charsize) + ')=? and sha1=?;'
-      _id, sha1 = id_n_sha1
-      tuplevalues = (self.trg_dirpath, sha1)
-      fetched_list = self.bak_dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
+  def gather_trg_ids_to_delete_upon_confirm(self):
+    trg_charsize = 1 + len(self.trg_branchdir_parentpath)
+    sql = 'SELECT * FROM %(tablename)s WHERE substr(parentpath, 0, ' + str(trg_charsize) + ')=? and sha1=?;'
+    for sha1 in self.src_sha1s:
+      tuplevalues = (self.trg_branchdir_parentpath, sha1)
+      fetched_list = self.ori_dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
       for row in fetched_list:
-        self.n_deletes += 1
-        dirnode = dn.DirNode.create_with_tuplerow(row, self.bak_dbtree.fieldnames)
-        if not dirnode.does_dirnode_exist_in_disk(self.ori_dbtree.mountpath):
-          continue
-        if _id == dirnode.get_db_id():
-          # deletion cannot happen on the supposed source
-          continue
-        self.n_deletes += 1
-        _id = row[0]  # id is always index 0
-        self.delete_ids.append(_id)
-        print(self.n_deletes, 'trg dirnode', dirnode)
+        self.n_trg_processed_files += 1
+        dirnode = dn.DirNode.create_with_tuplerow(row, self.ori_dbtree.fieldnames)
+        if dirnode.does_dirnode_exist_in_disk(self.ori_dbtree.mountpath):
+          self.n_trg_exists += 1
+          print(
+            'trg fil exi', self.n_trg_exists, 'proc', self.n_trg_processed_files, 'tot', self.total_src_files_in_os,
+            'trg id=%d for later deletion confirm:' % dirnode.get_db_id(),
+            '[', dirnode.name, ']',
+            '@', '[', strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50), ']'
+          )
+          self.trg_ids_to_delete_upon_confirm.append(dirnode.get_db_id())
 
   def confirm_deletion(self):
     print('Confirm deletion: ids:')
-    n_to_delete = 0
-    for i, _id in enumerate(self.delete_ids):
-      n_to_delete += 1
-      print(n_to_delete, _id)
+    total_trg_files_to_delete = len(self.trg_ids_to_delete_upon_confirm)
+    for i, _id in enumerate(self.trg_ids_to_delete_upon_confirm):
+      self.n_processed_deletes += 1
+      dirnode = self.ori_dbtree.fetch_dirnode_by_id(_id)
+      print(
+        self.n_processed_deletes, 'of', total_trg_files_to_delete, 'to delete and',
+        self.total_src_files_in_os, 'in dirtree :',
+        'File to delete in target: id=%d' % dirnode.get_db_id(), '::', dirnode.sha1.hex()[:10] + '...'
+      )
+      print(
+        '[', dirnode.name, '] @ [',
+        strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50), ']'
+      )
+    screen_msg = 'Do you want to delete the %d target files above? (*Y/n) [ENTER means yes] '
+    ans = input(screen_msg)
+    if ans in ['Y', 'y', '']:
+      return True
+    return False
+
+  def do_confirmed_deletes(self):
+    # double-check
+    if not self.bool_del_confirmed:
+      return False
+    self.n_processed_deletes = 0
+    for _id in self.trg_ids_to_delete_upon_confirm:
+      print(self.n_processed_deletes + 1, 'Deleting id', _id, 'in db and in os.')
+      dirnode = self.ori_dbtree.fetch_dirnode_by_id(_id)
+      file_abspath = dirnode.get_abspath_with_mountpath(self.ori_dbtree.mountpath)
+      if os.path.isfile(file_abspath):
+        print(self.n_trg_os_phys_files_deleted + 1, 'Deleting', file_abspath)
+        os.remove(file_abspath)
+        self.n_trg_os_phys_files_deleted += 1
+      print('Deleting in db', _id, dirnode.name, '@', strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50))
+      _ = self.ori_dbtree.delete_row_by_id(_id)
+      self.n_processed_deletes += 1
+    print('-'*50)
+    print('Deleted altogether', self.n_processed_deletes, 'ids')
+    print('-'*50)
+
+  def process(self):
+    self.gather_sha1s_from_srcdir_minus_trgdir()
+    self.gather_trg_ids_to_delete_upon_confirm()
+    self.bool_del_confirmed = self.confirm_deletion()
+    if self.bool_del_confirmed:
+      self.do_confirmed_deletes()
+    self.report()
 
   def report(self):
     print('Report:')
     print('=======')
-    print('dirtrees:', self.ori_dbtree.mountpath, self.bak_dbtree.mountpath)
-    print('n_deletes', self.n_deletes)
-
-  def process(self):
-    self.gather_sha1s_in_srcdir()
-    self.look_up_trg_dirup()
-    self.confirm_deletion()
+    print('dirtree:', self.ori_dbtree.mountpath)
+    print('src_branchdir_parentpath:', self.src_branchdir_parentpath)
+    print('trg_branchdir_parentpath:', self.trg_branchdir_parentpath)
+    print('total_src_sha1s', self.total_src_sha1s)
+    print('total_src_files_in_db', self.total_src_files_in_db)
+    print('total_src_files_in_os', self.total_src_files_in_os)
+    print('total_src_dirs_in_os', self.total_src_dirs_in_os)
+    print('total_sha1s_src_files_in_db', self.total_sha1s_src_files_in_db)
+    print('n_src_processed_files', self.n_src_processed_files)
+    print('n_trg_processed_files', self.n_trg_processed_files)
+    print('n_src_exists', self.n_src_exists)
+    print('n_trg_exists', self.n_trg_exists)
+    print('n_processed_deletes', self.n_processed_deletes)
+    print('n_trg_os_phys_files_deleted', self.n_trg_os_phys_files_deleted)
 
 
 def get_src_n_trg_full_inner_paths():
@@ -145,28 +236,28 @@ def get_src_n_trg_full_inner_paths():
   trg_fpath = /sciences/quantum/lectures (suppose a search for lectureA.mp4)
   In the example above if lectureA.mp4 is a "repeat" of lecture1.mp4, the former will be deleted.
   """
-  src_fullpath = None
-  trg_fullpath = None
+  src_branchdir_abspath = None
+  trg_branchdir_abspath = None
   for arg in sys.argv:
     if arg.startswith('-sp='):
-      src_fullpath = arg[len('-sp=')]
+      src_branchdir_abspath = arg[len('-sp='):]
     elif arg.startswith('-tp='):
-      trg_fullpath = arg[len('-tp=')]
-  if not os.path.isdir(src_fullpath):
-    error_msg = 'Error: src dirpath ' + src_fullpath + ' does not exist.'
+      trg_branchdir_abspath = arg[len('-tp='):]
+  if not os.path.isdir(src_branchdir_abspath):
+    error_msg = 'Error: src dirpath ' + src_branchdir_abspath + ' does not exist.'
     raise OSError(error_msg)
-  if not os.path.isdir(trg_fullpath):
-    error_msg = 'Error: trg dirpath ' + trg_fullpath + ' does not exist.'
+  if not os.path.isdir(trg_branchdir_abspath):
+    error_msg = 'Error: trg dirpath ' + trg_branchdir_abspath + ' does not exist.'
     raise OSError(error_msg)
-  return src_fullpath, trg_fullpath
+  return src_branchdir_abspath, trg_branchdir_abspath
 
 
 def process():
   """
   """
-  src_mountpath, trg_mountpath = defaults.get_src_n_trg_mountpath_args_or_default()
-  src_fpath, trg_fpath = get_src_n_trg_full_inner_paths()
-  forcedeleter = ForceDeleterLookingDirUp(src_mountpath, trg_mountpath, src_fpath, trg_fpath)
+  src_mountpath, _ = defaults.get_src_n_trg_mountpath_args_or_default()
+  src_branchdir_abspath, trg_branchdir_abspath = get_src_n_trg_full_inner_paths()
+  forcedeleter = ForceDeleterLookingDirUp(src_mountpath, src_branchdir_abspath, trg_branchdir_abspath)
   forcedeleter.process()
 
 
