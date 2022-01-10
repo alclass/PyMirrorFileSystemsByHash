@@ -18,7 +18,7 @@ import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
-import fs.strfs.strfunctions_mod as strf
+import fs.strnlistfs.strfunctions_mod as strf
 # import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
 
 

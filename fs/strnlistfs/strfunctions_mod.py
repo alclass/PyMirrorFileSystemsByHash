@@ -7,8 +7,10 @@ import os
 
 def prepend_slash_if_needed(middlepath):
   try:
-    if not middlepath.startswith('/'):
-      middlepath = '/' + middlepath
+    if not middlepath.startswith('./'):
+      middlepath = middlepath.lstrip('.')
+    middlepath = middlepath.lstrip('/')
+    middlepath = '/' + middlepath
     return middlepath
   except AttributeError:
     pass

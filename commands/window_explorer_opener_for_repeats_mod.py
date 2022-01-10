@@ -35,10 +35,21 @@ class RepeatVerifier:
     self.n_item = 0
     self.db_fetch_ended = False  # this boolean stops the main while-loop in process()
     self.n_sha1_repeats = 0
+    self.total_files_in_db = 0
+    self.total_sha1s_in_db = 0
     self.n_rows_deleted = 0
     self.mountpath = mountpath
     self.dbtree = dbt.DBDirTree(self.mountpath)
     self.dbrepeat = dbr.DBRepeat(self.mountpath)
+    self.count_stats()
+
+  def count_stats(self):
+    self.total_files_in_db = self.dbtree.count_rows_as_int()
+    self.total_sha1s_in_db = self.dbtree.count_unique_sha1s_as_int()
+
+  @property
+  def total_repeats_in_db(self):
+    return self.total_files_in_db - self.total_sha1s_in_db
 
   def verify_sha1_repeats(self, sha1):
     """
@@ -118,23 +129,35 @@ class RepeatsGrabber:
   def __init__(self, mountpath):
     self.mountpath = mountpath
     self.dbtree = dbt.DBDirTree(self.mountpath)
-    self.n_files_in_db = self.dbtree.count_rows_as_int()
+    self.total_files_in_db = 0
+    self.total_sha1s_in_db = 0
     self.n_unique_files_in_db = self.dbtree.count_unique_sha1s_as_int()
-    self.n_repeated_files = self.n_files_in_db - self.n_unique_files_in_db
+    self.n_repeated_files = self.total_files_in_db - self.n_unique_files_in_db
     self.n_windows_open = 0
     self.n_processed_repeated_files = 0
+    self.count_stats()
+
+  def count_stats(self):
+    self.total_files_in_db = self.dbtree.count_rows_as_int()
+    self.total_sha1s_in_db = self.dbtree.count_unique_sha1s_as_int()
+
+  @property
+  def total_repeats_in_db(self):
+    return self.total_files_in_db - self.total_sha1s_in_db
 
   def open_window_explorer_for_user(self, n_repeats, sha1):
+    print('Opening Window for', sha1.hex(), 'with', n_repeats, 'repeats')
     sql = 'SELECT * FROM %(tablename)s WHERE sha1=?;'
     tuplevalues = (sha1, )
     rows = self.dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
+    print('Number of rows found', len(rows))
     for n_row, row in enumerate(rows):
       self.n_processed_repeated_files += 1
       idx = self.dbtree.fieldnames.index('name')
       name = row[idx]
       _, ext = os.path.splitext(name)
-      if ext in defaults.EXTENSIONS_IN_SHA1_VERIFICATION:
-        self.go_open_windows_for_repeats(n_repeats, row, n_row)
+      # if ext in defaults.EXTENSIONS_IN_SHA1_VERIFICATION:
+      self.go_open_windows_for_repeats(n_repeats, row, n_row)
 
   def go_open_windows_for_repeats(self, n_repeats, row, n_row):
     idx = self.dbtree.fieldnames.index('name')
@@ -144,7 +167,7 @@ class RepeatsGrabber:
     _, ext = os.path.splitext(name)
     print(
       'Extension', ext,
-      self.n_processed_repeated_files, 'of', self.n_files_in_db,
+      self.n_processed_repeated_files, 'of', self.total_files_in_db,
       n_row, 'repeats =', n_repeats, '[', name, '] =>', parentpath
     )
     print('-'*40)
@@ -160,25 +183,29 @@ class RepeatsGrabber:
       _ = input(screen_msg)
 
   def fetch_distinct_sha1s(self):
-    sql = 'SELECT DISTINCT sha1, COUNT(id) FROM %(tablename)s GROUP by sha1;'
+    sql = 'SELECT DISTINCT sha1, COUNT(id) as c FROM %(tablename)s GROUP by sha1 having c > 1;'
     generator_rows = self.dbtree.do_select_sql_n_tuplevalues_w_limit_n_offset(sql)
     for generated_rows in generator_rows:
-      for row in generated_rows:
+      for i, row in enumerate(generated_rows):
         sha1 = row[0]
-        if sha1 == hm.EMPTY_SHA1_AS_BIN:
-          print('Jumping EMPTY_SHA1')
-          continue
         n_repeats = row[1]
-        if n_repeats < 2:
+        print(
+          i+1, '/', self.total_repeats_in_db,
+          'count', n_repeats, sha1.hex()
+        )
+        if sha1 == hm.EMPTY_SHA1_AS_BIN:
+          print('Jumping EMPTY_SHA1 ::', hm.EMPTY_SHA1HEX_STR)
           continue
         self.open_window_explorer_for_user(n_repeats, sha1)
 
   def as_dict(self):
     outdict = {
       'mountpath': self.mountpath,
-      'n_files_in_db': self.n_files_in_db,
+      'n_files_in_db': self.total_files_in_db,
       'n_unique_files_in_db': self.n_unique_files_in_db,
-      'n_repeated_files': self.n_repeated_files,
+      'total_files_in_db': self.total_files_in_db,
+      'total_sha1s_in_db': self.total_sha1s_in_db,
+      'total_repeats_in_db': self.total_repeats_in_db,
       'n_processed_repeated_files': self.n_processed_repeated_files,
     }
     return outdict
@@ -189,8 +216,10 @@ class RepeatsGrabber:
     mountpath = %(mountpath)s
     n_files_in_db = %(n_files_in_db)d
     n_unique_files_in_db = %(n_unique_files_in_db)d
-    n_repeated_files =  %(n_repeated_files)d
-    n_processed_repeated_files : %(n_repeated_files)d''' \
+    total_files_in_db = %(total_files_in_db)d
+    total_sha1s_in_db = %(total_sha1s_in_db)d
+    total_repeats_in_db = %(total_repeats_in_db)d
+    n_processed_repeated_files : %(n_processed_repeated_files)d''' \
       % self.as_dict()
     print(outstr)
 

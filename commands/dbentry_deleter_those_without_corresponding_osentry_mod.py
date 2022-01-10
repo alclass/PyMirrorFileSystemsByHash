@@ -32,7 +32,7 @@ import os.path
 import default_settings as defaults
 import fs.db.dbdirtree_mod as dbt
 import fs.dirfilefs.dir_n_file_fs_mod as dirfil
-import fs.strfs.strfunctions_mod as strf
+import fs.strnlistfs.strfunctions_mod as strf
 import models.entries.dirnode_mod as dn
 SQL_SELECT_LIMIT_DEFAULT = 50
 
@@ -59,6 +59,7 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
 
   def count_totals(self):
     self.total_files_in_db = self.dbtree.count_rows_as_int()
+    self.total_sha1s_in_db = self.dbtree.count_unique_sha1s_as_int()
     self.total_files_os, self.total_dirs_os = dirfil.count_total_files_n_folders_with_restriction(self.mountpath)
 
   def delete_dbentry_if_theres_no_equivalent_os_entry(self, row):
@@ -84,8 +85,10 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
         % {'limit': k_limit, 'offset': offset}
       sql = 'SELECT * FROM %(tablename)s' + limit_clause
       rows = self.dbtree.do_select_with_sql_without_tuplevalues(sql)
-      self.n_deleted_in_loop = 0
-      for row in rows:
+      for i, row in enumerate(rows):
+        print(
+          i + 1, '/', self.n_processed_in_db, '/', self.total_files_in_db
+        )
         self.delete_dbentry_if_theres_no_equivalent_os_entry(row)
       offset = offset + k_limit - self.n_deleted_in_loop
       if len(rows) < k_limit:  # this is the condition for interrupting the while-infinite-loop "WHILE 1" above
@@ -100,6 +103,7 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
     print('total_files_in_db', self.total_files_in_db)
     print('total_files_os', self.total_files_os)
     print('total_dirs_os', self.total_dirs_os)
+    print('total_sha1s_in_db', self.total_sha1s_in_db)
     print('n_processed_in_db', self.n_processed_in_db)
     print('n_deleted_dbentries', self.n_deleted_dbentries)
     print('End of Processing')

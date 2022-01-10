@@ -19,7 +19,7 @@ import os
 import fs.db.dbdirtree_mod as dbdt
 import default_settings as defaults
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
-import fs.strfs.strfunctions_mod as strf
+import fs.strnlistfs.strfunctions_mod as strf
 import models.entries.dirnode_mod as dn
 
 
@@ -45,6 +45,10 @@ class DBEntryUpdater:
     self.total_dirs_in_os = total_dirs
     self.total_files_in_db = self.dbtree.count_rows_as_int()
     self.total_unique_sha1s = self.dbtree.count_unique_sha1s_as_int()
+
+  @property
+  def total_repeats_in_db(self):
+    return self.total_files_in_db - self.total_unique_sha1s
 
   def verify_if_an_update_can_happen(
       self,
@@ -176,12 +180,13 @@ class DBEntryUpdater:
     print('='*40)
     print('dirtree:', self.dbtree.mountpath)
     print('total_files_in_db', self.total_files_in_db)
+    print('total_unique_sha1s', self.total_unique_sha1s)
+    print('total_repeats_in_db', self.total_repeats_in_db)
     print('total_files_in_os', self.total_files_in_os)
     print('total_dirs_in_os', self.total_dirs_in_os, '(obs: rootdir files do not count.)')
     print('n_processed_dirs', self.n_processed_dirs)
     print('n_processed_files', self.n_processed_files)
     print('n_failed_filestats', self.n_failed_filestats)
-    print('n_unique_sha1s', self.total_unique_sha1s)
     print('n_dbupdates', self.n_dbupdates, "(meaning files that were moved before and got unsync'd, now db-sync'd)")
 
   def set_totals_in_db(self, n_files_in_db=None, n_unique_sha1s=None):

@@ -15,7 +15,7 @@ import fs.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
 import fs.dirfilefs.dir_n_file_fs_mod as dirfil
-import fs.strfs.strfunctions_mod as strf
+import fs.strnlistfs.strfunctions_mod as strf
 
 
 class TargetSameSha1ForceDeleter:

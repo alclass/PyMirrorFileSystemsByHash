@@ -53,7 +53,7 @@ import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_mod as dbentry_u
 import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
 import fs.db.dbfailed_fileread_mod as freadfail
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
-import fs.strfs.strfunctions_mod as strf
+import fs.strnlistfs.strfunctions_mod as strf
 import default_settings as defaults
 
 
@@ -363,10 +363,11 @@ class FilesUpDirTreeWalker:
   def report(self):
     self.calc_totals()
     print('total_files_in_db', self.total_files_in_db)
+    print('total_unique_files_in_db', self.total_unique_files_in_db)
     print('total_files_in_os', self.total_files_in_os)
     print('total_dirs_in_os', self.total_dirs_in_os)
     print('n_processed_files', self.n_processed_files)
-    print('n_processed_files', self.n_found_files_name_n_parent_in_db)
+    print('n_found_files_name_n_parent_in_db', self.n_found_files_name_n_parent_in_db)
     print('n_found_files_size_n_date_in_db', self.n_found_files_size_n_date_in_db)
     print('n_updated_dbentries', self.n_updated_dbentries)
     print('n_updated_dbentries', self.n_inserted)

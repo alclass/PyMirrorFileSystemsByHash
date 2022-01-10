@@ -30,7 +30,7 @@ import datetime
 import os.path
 import fs.db.dbdirtree_mod as dbt
 import fs.dirfilefs.dir_n_file_fs_mod as dirfil
-# import fs.strfs.strfunctions_mod as strf
+# import fs.strnlistfs.strfunctions_mod as strf
 import default_settings as defaults
 # import models.entries.dirnode_mod as dn
 SQL_SELECT_LIMIT_DEFAULT = 50

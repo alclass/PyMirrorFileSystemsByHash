@@ -9,7 +9,7 @@ import models.entries.dirnode_mod as dn
 import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentry_del
 import fs.hashfunctions.hash_mod as hm
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
-import fs.strfs.strfunctions_mod as strf
+import fs.strnlistfs.strfunctions_mod as strf
 import default_settings as defaults
 
 

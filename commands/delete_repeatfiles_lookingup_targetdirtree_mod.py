@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-force_delete_repeatfiles_lookingup_targetdirtree_mod.py
+delete_repeatfiles_lookingup_targetdirtree_mod.py
 
 This script does the following:
   1) it considers one only dirtree (not two as ori [origin] and bak [back-up], the whole dirtree is ori);
@@ -34,7 +34,7 @@ import sys
 import fs.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
-import fs.strfs.strfunctions_mod as strf
+import fs.strnlistfs.strfunctions_mod as strf
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
 
 
@@ -138,7 +138,8 @@ class ForceDeleterLookingDirUp:
   def gather_trg_ids_to_delete_upon_confirm(self):
     trg_charsize = 1 + len(self.trg_branchdir_parentpath)
     sql = 'SELECT * FROM %(tablename)s WHERE substr(parentpath, 0, ' + str(trg_charsize) + ')=? and sha1=?;'
-    for sha1 in self.src_sha1s:
+    for i, sha1 in enumerate(self.src_sha1s):
+      print(i+1, 'processing', sha1.hex())
       tuplevalues = (self.trg_branchdir_parentpath, sha1)
       fetched_list = self.ori_dbtree.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
       for row in fetched_list:
@@ -156,6 +157,9 @@ class ForceDeleterLookingDirUp:
 
   def confirm_deletion(self):
     print('Confirm deletion: ids:')
+    if len(self.trg_ids_to_delete_upon_confirm) == 0:
+      print(' >>>>>>>>>>>> No ids to delete.')
+      return False
     total_trg_files_to_delete = len(self.trg_ids_to_delete_upon_confirm)
     for i, _id in enumerate(self.trg_ids_to_delete_upon_confirm):
       self.n_processed_deletes += 1
@@ -169,7 +173,8 @@ class ForceDeleterLookingDirUp:
         '[', dirnode.name, '] @ [',
         strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50), ']'
       )
-    screen_msg = 'Do you want to delete the %d target files above? (*Y/n) [ENTER means yes] '
+    screen_msg = 'Do you want to delete the %d target files above? (*Y/n) [ENTER means yes] ' \
+                 % total_trg_files_to_delete
     ans = input(screen_msg)
     if ans in ['Y', 'y', '']:
       return True
