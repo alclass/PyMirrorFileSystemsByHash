@@ -126,7 +126,11 @@ class TrgBasedByrcSha1sMolder:
         return False
     basepath, _ = os.path.split(trg_filepath)
     if not os.path.isdir(basepath):
-      os.makedirs(basepath)
+      try:
+        os.makedirs(basepath)
+      except (OSError, IOError):
+        self.n_failed_copies += 1
+        return False
     self.n_copied_files += 1
     print(
       'Copying', self.n_copied_files, 'of', self.total_srcfiles_in_os,
@@ -219,7 +223,7 @@ class TrgBasedByrcSha1sMolder:
     print('total_unique_trgfiles:', self.total_unique_trgfiles)
 
   def report(self):
-    print('=_+_+_='*3, 'TrgBasedOnSrcMolder Report', '=_+_+_='*3)
+    print('=_+_+_='*3, 'TrgBasedByrcSha1sMolder Report', '=_+_+_='*3)
     self.print_counters()
     print('n_src_processed_files:', self.n_src_processed_files)
     print('n_moved_files:', self.n_moved_files)
