@@ -42,6 +42,7 @@ EXTENSIONS_IN_SHA1_VERIFICATION = [
 ]
 RESTRICTED_DIRNAMES_FOR_WALK = ['.', 'z-del', 'z-tri', 'z-ext']  # z-tri covers z-Triage, z-ext covers z-Extra
 FORBIBBEN_FIRST_LEVEL_DIRS = ['System Volume Information']
+LIMIT_NUMBER_IN_WHILE_LOOP = 5000
 
 
 class Paths:

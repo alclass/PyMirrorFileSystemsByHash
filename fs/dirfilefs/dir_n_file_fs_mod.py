@@ -2,6 +2,7 @@
 """
 dir_n_file_fs_mod.py
 """
+import copy
 import os
 import default_settings as defaults
 import itertools
@@ -193,6 +194,70 @@ def filter_in_files_with_exts(files, extensionlist):
   return filtered_files
 
 
+def form_abspath_with_mount_middle_n_name(mount, middle, name):
+  if mount is None or name is None:
+    return None
+  try:
+    mount = name.lstrip('/')
+    mount = '/' + mount
+    name = name.lstrip('/')
+    if middle is None:
+      return os.path.join(mount, name)
+    middle = middle.lstrip('/')
+    folderpath = os.path.join(mount, middle)
+    return os.path.join(folderpath, name)
+  except (AttributeError, TypeError):
+    pass
+  return None
+
+
+def liberate_filename_by_renaming_with_incremental_int_sufixes(filepath):
+  """
+  This function renames a file in a folder to liberate its filename.
+  The former file is renamed with an incremental integer sufix.
+  If many tries cannot liberate it (cf. LIMIT_NUMBER_IN_WHILE_LOOP), (False, None) is returned.
+  If a rename succeeds, it returns (True, newfilename)
+  """
+  if filepath is None:
+    return True, None
+  p, old_filename = os.path.split(filepath)
+  if not os.path.isfile(filepath):
+    return True, old_filename
+  if not os.path.isdir(p):
+    return True, None
+  int_sufix = 0
+  while 1:
+    oldname, ext = os.path.splitext(old_filename)
+    int_sufix += 1
+    newname = oldname + ' ' + str(int_sufix)
+    newfilename = newname + ext
+    new_trg_filepath = os.path.join(p, newfilename)
+    if not os.path.isfile(new_trg_filepath):
+      os.rename(filepath, new_trg_filepath)
+      return True, newfilename
+    old_filename = newfilename
+    if int_sufix > defaults.LIMIT_NUMBER_IN_WHILE_LOOP:
+      break
+  return False, None
+
+
+def db_update_dirnode_with_newname_n_dbtree(dirnode, newname, dbtree):
+  projected_dirnode = copy.copy(dirnode)
+  oldfilepath = dirnode.get_abspath_with_mountpath(dbtree.mountpath)
+  projected_dirnode.name = newname
+  newfilepath = projected_dirnode.get_abspath_with_mountpath(dbtree.mountpath)
+  try:
+    os.rename(oldfilepath, newfilepath)
+    # change it also in db
+    sql = 'update %(tablename) set name=? where id=?;'
+    tuplevalues = (newname, dirnode.get_db_id())
+    dirnode.name = newname
+    return dbtree.do_update_with_sql_n_tuplevalues(sql, tuplevalues)
+  except (AttributeError, IOError, OSError):
+    pass
+  return False
+
+
 def adhoc_test():
   starting_strs_list = ['z-del', 'z-tri']
   names = ['bla', 'z-Del', 'z-Triage', 'z-tri legal', "what's up", 'z Triage', 'tri legal']
@@ -219,8 +284,17 @@ def adhoc_test3():
   print(filtered_files)
 
 
+def adhoc_test4():
+  """
+  test liberate_filename_by_renaming_with_incremental_int_sufixes()
+  """
+  filepath = '/home/dados/Sw3/SwDv/OSFileSystemSwDv/PyMirrorFileSystemsByHashSwDv/dados/trg/d1/d1f2.txt'
+  ret_tupl = liberate_filename_by_renaming_with_incremental_int_sufixes(filepath)
+  print(ret_tupl)
+
+
 def process():
-  adhoc_test3()
+  adhoc_test4()
 
 
 if __name__ == '__main__':
