@@ -11,6 +11,8 @@ import itertools
 def prune_dirtree_deleting_empty_folders(current_dirpath, n_visited=0, n_removed=0, n_failed=0):
   """
   This function deletes empty folders, starting from a dirpath and recursively visiting its subdirectory
+  IMPORTANT for unit test:
+    this folder, as most in this module, is os-dependant, care is to be taken
   """
   entries = os.listdir(current_dirpath)
   for e in entries:
@@ -211,12 +213,61 @@ def form_abspath_with_mount_middle_n_name(mount, middle, name):
   return None
 
 
+def get_names_end_int_sufix_or_0(name):
+  """
+  The approach here is to reverse traverse the name in order to find a number
+  """
+  if name is None:
+    return 0
+  try:
+    lastchar = name[-1]
+    _ = int(lastchar)
+    reversed_name = name[::-1]
+  except (TypeError, ValueError):
+    return 0
+  char_number = ''
+  for char in reversed_name:
+    try:
+      _ = int(char)
+      char_number = char + char_number
+    except ValueError:
+      break
+  if len(char_number) > 0:
+    return int(char_number)
+  return 0
+
+
+def get_newfilename_based_on_filenames_end_int_sufix_or_none(filename):
+  try:
+    name, ext = os.path.splitext(filename)
+    sufix = get_names_end_int_sufix_or_0(name)
+    if sufix == 0:
+      new_filename = name + ' 1' + ext
+      return new_filename
+    str_sufix = str(sufix)
+    new_sufix = sufix + 1
+    size_sufix = len(str_sufix)
+    str_newsufix = str(new_sufix)
+    newname = name[:-size_sufix] + str_newsufix
+    new_filename = newname + ext
+    return new_filename
+  except (TypeError, ValueError):
+    # TypeError: expected str, bytes or os.PathLike object, not int
+    pass
+  return None
+
+
 def liberate_filename_by_renaming_with_incremental_int_sufixes(filepath):
   """
   This function renames a file in a folder to liberate its filename.
   The former file is renamed with an incremental integer sufix.
   If many tries cannot liberate it (cf. LIMIT_NUMBER_IN_WHILE_LOOP), (False, None) is returned.
   If a rename succeeds, it returns (True, newfilename)
+  The logics for the new filename is delegated to function:
+    get_newfilename_based_on_filenames_end_int_sufix_or_none()
+
+  IMPORTANT for unit test: this folder is os-dependant, care is to be taken
+  TO-DO: a mock version may be develop for unit test purposes.
   """
   if filepath is None:
     return True, None
@@ -225,18 +276,20 @@ def liberate_filename_by_renaming_with_incremental_int_sufixes(filepath):
     return True, old_filename
   if not os.path.isdir(p):
     return True, None
-  int_sufix = 0
+  local_loop_counter = 0
   while 1:
-    oldname, ext = os.path.splitext(old_filename)
-    int_sufix += 1
-    newname = oldname + ' ' + str(int_sufix)
-    newfilename = newname + ext
-    new_trg_filepath = os.path.join(p, newfilename)
+    new_filename = get_newfilename_based_on_filenames_end_int_sufix_or_none(old_filename)
+    if new_filename is None:
+      return False, None
+    new_trg_filepath = os.path.join(p, new_filename)
     if not os.path.isfile(new_trg_filepath):
       os.rename(filepath, new_trg_filepath)
-      return True, newfilename
-    old_filename = newfilename
-    if int_sufix > defaults.LIMIT_NUMBER_IN_WHILE_LOOP:
+      return True, new_filename
+    old_filename = new_filename
+    if len(old_filename) > 240:  # for Linux system, it's a resonable size, for Windows, this may be a problem...
+      break
+    local_loop_counter += 1
+    if local_loop_counter > defaults.LIMIT_NUMBER_IN_WHILE_LOOP:
       break
   return False, None
 
@@ -288,9 +341,14 @@ def adhoc_test4():
   """
   test liberate_filename_by_renaming_with_incremental_int_sufixes()
   """
-  filepath = '/home/dados/Sw3/SwDv/OSFileSystemSwDv/PyMirrorFileSystemsByHashSwDv/dados/trg/d1/d1f2.txt'
+  filepath = '/home/dados/Sw3/SwDv/OSFileSystemSwDv/PyMirrorFileSystemsByHashSwDv/dados/trg/d1/d1f2 1002.txt'
   ret_tupl = liberate_filename_by_renaming_with_incremental_int_sufixes(filepath)
   print(ret_tupl)
+  print('-'*50)
+  fn = 'fasdafsd-1.bla'
+  number = get_newfilename_based_on_filenames_end_int_sufix_or_none(fn)
+  print('for', fn)
+  print('int sufix is [', number, ']')
 
 
 def process():

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-dbentry_updater_by_filemove_based_on_size_n_mdt_mod.py
+dbentry_updater_by_filemove_based_on_size_n_mdt_cm.py
 
 This script looks up all files thru a dirtree and checks if each has a corresponding dbentry.
 If a file doesn't have a corresponding dbentry, three conditions must be met for an updating against the dbentry, ie:

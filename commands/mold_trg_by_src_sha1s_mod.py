@@ -30,10 +30,13 @@ class TrgBasedByrcSha1sMolder:
     self.total_trgdirs_in_os = 0
     self.n_src_processed_files = 0
     self.n_copied_files = 0
+    self.n_failed_copies = 0
     self.n_moved_files = 0
+    self.n_names_not_liberated = 0
     self.n_move_not_needed = 0
     self.n_failed_moves = 0
-    self.n_failed_copies = 0
+    self.n_renames = 0
+    self.failed_renames = 0
     self.n_empty_dirs_removed = 0
     self.n_empty_dirs_fail_rm = 0
     self.calc_totals()
@@ -75,6 +78,31 @@ class TrgBasedByrcSha1sMolder:
         return trg_dirnode
     return None
 
+  def rename_file_as_parentpaths_are_same(self, old_trg_dirnode, new_trg_dirnode):
+    """
+    At this point, if another file with a different sha1 but same name were in folder,
+      that file would have been renamed by liberate_filename_by_renaming_with_incremental_int_sufixes()
+    Consider this method private, it should only be called by
+      move_file_within_trg_to_its_src_relative_position_if_vacant()
+    """
+    old_filepath = old_trg_dirnode.get_abspath_with_mountpath(self.bak_dt.mountpath)
+    new_filepath = new_trg_dirnode.get_abspath_with_mountpath(self.bak_dt.mountpath)
+    try:
+      os.rename(old_filepath, new_filepath)
+      self.n_renames += 1
+      print(
+        'Renamed', self.n_renames, 'of', self.total_srcfiles_in_os,
+        '@', strf.put_ellipsis_in_str_middle(new_trg_dirnode.parentpath, 50)
+      )
+      print('previous name [', old_trg_dirnode.name, ']')
+      print('current name [', new_trg_dirnode.name, ']')
+    except (IOError, OSError):
+      self.failed_renames += 1
+      return False
+    name = new_trg_dirnode.name
+    parentpath = new_trg_dirnode.parentpath
+    return old_trg_dirnode.update_db_name_n_parentpath(name, parentpath, self.bak_dt.dbtree)
+
   def move_file_within_trg_to_its_src_relative_position_if_vacant(self, src_dirnode, old_trg_dirnode):
     """
     if program flow gets up to here, srcfile exists.
@@ -88,9 +116,12 @@ class TrgBasedByrcSha1sMolder:
     new_filepath = new_trg_dirnode.get_abspath_with_mountpath(self.bak_dt.mountpath)
     is_liberated, _ = dirf.liberate_filename_by_renaming_with_incremental_int_sufixes(new_filepath)
     if not is_liberated:
+      self.n_names_not_liberated += 1
       return False
     # if whichname is not None:
     #   pass
+    if old_trg_dirnode.parentpath == new_trg_dirnode.parentpath:
+      return self.rename_file_as_parentpaths_are_same(old_trg_dirnode, new_trg_dirnode)
     basepath, _ = os.path.split(new_filepath)
     if not os.path.isdir(basepath):
       # create target base dir when it does not exist
@@ -227,9 +258,12 @@ class TrgBasedByrcSha1sMolder:
     self.print_counters()
     print('n_src_processed_files:', self.n_src_processed_files)
     print('n_moved_files:', self.n_moved_files)
-    print('n_move_not_needed:', self.n_move_not_needed)
-    print('n_copied_files:', self.n_copied_files)
     print('n_failed_moves:', self.n_failed_moves)
+    print('n_move_not_needed:', self.n_move_not_needed)
+    print('n_names_not_liberated:', self.n_names_not_liberated)
+    print('n_renames:', self.n_renames)
+    print('failed_renames:', self.failed_renames)
+    print('n_copied_files:', self.n_copied_files)
     print('n_failed_copies:', self.n_failed_copies)
     print('n_empty_dirs_removed:', self.n_empty_dirs_removed)
     print('n_empty_dirs_fail_rm:', self.n_empty_dirs_fail_rm)

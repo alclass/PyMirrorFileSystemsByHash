@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mirror2trees.py
+mirror2trees_cm.py
 
 This script does basically two things:
   1) it moves target-tree files to the relative position, in the target-tree itself, that exists in the source-tree;

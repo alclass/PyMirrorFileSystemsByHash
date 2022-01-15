@@ -1,13 +1,30 @@
 #!/usr/bin/env python3
 """
-extract_exts_to_another_dirtrees_mod.py
+copy_across_trees_cm.py
 
+This script does basically three things:
+  1) it moves target-tree files to the relative position, in the target-tree itself, that exists in the source-tree;
+  2) it copies to the target-tree missing files that exists in the source-tree;
+  3) it deletes under confirmation excess files in target, ie files that exist in target but do not in source;
+
+Notice that script [mold_trg_based_on_src_mod.py] also does the two first actions above as a sort of "mold" operation.
+
+Things this script doesn't do:
+  1) this script DOESN'T do removals in source
+     (note above that it removes excess files in target under user confirmation);
+  2) this script DOESN'T do the inverse of the three operations above;
+     the user can run it herself inversely swapping the order of the two parameters:
+     source_mountpath and target_mountpath.
+
+Other scripts in this system/app complete the mirroring effect, for example:
+  - cleaning up entries that end with whitespaces;
+  - treating duplicates in a directory tree (in fact this should be run before this mirror-back-up script);
+  - syncronize os-entries with db-entries
+    (TO-DO: a GUI window manager is planned for the future to integrate db-sync with os-operations).
 """
 import datetime
 import os.path
 import shutil
-import sys
-
 import models.entries.dirnode_mod as dn
 import fs.db.dbdirtree_mod as dbdt
 import fs.db.dbfailed_filecopy_mod as dbfailedcopy
@@ -17,14 +34,9 @@ import default_settings as defaults
 import commands.move_rename_target_based_on_source_mod as moverename
 
 
-class FilesByExtToAnotherDirTreeMover:
+class MirrorDirTree:
 
-  def __init__(self, ori_mountpath, bak_mountpath, extensionlist):
-    if extensionlist is None or len(extensionlist) == 0:
-      error_msg = 'Error: parameter extensionlist to FilesByExtToAnotherDirTreeMover()' \
-                  ' is empty. Please, enter an extension list.'
-      raise ValueError(error_msg)
-    self.extensionlist = extensionlist
+  def __init__(self, ori_mountpath, bak_mountpath):
     self.start_time = datetime.datetime.now()
     self.ori_dt = dbdt.DBDirTree(ori_mountpath)
     self.bak_dt = dbdt.DBDirTree(bak_mountpath)
@@ -208,67 +220,68 @@ class FilesByExtToAnotherDirTreeMover:
     tuplevalues = (newname, newparentpath, oldname, oldparentpath,  src_dirnode.sha1)
     return self.bak_dt.do_update_with_sql_n_tuplevalues(sql, tuplevalues)
 
-  def move_extfiles_to_target_if_needed(self, src_row):
+  def copy_source_files_to_target_if_needed(self, src_rowlist):
     """
     TO-DO: create a constant-list that contains the index-position of fields in a centralized way
       0 id | 1 hkey | 2 name | 3 parentpath | 4 is_present | 5 sha1 | 6 bytesize | 7 mdatetime
     """
-    self.n_files_processed += 1
-    src_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.fieldnames)
-    print(self.n_files_processed, 'verifying copy/move for', src_row)
-    # if src has repeats, it should not copy or move files, because repeats are ambiguity
-    # (in thesis, they must be solved before this point and none left here)
-    sql = 'SELECT count(id) FROM %(tablename)s WHERE sha1=?;'
-    tuplevalues = (src_dirnode.sha1, )
-    fetched_list = self.ori_dt.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
-    if fetched_list:
-      n_of_filerepeats = int(fetched_list[0][0])
-      self.total_filerepeats += n_of_filerepeats
-      if n_of_filerepeats > 1:
-        print(
-          self.n_files_processed, '/', self.total_srcfiles_in_db,
-          'Ambiguity: script cannot copy or move with repeats =', n_of_filerepeats,
-          ' for', src_dirnode.name, 'in dir:', src_dirnode.parentpath, 'Continuing.'
-        )
-        return
-    if src_dirnode.sha1 == hm.EMPTY_SHA1_AS_BIN:
-      self.n_file_not_backable += 1
-      print('Continuing for next. File not copiable (the zero sha1):', src_dirnode.name)
-      return
-    if src_dirnode.name.endswith('.part'):
-      self.n_file_not_backable += 1
-      print('Continuing for next. File not copiable (.part extension):', src_dirnode.name)
-      return
-    if strf.any_dir_in_path_startswith(src_dirnode.parentpath, 'mp3s '):
-      self.n_file_not_backable += 1
-      return
-    lowercharspath = src_dirnode.parentpath.lower()
-    if lowercharspath.find('z-del') > -1:
-      self.n_file_not_backable += 1
-      print('Continuing for next. [z-del] foldername detected:', src_dirnode.parentpath)
-      return
-    src_filepath = src_dirnode.get_abspath_with_mountpath(self.ori_dt.mount_abspath)
-    if not os.path.isfile(src_filepath):
-      print(self.n_files_processed, '/', self.total_srcfiles_in_db,
-            'Continuing for next. Source file does not exist (%s) ' % src_filepath)
-      return
-    trg_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.fieldnames)
-    trg_filepath = trg_dirnode.get_abspath_with_mountpath(self.bak_dt.mount_abspath)
-    if os.path.isfile(trg_filepath):
-      print(self.n_files_processed, '/', self.total_srcfiles_in_db,
-            'Continuing for next. Target file exists (%s) ' % src_filepath)
-      return
-    trg_rows = self.fetch_row_if_sha1_exists_in_target(src_dirnode.sha1)
-    if trg_rows is not None and len(trg_rows) > 0:
-      print('sha1 of target file exists. Check if a move is appropriate/possible.')
-      trg_row = trg_rows[0]
-      _ = self.sha1_exists_in_trg_try_move_within_target(src_dirnode, trg_row)
-      return
-    bool_copied = self.copy_filepath(src_filepath, trg_filepath)
-    if bool_copied:
-      return trg_dirnode.insert_into_db(self.bak_dt)
-    else:
-      self.report_failed_copy(src_dirnode)
+    for src_row in src_rowlist:
+      self.n_files_processed += 1
+      src_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.fieldnames)
+      print(self.n_files_processed, 'verifying copy/move for', src_row)
+      # if src has repeats, it should not copy or move files, because repeats are ambiguity
+      # (in thesis, they must be solved before this point and none left here)
+      sql = 'SELECT count(id) FROM %(tablename)s WHERE sha1=?;'
+      tuplevalues = (src_dirnode.sha1, )
+      fetched_list = self.ori_dt.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
+      if fetched_list:
+        n_of_filerepeats = int(fetched_list[0][0])
+        self.total_filerepeats += n_of_filerepeats
+        if n_of_filerepeats > 1:
+          print(
+            self.n_files_processed, '/', self.total_srcfiles_in_db,
+            'Ambiguity: script cannot copy or move with repeats =', n_of_filerepeats,
+            ' for', src_dirnode.name, 'in dir:', src_dirnode.parentpath, 'Continuing.'
+          )
+          continue
+      if src_dirnode.sha1 == hm.EMPTY_SHA1_AS_BIN:
+        self.n_file_not_backable += 1
+        print('Continuing for next. File not copiable (the zero sha1):', src_dirnode.name)
+        continue
+      if src_dirnode.name.endswith('.part'):
+        self.n_file_not_backable += 1
+        print('Continuing for next. File not copiable (.part extension):', src_dirnode.name)
+        continue
+      if strf.any_dir_in_path_startswith(src_dirnode.parentpath, 'mp3s '):
+        self.n_file_not_backable += 1
+        continue
+      lowercharspath = src_dirnode.parentpath.lower()
+      if lowercharspath.find('z-del') > -1:
+        self.n_file_not_backable += 1
+        print('Continuing for next. [z-del] foldername detected:', src_dirnode.parentpath)
+        continue
+      src_filepath = src_dirnode.get_abspath_with_mountpath(self.ori_dt.mount_abspath)
+      if not os.path.isfile(src_filepath):
+        print(self.n_files_processed, '/', self.total_srcfiles_in_db,
+              'Continuing for next. Source file does not exist (%s) ' % src_filepath)
+        continue
+      trg_dirnode = dn.DirNode.create_with_tuplerow(src_row, self.ori_dt.fieldnames)
+      trg_filepath = trg_dirnode.get_abspath_with_mountpath(self.bak_dt.mount_abspath)
+      if os.path.isfile(trg_filepath):
+        print(self.n_files_processed, '/', self.total_srcfiles_in_db,
+              'Continuing for next. Target file exists (%s) ' % src_filepath)
+        continue
+      trg_rows = self.fetch_row_if_sha1_exists_in_target(src_dirnode.sha1)
+      if trg_rows is not None and len(trg_rows) > 0:
+        print('sha1 of target file exists. Check if a move is appropriate/possible.')
+        trg_row = trg_rows[0]
+        _ = self.sha1_exists_in_trg_try_move_within_target(src_dirnode, trg_row)
+        continue
+      bool_copied = self.copy_filepath(src_filepath, trg_filepath)
+      if bool_copied:
+        return trg_dirnode.insert_into_db(self.bak_dt)
+      else:
+        self.report_failed_copy(src_dirnode)
 
   def report_failed_copy(self, src_dirnode):
     pdict = {
@@ -282,29 +295,9 @@ class FilesByExtToAnotherDirTreeMover:
     moverenamer = moverename.MoveRename(self.ori_dt.mountpath, self.bak_dt.mountpath)
     moverenamer.process()
 
-  def form_sql_whereclause_for_the_extensions_n_get_tuplevalues(self):
-    whereclause = 'where'
-    sqltrunk = ''
-    tuplelist = []
-    for ext in self.extensionlist:
-      ext = ext.lstrip('.')
-      if len(ext) == 0:  # if this happens, extension, if any, is all dots and this script will ignore them
-        continue
-      n_chars = - len(ext)
-      sqltrunk += ' substr(name, %d)=? or ' % n_chars
-      tuplelist.append(ext)
-    sqltrunk = sqltrunk.rstrip(' or ') + ';'
-    whereclause += sqltrunk
-    tuplevalues = tuple(tuplelist)
-    return whereclause, tuplevalues
-
-  def move_files_if_ext(self):
-    whereclause, tuplevalues = self.form_sql_whereclause_for_the_extensions_n_get_tuplevalues()
-    sql = 'select * from %(tablename)s ' + whereclause
-    fetched_list = self.ori_dt.do_select_with_sql_n_tuplevalues(sql, tuplevalues)
-    for row in fetched_list:
-      print(row)
-      self.move_extfiles_to_target_if_needed(row)
+  def mirror_by_copying_across_dirtrees(self):
+    for i, src_rowlist in enumerate(self.ori_dt.do_select_all_w_limit_n_offset()):
+      self.copy_source_files_to_target_if_needed(src_rowlist)
 
   def erase_excess_of_src_in_trg(self):
     delete_list = []
@@ -349,14 +342,14 @@ class FilesByExtToAnotherDirTreeMover:
 
   def process(self):
     # print('1 whitespace (more important are the trailing spaces) in names verifier')
-    # self.fetch_total_files_in_src_n_trg()
-    # self.fetch_total_unique_files_in_src_n_trg()
-    # print('-'*70)
-    self.move_files_if_ext()
-    # print('After mirroring source to target, erase excess in target')
-    # print('-'*70)
-    # self.erase_excess_of_src_in_trg()
-    # self.report()
+    self.fetch_total_files_in_src_n_trg()
+    self.fetch_total_unique_files_in_src_n_trg()
+    print('-'*70)
+    self.mirror_by_copying_across_dirtrees()
+    print('After mirroring source to target, erase excess in target')
+    print('-'*70)
+    self.erase_excess_of_src_in_trg()
+    self.report()
 
   def report(self):
     print('=_+_+_='*3, 'CopyAcross Report', '=_+_+_='*3)
@@ -384,24 +377,12 @@ class FilesByExtToAnotherDirTreeMover:
     print('=_+_+_='*3, 'End of the CopyAcross Report', '=_+_+_='*3)
 
 
-def get_extensionlist_arg():
-  for arg in sys.argv:
-    if arg.startswith('-e='):
-      exts = arg[len('-e='):]
-      if arg.find(','):
-        return exts.split(',')
-      else:
-        return [exts]
-  return None
-
-
 def process():
   """
   """
   src_mountpath, trg_mountpath = defaults.get_src_n_trg_mountpath_args_or_default()
-  exts = get_extensionlist_arg()
-  extmover = FilesByExtToAnotherDirTreeMover(src_mountpath, trg_mountpath, extensionlist=exts)
-  extmover.process()
+  mirror = MirrorDirTree(src_mountpath, trg_mountpath)
+  mirror.process()
 
 
 if __name__ == '__main__':

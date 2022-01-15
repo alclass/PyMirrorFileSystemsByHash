@@ -5,7 +5,7 @@ clean_restricted_path_rows_in_db_mod.py
 This script removes from db the rows that have restricted paths.
 These rows are probably derived from the action of moving files (*) into the restricted directores [eg z-del z-tri etc]
 
-(*) script dbentry_updater_by_filemove_based_on_size_n_mdt_mod.py does that (at the moment).
+(*) script dbentry_updater_by_filemove_based_on_size_n_mdt_cm.py does that (at the moment).
 """
 import fs.db.dbdirtree_mod as dbdt
 import default_settings as defaults

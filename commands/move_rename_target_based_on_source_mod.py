@@ -7,7 +7,7 @@ import shutil
 import fs.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
-import commands.dbentry_deleter_those_without_corresponding_osentry_mod as dbentr_del
+import commands.dbentry_deleter_those_without_corresponding_osentry_cm as dbentr_del
 
 
 class MoveRename:

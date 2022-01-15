@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mp3_elsewhere_mover_mod.py
+mp3_elsewhere_mover_cm.py
 This script moves mp3 files from a source dirtree to a target dirtree and then removes them from source.
 
 This script's main application happens when mp3's are derived (extracted) from videos and kept in the same disk.

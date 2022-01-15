@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-dbentry_deleter_those_without_corresponding_osentry_mod.py
+dbentry_deleter_those_without_corresponding_osentry_cm.py
 This script should be used after dbentry_updater_by_filemove_based_on_size_n_mdt_mod,
   ie, before deleting a dbentry, an attempt should be made to check whether an osentry was moved.
 

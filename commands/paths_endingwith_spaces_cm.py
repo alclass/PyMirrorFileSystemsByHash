@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-paths_endingwith_spaces_mod.py
+paths_endingwith_spaces_cm.py
 """
 import os
 import sys

@@ -2,14 +2,14 @@
 """
 mold_trg_based_on_src_mod.py
 
-This script (a little bit similar to mirror2trees.py) does two things:
+This script (a little bit similar to mirror2trees_cm.py) does two things:
   1) it moves target-tree files to the relative position, in the target-tree itself, that exists in the source-tree;
   2) it copies missing files in the target-tree that exists in the source-tree;
 
-One thing mirror2trees.py does in addition is the excess target files deletion under user confirmation.
+One thing mirror2trees_cm.py does in addition is the excess target files deletion under user confirmation.
 
 TO-DO:
-  integrate the two scripts (mirror2trees.py and this one [mold_trg_based_on_src_mod.py] to simplify this system.
+  integrate the two scripts (mirror2trees_cm.py and this one [mold_trg_based_on_src_mod.py] to simplify this system.
 """
 import copy
 import os.path

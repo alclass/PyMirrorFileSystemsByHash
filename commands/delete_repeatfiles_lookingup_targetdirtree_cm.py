@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-delete_repeatfiles_lookingup_targetdirtree_mod.py
+delete_repeatfiles_lookingup_targetdirtree_cm.py
 
 This script does the following:
   1) it considers one only dirtree (not two as ori [origin] and bak [back-up], the whole dirtree is ori);

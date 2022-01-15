@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-dbentry_deleter_those_without_corresponding_osentry_mod.py
+dbentry_deleter_those_without_corresponding_osentry_cm.py
 This script should be used after dbentry_updater_by_filemove_based_on_size_n_mdt_mod,
   ie, before deleting a dbentry, an attempt should be made to check whether an osentry was moved.
 
@@ -49,6 +49,7 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
     self.total_files_os = 0
     self.total_dirs_os = 0
     self.total_files_in_db = 0
+    self.total_sha1s_in_db = 0
     self.n_updates = 0
     self.mountpath = mountpath
     self.dbtree = dbt.DBDirTree(self.mountpath)
@@ -86,6 +87,12 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
       sql = 'SELECT * FROM %(tablename)s' + limit_clause
       rows = self.dbtree.do_select_with_sql_without_tuplevalues(sql)
       for i, row in enumerate(rows):
+        if self.n_processed_in_db > self.total_files_in_db:
+          error_msg = \
+            'self.n_processed_in_db (%d) > self.total_files_in_db (%d) ' \
+            'dbentry_deleter_those->in fetch_dbentries_n_check_their_osentries()' \
+            % (self.n_processed_in_db, self.total_files_in_db)
+          raise ValueError(error_msg)
         print(
           i + 1, '/', self.n_processed_in_db, '/', self.total_files_in_db
         )

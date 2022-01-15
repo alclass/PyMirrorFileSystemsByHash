@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-find_files_endingwithspaces_n_ren.py
+find_files_endingwithspaces_n_ren_cm.py
 This script aims to finding files that have names ending with whitespace (basically the 4 characters ' \t\r\n')
 If so, it will rename them in folder and update corresponding entries in db.
 """

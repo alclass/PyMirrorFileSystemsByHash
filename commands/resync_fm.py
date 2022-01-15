@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-resync_mod.py
+resync_fm.py
 This script runs:
  1) thw walkup_dirtree_to_verify_possible_moveupdates (to resync os-entries with db-entries) and
  2) delete_rows_not_existing_on_dirtree() which deletes db-entries with no corresponding os-entries
 """
 import fs.db.dbdirtree_mod as dbdt
 import default_settings as ds
-from commands.walkup_dirtree_files_mod import FilesUpDirTreeWalker
+from commands.walkup_dirtree_files_cm import FilesUpDirTreeWalker
 
 
 def resync_tree(mountpath):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-delete_repeats_intradir_dir_by_dir_mod.py
+delete_repeats_intradir_dir_by_dir_cm.py
 
 This script does the following:
   1) it loops with os.walk() all directories;
