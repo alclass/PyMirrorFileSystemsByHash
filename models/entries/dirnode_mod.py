@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import os
 import fs.hashfunctions.hash_mod as hm
+import fs.dirfilefs.dir_n_file_fs_mod as dirf
 LF = '\n'
 PREFIX_FOR_FILES_LINEPATH = 'F '
 
@@ -256,6 +257,19 @@ class DirNode:
   def update_db_with_fetched_row(self, fetched_row, dbtree):
     dirnodedict = self.fieldvalue_dict
     return dbtree.do_update_with_dict_n_fetchedrow(dirnodedict, fetched_row)
+
+  def delete_from_db_w_name_n_parentpath(self, dbtree):
+    sql = 'DELETE FROM %(tablename)s WHERE name=? AND parentpath=?;'
+    tuplevalues = (self.name, self.parentpath)
+    return dbtree.delete_with_sql_n_tuplevalues(sql, tuplevalues)
+
+  def delete_from_db_with_id(self, dbtree):
+    return dbtree.delete_by_id(self.get_db_id())
+
+  def delete_from_db(self, dbtree):
+    if self.get_db_id() is not None:
+      return dbtree.delete_row_by_id(self.get_db_id())
+    return self.delete_from_db_w_name_n_parentpath(dbtree)
 
   def insert_into_db(self, dbtree):
     dirnodedict = self.fieldvalue_dict
@@ -570,14 +584,17 @@ class DirNode:
     name = self.name
     if name is None:
       name = '//root//'
+    pretty_dt = datetime.datetime.fromtimestamp(float(self.mdatetime))
+    pretty_bytesize = dirf.put_sufix_to_bytesize(self.bytesize)
     pdict = {
       'name': name, 'parentpath': self.parentpath, 'sha1hex': self.sha1hex,
-      'bytesize': self.bytesize, 'mdatetime': self.mdatetime}
+      'bytesize': self.bytesize, 'mdatetime': self.mdatetime,
+      'pretty_dt': pretty_dt, 'pretty_bytesize': pretty_bytesize}
     outstr = '''DirNode name = {name} 
     parentpath = {parentpath}
     sha1hex = {sha1hex}
-    bytesize = {bytesize}
-    mdatetime = {mdatetime}
+    bytesize = {bytesize} {pretty_bytesize}
+    mdatetime = {mdatetime} {pretty_dt}
     '''.format(**pdict)
     return outstr
 

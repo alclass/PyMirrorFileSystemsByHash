@@ -125,6 +125,8 @@ class DBBase:
     return n_rows_deleted
 
   def delete_row_by_id(self, _id):
+    if id is None or type(_id) != type(3):
+      return 0
     sql = 'DELETE FROM %(tablename)s WHERE id=?;' % {'tablename': self.tablename}
     tuplevalues = (_id, )
     conn = self.get_connection()

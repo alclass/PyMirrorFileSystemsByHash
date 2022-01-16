@@ -295,7 +295,7 @@ class DoubleDirectionCopier:
 
   def do_copy_over(self, srcpath, src_dirnode, trgpath, trg_dirtree):
     """
-    This method should only be called from copy_over() for its preparation happens there
+    This method should only be called from delete_file() for its preparation happens there
     """
     folderpath, _ = os.path.split(trgpath)
     if not os.path.isdir(folderpath):

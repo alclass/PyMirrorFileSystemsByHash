@@ -84,6 +84,24 @@ def count_total_files_n_folders(mountpath):
   return src_total_files, src_total_dirs
 
 
+def put_sufix_to_bytesize(p_bytesize):
+  try:
+    if p_bytesize < 1024:
+      return str(p_bytesize) + 'b'
+    elif p_bytesize < (1024**2):
+      bytesize = round(p_bytesize/1024, 2)
+      return str(bytesize) + 'K'
+    elif p_bytesize < (1024**3):
+      bytesize = round(p_bytesize/(1024**2), 2)
+      return str(bytesize) + 'M'
+    elif p_bytesize < (1024**4):
+      bytesize = round(p_bytesize/(1024**3), 2)
+      return str(bytesize) + 'G'
+  except TypeError:
+    pass
+  return 'unknown-size'
+
+
 def rename_filename_if_its_already_taken_in_folder(filepath):
   """
   This function returns a filepath if it doesn't exist in its folder.
