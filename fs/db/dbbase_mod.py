@@ -113,6 +113,23 @@ class DBBase:
     conn.close()
     return n_rows_deleted
 
+  def delete_ids(self, delete_ids):
+    if delete_ids is None or len(delete_ids) == 0:
+      return 0
+    total_rows_deleted = 0
+    sql = 'delete from %(tablename)s where id=?;' % {'tablename': self.tablename}
+    conn = self.get_connection()
+    cursor = conn.cursor()
+    for _id in delete_ids:
+      tuplevalues = (_id,)
+      delete_result = cursor.execute(sql, tuplevalues)
+      n_rows_deleted = delete_result.rowcount  # debug at this point, another option conn.total_changes
+      total_rows_deleted += n_rows_deleted
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return total_rows_deleted
+
   def delete_with_sql_n_tuplevalues(self, sql, tuplevalues):
     sql = sql % {'tablename': self.tablename}
     conn = self.get_connection()
@@ -125,7 +142,7 @@ class DBBase:
     return n_rows_deleted
 
   def delete_row_by_id(self, _id):
-    if id is None or type(_id) != type(3):
+    if id is None or not isinstance(_id, type(3)):
       return 0
     sql = 'DELETE FROM %(tablename)s WHERE id=?;' % {'tablename': self.tablename}
     tuplevalues = (_id, )

@@ -45,7 +45,10 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
 
   def __init__(self, mountpath):
     self.n_deleted_dbentries = 0
+    self.delete_ids = []
+    self.total_rows_deleted = 0
     self.n_processed_in_db = 0
+    self.n_while_rounds = 0
     self.total_files_os = 0
     self.total_dirs_os = 0
     self.total_files_in_db = 0
@@ -68,12 +71,13 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
     dirnode = dn.DirNode.create_with_tuplerow(row, self.dbtree.fieldnames)
     filepath = dirnode.get_abspath_with_mountpath(self.mountpath)
     if not os.path.isfile(filepath):
+      self.delete_ids.append(dirnode.get_db_id())
       _ = self.dbtree.delete_row_by_id(dirnode.get_db_id())  # del_result
       self.n_deleted_dbentries += 1
       self.n_deleted_in_loop += 1
       print(' *-=-' * 4, 'DELETE DBENTRY', ' *-=-' * 4)
       print(
-        self.n_deleted_dbentries, '/', self.n_processed_in_db, '/', self.total_files_in_db,
+        'tot del', self.n_deleted_dbentries, 'proc', self.n_processed_in_db, '/', self.total_files_in_db,
         'deleted dbentry for', dirnode.get_db_id(),
         dirnode.name, strf.put_ellipsis_in_str_middle(dirnode.parentpath, 50)
       )
@@ -82,25 +86,35 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
     offset = 0
     k_limit = 50
     while 1:  # see below the condition for interrupting this while-infinite-loop
+      self.n_while_rounds += 1
       limit_clause = ' LIMIT %(limit)d OFFSET %(offset)d ;' \
-        % {'limit': k_limit, 'offset': offset}
+          % {'limit': k_limit, 'offset': offset}
       sql = 'SELECT * FROM %(tablename)s' + limit_clause
       rows = self.dbtree.do_select_with_sql_without_tuplevalues(sql)
+      self.n_deleted_in_loop = 0
       for i, row in enumerate(rows):
-        if self.n_processed_in_db > self.total_files_in_db:
-          error_msg = \
-            'self.n_processed_in_db (%d) > self.total_files_in_db (%d) ' \
-            'dbentry_deleter_those->in fetch_dbentries_n_check_their_osentries()' \
-            % (self.n_processed_in_db, self.total_files_in_db)
-          raise ValueError(error_msg)
         print(
-          i + 1, '/', self.n_processed_in_db, '/', self.total_files_in_db
+          i + 1, 'whl rnd', self.n_while_rounds, 'proc', self.n_processed_in_db, '/', self.total_files_in_db
         )
         self.delete_dbentry_if_theres_no_equivalent_os_entry(row)
-      offset = offset + k_limit - self.n_deleted_in_loop
+      offset = offset + k_limit  # - self.n_deleted_in_loop
       if len(rows) < k_limit:  # this is the condition for interrupting the while-infinite-loop "WHILE 1" above
         print('Interrupting while-1 loop: len(rows)', len(rows), ' < k_limit', k_limit, 'offset', offset)
         break
+      if self.n_while_rounds > defaults.LIMIT_NUMBER_IN_WHILE_LOOP:
+        screen_msg = 'self.n_while_rounds (%d) > defaults.LIMIT_NUMBER_IN_WHILE_LOOP (%d)' \
+          % (self.n_while_rounds, defaults.LIMIT_NUMBER_IN_WHILE_LOOP)
+        print(screen_msg)
+        break
+
+  def execute_delete_ids(self):
+    self.total_rows_deleted = self.dbtree.delete_ids(self.delete_ids)
+
+  def process(self):
+    self.fetch_dbentries_n_check_their_osentries()
+    self.execute_delete_ids()
+    # self.delete_empty_dirs()
+    self.report()
 
   def report(self):
     print('='*40)
@@ -113,6 +127,7 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
     print('total_sha1s_in_db', self.total_sha1s_in_db)
     print('n_processed_in_db', self.n_processed_in_db)
     print('n_deleted_dbentries', self.n_deleted_dbentries)
+    print('total_rows_deleted', self.total_rows_deleted)
     print('End of Processing')
 
   def delete_empty_dirs(self):
@@ -120,11 +135,6 @@ class DBEntryWithoutCorrespondingOsEntryDeleter:
     ans = input(screen_msg)
     if ans in ['Y', 'y', '']:
       dirfil.prune_dirtree_deleting_empty_folders(self.mountpath)
-
-  def process(self):
-    self.fetch_dbentries_n_check_their_osentries()
-    # self.delete_empty_dirs()
-    self.report()
 
 
 class PresentInDBNotInDirTreeReporter:
