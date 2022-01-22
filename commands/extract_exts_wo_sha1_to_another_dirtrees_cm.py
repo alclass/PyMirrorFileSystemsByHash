@@ -282,7 +282,7 @@ class FilesByExtToAnotherDirTreeWoSha1Mover:
     for self.ongoing_folderpath, dirs, files in os.walk(self.ori_dt.mountpath):
       if self.ongoing_folderpath == self.ori_dt.mountpath:
         continue
-      if dirf.is_any_dirname_in_path_startingwith_any_in_list(self.ongoing_folderpath):
+      if dirf.is_any_name_in_path_startingwith_any_prefix_in_list(self.ongoing_folderpath):
         continue
       filtered_files = dirf.filter_in_files_with_exts(files, self.extensionlist)
       if len(filtered_files) == 0:

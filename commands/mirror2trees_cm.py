@@ -56,11 +56,11 @@ class MirrorDirTree:
     print('total_unique_srcfiles', self.total_unique_srcfiles)
     self.total_unique_trgfiles = self.bak_dt.count_unique_sha1s_as_int()
     print('total_unique_trgfiles', self.total_unique_trgfiles)
-    tot_files, tot_dirs = dirf.count_total_files_n_folders(self.ori_dt.mountpath)
+    tot_files, tot_dirs = dirf.count_total_files_n_folders_excl_root(self.ori_dt.mountpath)
     self.total_srcfiles_in_os, self.total_srcdirs_in_os = tot_files, tot_dirs
     print('total_srcfiles_in_os', self.total_srcfiles_in_os)
     print('total_srcdirs_in_os', self.total_srcdirs_in_os)
-    tot_files, tot_dirs = dirf.count_total_files_n_folders(self.bak_dt.mountpath)
+    tot_files, tot_dirs = dirf.count_total_files_n_folders_excl_root(self.bak_dt.mountpath)
     self.total_trgfiles_in_os, self.total_trgdirs_in_os = tot_files, tot_dirs
     print('total_trgfiles_in_os', self.total_trgfiles_in_os)
     print('total_trgdirs_in_os', self.total_trgdirs_in_os)

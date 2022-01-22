@@ -51,8 +51,8 @@ class TargetSameSha1ForceDeleter:
     self.src_total_files = 0
     self.src_total_dirs = 0
     print('Counting src_total_files and folders. Please wait.')
-    self.src_total_files, self.src_total_dirs = dirfil.count_total_files_n_folders(self.ori_dbtree.mountpath)
-    self.trg_total_files, self.trg_total_dirs = dirfil.count_total_files_n_folders(self.bak_dbtree.mountpath)
+    self.src_total_files, self.src_total_dirs = dirfil.count_total_files_n_folders_excl_root(self.ori_dbtree.mountpath)
+    self.trg_total_files, self.trg_total_dirs = dirfil.count_total_files_n_folders_excl_root(self.bak_dbtree.mountpath)
 
   def calc_totals(self):
     self.count_files_in_db()

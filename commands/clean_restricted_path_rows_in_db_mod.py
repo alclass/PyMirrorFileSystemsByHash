@@ -61,7 +61,7 @@ class RowsWithRestrictedPathsCleaner:
   def verify_if_row_has_a_restricted_dir_prefix_n_append_if_so(self, row):
     idx = self.dbtree.fieldnames.index('parentpath')
     parentpath = row[idx]
-    if dirfil.does_a_dirname_in_path_begins_with_a_restricted_prefix(parentpath):
+    if dirfil.is_any_name_in_path_startingwith_any_prefix_in_list(parentpath):
       _id = row[0]
       self.rows_with_restricted_paths_ids.append(_id)
 

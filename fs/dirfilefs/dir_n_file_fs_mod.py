@@ -11,29 +11,29 @@ import itertools
 def prune_dirtree_deleting_empty_folders(current_dirpath, n_visited=0, n_removed=0, n_failed=0):
   """
   This function deletes empty folders, starting from a dirpath and recursively visiting its subdirectory
-  IMPORTANT for unit test:
-    this folder, as most in this module, is os-dependant, care is to be taken
+  IMPORTANT NOTICE for unit test:
+    this folder, as most in this module, is os-dependant, care is to be taken when running this with unit tests
+    TO-DO: introduce a mock-kind modality (how?)
   """
-  entries = os.listdir(current_dirpath)
-  for e in entries:
-    abspath = os.path.join(current_dirpath, e)
-    if os.path.isfile(abspath):
-      continue
-    if os.path.isdir(abspath):
+  try:
+    entries = os.listdir(current_dirpath)
+    for e in entries:
+      abspath = os.path.join(current_dirpath, e)
+      if not os.path.isdir(abspath):
+        continue
       n_visited += 1
       # recurse here to a subdirectory
       n_visited, n_removed, n_failed = prune_dirtree_deleting_empty_folders(abspath, n_visited, n_removed, n_failed)
-  entries = os.listdir(current_dirpath)
-  if len(entries) == 0:
-    # the directory/folder is empty, it can be removed
-    print('#'*50)
-    print('Total empty dirs removed', n_removed, 'removing:', current_dirpath)
-    print('#'*50)
-    try:
-      os.rmdir(current_dirpath)
-      n_removed += 1
-    except (IOError, OSError):
-      n_failed += 1
+      inner_entries = os.listdir(current_dirpath)
+      if len(inner_entries) == 0:
+        # the directory/folder is empty, it can be removed
+        print('#'*50)
+        print('Total empty dirs removed', n_removed, 'removing:', current_dirpath)
+        print('#'*50)
+        os.rmdir(current_dirpath)
+        n_removed += 1
+  except (IOError, OSError):
+    n_failed += 1
   return n_visited, n_removed, n_failed
 
 
@@ -55,7 +55,7 @@ def count_total_files_n_folders_with_restriction(
     if is_forbidden_dirpass(current_path, restricted_dirnames, forbidden_first_level_dirs):
       # do not count files or folder inside forbidden_first_level_dirs
       continue
-    if is_any_dirname_in_path_startingwith_any_in_list(current_path, restricted_dirnames):
+    if is_any_name_in_path_startingwith_any_prefix_in_list(current_path, restricted_dirnames):
       # do not count files or folder with paths having any restricted_dirnames (eg z-del or z-tri [for z-Triage])
       continue
     total_dirs += 1
@@ -72,7 +72,7 @@ def count_total_files_n_folders_inc_root(mountpath):
   return src_total_files, src_total_dirs
 
 
-def count_total_files_n_folders(mountpath):
+def count_total_files_n_folders_excl_root(mountpath):
   src_total_files = 0
   src_total_dirs = 0
   for current_path, folders, files in os.walk(mountpath):
@@ -85,6 +85,10 @@ def count_total_files_n_folders(mountpath):
 
 
 def put_sufix_to_bytesize(p_bytesize):
+  """
+  This function takes a number of bytes and returns it with a sufix (b, K, M or G),
+    these standing for bytes, Kilobytes, Megabytes and Gigabytes respectively.
+  """
   try:
     if p_bytesize < 1024:
       return str(p_bytesize) + 'b'
@@ -105,9 +109,20 @@ def put_sufix_to_bytesize(p_bytesize):
 def rename_filename_if_its_already_taken_in_folder(filepath):
   """
   This function returns a filepath if it doesn't exist in its folder.
-  If it exists, the function adds an integer to the end of its name and repeats checking if the file doesn't exist.
-  If it doesn't, the function returns filepath with its new name.
-  After 1000 tries, all names already existing in folder, it returns None.
+  If it exists, the function adds an integer to the end of the coinciding existing name
+    to liberate the original wanted filename itself in filepath.
+
+  Example: suppose filepath "/a/b/c/text.txt"
+
+  If it exists, to liberate filename, that one will renamed to "/a/b/c/text 1.txt"
+  If the sufixed one also exists, another rename-try will be to "/a/b/c/text 2.txt"
+  And so on.
+
+  Obs:
+    o1) if the rename with a sufix is not available, the operation recurses and checks again
+        (up to a limit, see example above "text 1", "text 2", "text n"...).
+    o2) after 1000 tries, all names already existing in folder, it returns None
+        (meaning it gave up and could not liberate filename).
 
   The function is useful for copying a file (that needs to be copied)
     when another file with the same name exists in the same folder.
@@ -130,6 +145,10 @@ def rename_filename_if_its_already_taken_in_folder(filepath):
 
 
 def is_lowerstr_startingwith_any_in_list(name, starting_strs_list):
+  """
+  This function is a helper to is_any_name_in_path_startingwith_any_prefix_in_list() below,
+    ie the restricted dirnames are looked up comparing their start-strings (example ["z-del", "z-extra", z-triage"]).
+  """
   if name is None:
     return False
   try:
@@ -145,32 +164,44 @@ def is_lowerstr_startingwith_any_in_list(name, starting_strs_list):
   return False
 
 
-def is_any_dirname_in_path_startingwith_any_in_list(fpath, starting_strs_list=None):
+def is_any_name_in_path_startingwith_any_prefix_in_list(fpath, starting_strs_list=None, use_lowercase=True):
+  """
+  This function compares if names in a path starts with some restricted prefix in a list.
+    Example: ["z-del", "z-extra", z-triage"]).
+  It uses helper-function is_lowerstr_startingwith_any_in_list(name, starting_strs_list) to check each name in path.
+  """
   if fpath is None:
     return False
   if starting_strs_list is None:
     starting_strs_list = defaults.RESTRICTED_DIRNAMES_FOR_WALK
   dirnames = fpath.split(os.path.sep)
   for dirname in dirnames:
-    if is_lowerstr_startingwith_any_in_list(dirname, starting_strs_list):
-      return True
+    if use_lowercase:
+      if is_lowerstr_startingwith_any_in_list(dirname, starting_strs_list):
+        return True
+    else:
+      for prefix in starting_strs_list:
+        if dirname.startswith(prefix):
+          return True
   return False
 
 
 def does_path_have_forbidden_dir(fpath, restricted_dirnames=None):
   """
-  This function is the same as is_any_dirname_in_path_startingwith_any_in_list() with an alternative name
+  This function is the same as is_any_name_in_path_startingwith_any_prefix_in_list() with an alternative name
   """
-  return is_any_dirname_in_path_startingwith_any_in_list(fpath, restricted_dirnames)
+  return is_any_name_in_path_startingwith_any_prefix_in_list(fpath, restricted_dirnames)
 
 
 def is_forbidden_dirpass(dirpath, restricted_dirnames=None, forbidden_first_level_dirs=None):
   """
+  This function returns True if a dirpath is "forbidden" (ie should not be processed) and False otherwise.
+
+  Note explanation for the split() method against paths and other miscellaneous with lstrip():
+  =====================================================
   if dirpath starts with /, the split() result will have an '' (empty string) as first element
   if dirpath does not start with /, the split() result will have the top level dirname as first element
   path.lstrip('/') will strip out any beginning slashes if any, assuring split()[0] gives the top level dirname in path
-  if first_level_dir.startswith('.'):
-    return True
   """
   if dirpath is None:
     return None
@@ -178,7 +209,7 @@ def is_forbidden_dirpass(dirpath, restricted_dirnames=None, forbidden_first_leve
     ongoingfolder_abspath = dirpath.lstrip('/')  # this assures topleveldir is the first element after split('/')
     if restricted_dirnames is None:
       restricted_dirnames = defaults.RESTRICTED_DIRNAMES_FOR_WALK
-    boolres = is_any_dirname_in_path_startingwith_any_in_list(ongoingfolder_abspath, restricted_dirnames)
+    boolres = is_any_name_in_path_startingwith_any_prefix_in_list(ongoingfolder_abspath, restricted_dirnames)
     if boolres:
       return True
     if forbidden_first_level_dirs is None:
@@ -190,20 +221,6 @@ def is_forbidden_dirpass(dirpath, restricted_dirnames=None, forbidden_first_leve
     pass
   except IndexError:
     pass
-  return False
-
-
-def does_a_dirname_in_path_begins_with_a_restricted_prefix(ppath, restricted_prefixes=None):
-  """
-
-  """
-  if restricted_prefixes is None:
-    restricted_prefixes = defaults.RESTRICTED_DIRNAMES_FOR_WALK
-  pp = ppath.split('/')
-  for name in pp:
-    for restricted_dir_prefix in restricted_prefixes:
-      if name.startswith(restricted_dir_prefix):
-        return True
   return False
 
 
@@ -342,7 +359,7 @@ def adhoc_test2():
   paths = ['/bla/blah/balalah', '/z-Del', '/z-t/z-Triage', 'z-tri/z-tri legal', "what's up",
            'z Triage/z-Triage', 'tri legal']
   for i, fpath in enumerate(paths):
-    boolres = is_any_dirname_in_path_startingwith_any_in_list(fpath, starting_strs_list)
+    boolres = is_any_name_in_path_startingwith_any_prefix_in_list(fpath, starting_strs_list)
     print(i+1, '[', fpath, '] starts with any', starting_strs_list, '=>', boolres)
 
 

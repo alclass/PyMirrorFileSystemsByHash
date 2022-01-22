@@ -49,10 +49,10 @@ class TrgBasedOnSrcMolder:
     self.total_unique_trgfiles = self.bak_dt.dbtree.count_unique_sha1s_as_int()
     self.total_srcfiles_in_db = self.ori_dt.dbtree.count_rows_as_int()
     self.total_trgfiles_in_db = self.bak_dt.dbtree.count_rows_as_int()
-    total_files, total_dirs = dirf.count_total_files_n_folders(self.ori_dt.mountpath)
+    total_files, total_dirs = dirf.count_total_files_n_folders_excl_root(self.ori_dt.mountpath)
     self.total_srcfiles_in_os = total_files
     self.total_srcdirs_in_os = total_dirs
-    total_files, total_dirs = dirf.count_total_files_n_folders(self.bak_dt.mountpath)
+    total_files, total_dirs = dirf.count_total_files_n_folders_excl_root(self.bak_dt.mountpath)
     self.total_trgfiles_in_os = total_files
     self.total_trgdirs_in_os = total_dirs
     self.print_counters()

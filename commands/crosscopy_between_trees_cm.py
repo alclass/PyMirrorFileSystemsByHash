@@ -358,7 +358,7 @@ class DoubleDirectionCopier:
         continue
       src_dirnode = dn.DirNode.create_with_tuplerow(src_row, src_dirtree.fieldnames)
       srcfilepath = src_dirnode.get_abspath_with_mountpath(self.ori_dt.mountpath)
-      if dirf.is_any_dirname_in_path_startingwith_any_in_list(srcfilepath):
+      if dirf.is_any_name_in_path_startingwith_any_prefix_in_list(srcfilepath):
         print(
           self.n_looped_rows, '/', self.total_srcfiles_in_db,
           'file in FORBIDDEN path', srcfilepath

@@ -100,7 +100,7 @@ class CleanDeleterThruSubtreeInSameDisk:
     self.total_files_os = 0
     self.total_dirs_os = 0
     print('Counting src_total_files and folders. Please wait.')
-    self.total_files_os, self.total_dirs_os = dirfil.count_total_files_n_folders(self.dbtree.mountpath)
+    self.total_files_os, self.total_dirs_os = dirfil.count_total_files_n_folders_excl_root(self.dbtree.mountpath)
     self.total_files_cleandeldirpath_os, self.total_dirs_cleandeldirpath_os = \
         dirfil.count_total_files_n_folders_inc_root(self.dirpath_to_cleandel)
 
