@@ -16,11 +16,16 @@ Obs:
   => this script DOES NOT DELETE repeats in the same folder as source's;
      example:
        if A.txt and B.txt are equals and exists in one source folder (or source minus target),
-       both will be kept. There is another script in this system for that.
+       both will be kept. There is another script in this system for that (*).
+
+       (*) delete_repeats_intradir_dir_by_dir_cm.py does that, ie it deletes repeats inside same folders,
+       the name choice for the one that will remain is based on "largest" filename.
+         Eg: if A.txt and AA.txt are equals and in the same folder,
+             AA.txt (largest filename) will remain and A.txt will be deleted.
 
 Notice the main class here needs 3 parameters (ori_mountpath, src_branchdir_abspath, trg_branchdir_abspath)
   to do its job. This is an important difference from the script:
-    => force_delete_every_equal_sha1_in_targetdirtree_mod
+    => clean_delete_sha1s_in_trg_that_exist_in_src_mod.py
   which only needs 2 parameters, ie src_dirtree (or src_mountpath) and trg_dirtree (or trg_mountpath)
 
 Also IMPORTANT:
@@ -257,9 +262,17 @@ def get_src_n_trg_full_inner_paths():
   return src_branchdir_abspath, trg_branchdir_abspath
 
 
+def show_help_cli_msg_if_asked():
+  for arg in sys.argv:
+    if arg in ['-h', '--help']:
+      print(__doc__)
+      sys.exit(0)
+
+
 def process():
   """
   """
+  show_help_cli_msg_if_asked()
   src_mountpath, _ = defaults.get_src_n_trg_mountpath_args_or_default()
   src_branchdir_abspath, trg_branchdir_abspath = get_src_n_trg_full_inner_paths()
   forcedeleter = ForceDeleterLookingDirUp(src_mountpath, src_branchdir_abspath, trg_branchdir_abspath)

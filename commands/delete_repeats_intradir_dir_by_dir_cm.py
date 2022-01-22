@@ -11,6 +11,7 @@ This script does the following:
   5) if confirmed, the script will delete the repeats.
 """
 import os
+import sys
 import fs.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
@@ -166,9 +167,17 @@ class IntraDirRepeatsDeleter:
     print('n_trg_os_phys_files_deleted', self.n_os_phys_files_deleted)
 
 
+def show_help_cli_msg_if_asked():
+  for arg in sys.argv:
+    if arg in ['-h', '--help']:
+      print(__doc__)
+      sys.exit(0)
+
+
 def process():
   """
   """
+  show_help_cli_msg_if_asked()
   src_mountpath, _ = defaults.get_src_n_trg_mountpath_args_or_default()
   forcedeleter = IntraDirRepeatsDeleter(src_mountpath)
   forcedeleter.process()

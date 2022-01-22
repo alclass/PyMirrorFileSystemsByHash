@@ -299,7 +299,15 @@ def get_dirpath_to_cleandel_arg():
   return dirpath_to_cleandel
 
 
+def show_help_cli_msg_if_asked():
+  for arg in sys.argv:
+    if arg in ['-h', '--help']:
+      print(__doc__)
+      sys.exit(0)
+
+
 def process():
+  show_help_cli_msg_if_asked()
   src_mountpath, _ = defaults.get_src_n_trg_mountpath_args_or_default()
   dirpath_to_cleandel = get_dirpath_to_cleandel_arg()
   cleandeleter = CleanDeleterThruSubtreeInSameDisk(src_mountpath, dirpath_to_cleandel)

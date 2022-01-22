@@ -1,33 +1,30 @@
 #!/usr/bin/env python3
 """
-dbentry_deleter_those_without_corresponding_osentry_cm.py
-This script should be used after dbentry_updater_by_filemove_based_on_size_n_mdt_mod,
-  ie, before deleting a dbentry, an attempt should be made to check whether an osentry was moved.
+dbentry_deleter_via_ppath_those_without_corresponding_cm
 
-This script reads all files in db and checks whether or not each one is in its folder.
+This script takes a different strategy to delete db-entries that do not have corresponding os-entries.
 
-A bit of history
-================
+First, let us comment how script:
+  dbentry_deleter_those_without_corresponding_osentry_cm.py
+treats the problem.  It visits each db-entry and checks, one by one, existence of its corresponding os-entry.
 
-When the strategy of this system discontinued the self-reference id field (which linked childnode to parentnode),
-it also discontinued the db-recording of foldernodes leaving only filenodes in db.
-  (That old strategy was done with the help of SqlAlchemy,
-    instead of direct sqlite which became the implemented approach nowadays. This was a simplying initiative.)
+This script doesn't do that, it uses a completely different strategy, it looks each parentpath,
+   if it doesn't exist, it chdirs down (it drills down to check if parent folders are also non-existence)
+     until a parent folder exists. (Notice this drilling-down must stop at least in the root folder.)
+   Once the most-based non-existent folder is determined, a SQL-DELETE will apply
+     to every record covered by the WHERE clause encompassing the folders.
 
-At that moment, field is_file, though introduced, was not really used. After a while, it was thought that
-is_file could be changed into is_present_on_folder for transient use, ie for use in a step-by-step process chain.
+  So instead of going one record by one record, it may take various at one shot.
 
-For example: suppose a back-up operation is started. An operation in this chain process
-  might check whether or not the on-going db-registered file is present on folder.
-   If it's not present, before concluding it's been erased/removed,
-     the system might try to find it elsewhere by size and mdatetime (name itself might have be changed).
-
-  It's expected that this might help resync files that were moved and if name, size and mdate are the same,
-    it's reasonable to expect this file was previously moved.
-  So this script does this checking recording True (1) of False (0) in the is_present field.
+This script is useful for deleting remainders when folders were moved or renamed (outside of this system)
+  and a resync still left "loose" records on db.
+Prefer this script for deleting db-entries to folders that were moved, renamed or deleted outside of this system.
+Prefer script dbentry_deleter_those_without_corresponding_osentry_cm.py otherwise (when changes are mix).
 """
 import datetime
 import os.path
+import sys
+
 import fs.db.dbdirtree_mod as dbt
 import fs.dirfilefs.dir_n_file_fs_mod as dirfil
 # import fs.strnlistfs.strfunctions_mod as strf
@@ -121,8 +118,16 @@ class DBEntryViaPPathWithoutCorrespondingOsDeleter:
     print('End of Processing')
 
 
+def show_help_cli_msg_if_asked():
+  for arg in sys.argv:
+    if arg in ['-h', '--help']:
+      print(__doc__)
+      sys.exit(0)
+
+
 def process():
   start_time = datetime.datetime.now()
+  show_help_cli_msg_if_asked()
   mountpath, _ = defaults.get_src_n_trg_mountpath_args_or_default()
   print('start_time', start_time)
   dbentry_eraser = DBEntryViaPPathWithoutCorrespondingOsDeleter(mountpath)

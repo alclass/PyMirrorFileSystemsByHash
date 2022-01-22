@@ -11,7 +11,7 @@ These files (in bak not in ori) are called here excess files and are listed for 
 IMPORTANT OBS: 
   the files to be deleted do not have a copy (or backup copy) elsewhere, so this script is useful 
   when a cleaning-up operation in source has already been taken and now the cleaning-up needs to be
-  completed in target. Take care with this caution.
+  completed in target. Caution: take care with this cleaning operation, it deletes files that do not have back-up!
 
 Usage:
 =====
@@ -23,7 +23,6 @@ $delete_excess_sha1_trgfiles_that_dont_exist_in_src_cm.py "/media/user/disk_scie
 """
 import os.path
 import sys
-
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
