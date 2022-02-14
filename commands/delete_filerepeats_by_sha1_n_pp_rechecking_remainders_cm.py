@@ -72,12 +72,16 @@ class ReportFileRepeat:
     return sum(total)
 
   def prepare_ids_to_del(self):
-    for sha1 in self.sha1_n_ids_dict:
+    total_sha1s = len(self.sha1_n_ids_dict)
+    acc_to_del = 0
+    for i, sha1 in enumerate(self.sha1_n_ids_dict):
       tuplelist_id_n_ppcharsize = []
       for _id in self.sha1_n_ids_dict[sha1]:
         self.n_processing_ids += 1
         dirnode = self.dbtree.fetch_dirnode_by_id(_id)
-        id_n_ppcharsize_tupl = (_id, len(dirnode.parentpath))
+        # fpath is os.path.join(parentpath, name)
+        # if the repeats are in the same folder, the one with largest name (filename) will be the one to remain
+        id_n_ppcharsize_tupl = (_id, len(dirnode.fpath))
         tuplelist_id_n_ppcharsize.append(id_n_ppcharsize_tupl)
       sorted(tuplelist_id_n_ppcharsize, key=lambda e: e[1])
       if len(tuplelist_id_n_ppcharsize) > 1:
@@ -86,6 +90,13 @@ class ReportFileRepeat:
         self.ids_to_del += inner_ids_to_del
         _id, _ = tuplelist_id_n_ppcharsize[-1]
         self.ids_to_save.append(_id)
+      n_loop = i + 1  # n_loop is also the number of "files to save" (or files to remain)
+      len_tuplelist = len(tuplelist_id_n_ppcharsize)
+      acc_to_del += len_tuplelist - 1
+      print(
+        'prep', n_loop, 'tot sha1s', total_sha1s,
+        'len ids_n_ppcharsizes', len_tuplelist, 'remains', n_loop, 'to confirm del', acc_to_del
+      )
 
   def show_ids_to_del(self):
     print('total sha1s with repeats', len(self.sha1_n_ids_dict))
