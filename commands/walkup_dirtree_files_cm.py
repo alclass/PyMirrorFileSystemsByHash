@@ -370,7 +370,7 @@ class FilesUpDirTreeWalker:
     print('n_found_files_name_n_parent_in_db', self.n_found_files_name_n_parent_in_db)
     print('n_found_files_size_n_date_in_db', self.n_found_files_size_n_date_in_db)
     print('n_updated_dbentries', self.n_updated_dbentries)
-    print('n_updated_dbentries', self.n_inserted)
+    print('n_inserted', self.n_inserted)
     print('n_restricted_dirs', self.n_restricted_dirs, ':: those in ', defaults.RESTRICTED_DIRNAMES_FOR_WALK)
     print('n_files_empty_sha1', self.n_files_empty_sha1)
     print('n_failed_filestat', self.n_failed_filestat)

@@ -24,14 +24,13 @@ def prune_dirtree_deleting_empty_folders(current_dirpath, n_visited=0, n_removed
       n_visited += 1
       # recurse here to a subdirectory
       n_visited, n_removed, n_failed = prune_dirtree_deleting_empty_folders(abspath, n_visited, n_removed, n_failed)
-      inner_entries = os.listdir(current_dirpath)
-      if len(inner_entries) == 0:
-        # the directory/folder is empty, it can be removed
-        print('#'*50)
-        print('Total empty dirs removed', n_removed, 'removing:', current_dirpath)
-        print('#'*50)
-        os.rmdir(current_dirpath)
-        n_removed += 1
+    inner_entries = os.listdir(current_dirpath)
+    # print('n entries', len(inner_entries), 'dir', current_dirpath)
+    if len(inner_entries) == 0:
+      # the directory/folder is empty, it can be removed
+      print(' ###### empty dirs removal count =', n_removed, 'removing:', current_dirpath)
+      os.rmdir(current_dirpath)
+      n_removed += 1
   except (IOError, OSError):
     n_failed += 1
   return n_visited, n_removed, n_failed
