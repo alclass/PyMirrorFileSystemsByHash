@@ -368,13 +368,15 @@ class DBBase:
     return self.do_update_with_sql_n_tuplevalues(sql_before_interpol, tuplevalues)
 
   def do_update_with_sql_n_tuplevalues(self, sql, tuplevalues):
+    was_updated = False
     conn = self.get_connection()
     cursor = conn.cursor()
     sql = sql % {'tablename': self.tablename}
     print('do_update =>', tuplevalues)
     try:
-      _ = cursor.execute(sql, tuplevalues)
-      was_updated = True
+      retval = cursor.execute(sql, tuplevalues)
+      if retval and retval.rowcount == 1:
+        was_updated = True
     except sqlite3.IntegrityError:
       was_updated = False
     cursor.close()

@@ -158,14 +158,21 @@ class FilesUpDirTreeWalker:
       return True
     return False
 
-  def update_db_entry_with_dirnode(self, dirnode):
+  def update_db_entry_with_dirnode(self, dirnode, p_bytesize, p_mdatetime):
+    mdatetime = dirnode.mdatetime
+    # prefer the OS value taken from os.stat().st_date if that is different from the previous recorded value
+    if mdatetime != p_mdatetime:
+      mdatetime = p_mdatetime
+    # bytesize is necessarily different, because it's False in the 'if' just before calling here
+    # otherwise the calling method would've returned without getting here
+    bytesize = p_bytesize
     return self.update_db_entry_with_updated_file(
         dirnode.get_db_id(),
         dirnode.name,
         dirnode.parentpath,
         dirnode.sha1,
-        dirnode.bytesize,
-        dirnode.mdatetime
+        bytesize,
+        mdatetime
     )
 
   def insert_db_entry_with_updated_file(self, name, parentpath, sha1, bytesize, mdatetime):
@@ -182,48 +189,6 @@ class FilesUpDirTreeWalker:
         dirnode.bytesize,
         dirnode.mdatetime
     )
-
-  def dbinsert_or_update_file_entry(self, name, parentpath, bytesize, mdatetime, filepath):
-    """
-    This method is not being called (TO-DO see if it can go elsewhere)
-    """
-    sha1 = hm.calc_sha1_from_file(filepath)
-    if sha1 == hm.EMPTY_SHA1_AS_BIN:
-      self.n_files_empty_sha1 += 1
-      print(
-        self.n_files_empty_sha1, 'of', self.total_files_in_os,
-        'DirNodoe has the empty (zero) sha1. Continuing', name, parentpath
-      )
-      return
-    dirnode = dn.DirNode(name, parentpath, sha1, bytesize, mdatetime)
-    if sha1 is None:
-      self.n_failed_sha1s += 1
-      print(
-        self.n_failed_sha1s, 'of', self.total_files_in_os, name,
-        ' >>>>>>>>>>>>>>>> failed sha1 calc (file probably unreadable). Continuing.'
-      )
-      self.report_unreadable_file(dirnode)
-      return
-    _id = self.get_id_or_none_from_name_n_parentpath(name, parentpath)
-    if _id is None:
-      # boolres = self.insert_db_entry_with_updated_file(name, parentpath, sha1, bytesize, mdatetime)
-      insert_update_result = self.dirtree.dbinsert_dirnode(dirnode)
-      if insert_update_result:
-        self.n_dbentries_ins_upd += 1
-        print(
-          'n_dbentries_ins_upd', self.n_dbentries_ins_upd, 'of', self.total_files_in_os,
-          'INSERTED dirnode', dirnode
-        )
-      return
-    else:
-      boolres = self.update_db_entry_with_updated_file(_id, name, parentpath, sha1, bytesize, mdatetime)
-      if boolres:
-        self.n_dbentries_ins_upd += 1
-        print(
-          'n_dbentries_ins_upd', self.n_dbentries_ins_upd, 'of', self.total_files_in_os, boolres,
-          'UPDATED id', _id
-        )
-      return
 
   def print_screen_msg_for_file_processing(self, dirnode, screen_msg_update_insert_or_none):
     sha1 = dirnode.sha1 or '[no-sha1]'
@@ -266,7 +231,8 @@ class FilesUpDirTreeWalker:
         self.print_screen_msg_for_file_processing(dirnode, screen_msg_update_insert_or_none)
         return False
       screen_msg_update_insert_or_none = 'DB-UPDATED'
-      _ = self.update_db_entry_with_dirnode(dirnode)  # name and parent exists but size and/or date are different
+      # name and parent exists but size and/or date are different
+      _ = self.update_db_entry_with_dirnode(dirnode, bytesize, mdatetime)
       self.print_screen_msg_for_file_processing(dirnode, screen_msg_update_insert_or_none)
       return True
     return self.calc_sha1_n_insert_db_entry_with_fields(
@@ -352,13 +318,13 @@ class FilesUpDirTreeWalker:
     self.freadfailer.do_insert_or_update_with_dict_to_prep_tuplevalues(pdict)
 
   def report_all_nodes_with_osread_problem(self):
-    print('-='*20)
+    print('-=*=-'*20)
     print('report_all_nodes_with_osread_problem:')
-    print('-='*20)
     for i, dirnode in enumerate(self.all_nodes_with_osread_problem):
       print(i+1, dirnode)
     n_unreadable = len(self.all_nodes_with_osread_problem)
-    print('Total', n_unreadable, ':: report_all_nodes_with_osread_problem')
+    print('Total n_unreadable', n_unreadable)
+    print('-='*20)
 
   def report(self):
     self.calc_totals()
