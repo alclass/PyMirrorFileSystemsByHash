@@ -3,6 +3,21 @@
 strfunctions_mod.py
 """
 import os
+import string
+ENC64CHARS = string.ascii_lowercase + string.ascii_uppercase + string.digits + '-_'
+
+
+def is_str_a_64enc(str64):
+  f = list(map(lambda c: c in ENC64CHARS, str64))
+  if False in f:
+    return False
+  return True
+
+
+def is_str_an_11hchar__64enc(p_char11_enc64):
+  if not p_char11_enc64 or len(p_char11_enc64) != 11:
+    return False
+  return is_str_a_64enc(p_char11_enc64)
 
 
 def prepend_slash_if_needed(middlepath):

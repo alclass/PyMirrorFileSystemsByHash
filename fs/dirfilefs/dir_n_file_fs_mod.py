@@ -6,6 +6,30 @@ import copy
 import os
 import default_settings as defaults
 import itertools
+DEFAULT_SQLITE_FILENAME = '.updirfileentries.sqlite'
+
+
+def find_recurs_rootfolder_sqlfile_abspath(ongoing_path=None):
+  """
+  Recursive directory path descent looking up the sqlite repo default filename
+
+  DEFAULT_SQLITE_FILENAME = '.updirfileentries.sqlite'
+
+  :param ongoing_path: string|path
+  :return: ongoing_path: string|path|None
+  """
+  if ongoing_path is None or not os.path.isdir(ongoing_path):
+    ongoing_path = os.path.abspath('.')
+  entries = os.listdir(ongoing_path)
+  for e in entries:
+    if e == DEFAULT_SQLITE_FILENAME:
+      repo_sqlfile_abspath = os.path.join(ongoing_path, DEFAULT_SQLITE_FILENAME)
+      return repo_sqlfile_abspath
+  if ongoing_path == '/':
+    # the sqlite file was not found after a possible recursive descent
+    return None
+  ongoing_path, _ = os.path.split(ongoing_path)
+  return find_recurs_rootfolder_sqlfile_abspath(ongoing_path)
 
 
 def prune_dirtree_deleting_empty_folders(current_dirpath, n_visited=0, n_removed=0, n_failed=0):
