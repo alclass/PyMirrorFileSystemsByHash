@@ -34,6 +34,8 @@ from pathlib import Path
 DATA_FOLDERNAME = 'dados'
 DEFAULT_DEVICEROOTDIR_SQLFILENAME = '.updirfileentries.sqlite'
 DEFAULT_YTIDS_FILENAME_PREFIX = 'z_ls-R_contents-'
+DEFAULT_YTIDSONLY_FILENAME = 'youtube-ids.txt'
+DEFAULT_YTDIS_TABLENAME = 'ytids'
 SOURCE_DIRTREE_FOLDERNAME_DEFAULT = 'src'  # this is the srcfolder default mainly for adhoc-testing
 TARGET_DIRTREE_FOLDERNAME_DEFAULT = 'trg'  # this is the trgfolder default mainly for adhoc-testing
 BUF_SIZE = 65536

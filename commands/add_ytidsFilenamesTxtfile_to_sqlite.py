@@ -6,9 +6,9 @@ strfs.is_str_a_64enc()
 strfs.is_str_an_11hchar__64enc()
 
 """
-import fs.dirfilefs.ytids_from_file_reader as ytfs
+import fs.dirfilefs.ytids_maintainer as ytfs
 
-DEFAULT_YTDIS_TABLENAME = 'ytids'
+DEFAULT_YTDIS_TABLENAME = 'sql_ytids'
 
 
 def get_read_ytids_from_textfile():
@@ -22,7 +22,7 @@ def adhoctest():
   ytids_filename = 'z_ls-R_contents-name1234.txt'
   print('hi')
   # ytids_folderpath, ytids_filename
-  ytids_o = ytfs.YtidsFileReader(ytids_folderpath, ytids_filename)
+  ytids_o = ytfs.YtidsTxtNSqliteMaintainer(ytids_folderpath, ytids_filename)
   ytids_o.read_ytids_from_ytidsonly_textfile()
   print(ytids_o)
 

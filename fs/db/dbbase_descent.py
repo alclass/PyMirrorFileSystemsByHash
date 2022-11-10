@@ -2,7 +2,7 @@
 """
 This module contains class DBDescent
 It tries to find, by dir=descending, the PyMirror default sqlite file
-  whick contains backup-data and also the ytids stored.
+  whick contains backup-data and also the sql_ytids stored.
 It can also retrieve a sqlite db-connection from that file.
 """
 import os
@@ -29,13 +29,13 @@ def find_recurs_baseir(ppath=None):
 
 def create_table_ytids(conn):
   sql = '''
-  CREATE TABLE IF NOT EXISTS ytids (
+  CREATE TABLE IF NOT EXISTS sql_ytids (
     ytid CHAR(11) NOT NULL UNIQUE
   );
   '''
   cursor = conn.cursor()
   f = cursor.execute(sql)
-  sql = 'CREATE INDEX IF NOT EXISTS ytid ON ytids(ytids);'
+  sql = 'CREATE INDEX IF NOT EXISTS ytid ON sql_ytids(sql_ytids);'
   f = cursor.execute(sql)
   print('Creating table ytds', f)
   conn.close()
@@ -43,9 +43,9 @@ def create_table_ytids(conn):
 
 def get_100_diffset_from_ytids(ytids, conn):
   if ytids is None or conn is None:
-    error_msg = 'Error: ytids is None or conn is None in get_100_diffset_from_ytids(ytids, conn)'
+    error_msg = 'Error: sql_ytids is None or conn is None in get_100_diffset_from_ytids(sql_ytids, conn)'
     raise OSError(error_msg)
-  sql = 'select ytid from ytids where ytid in ('
+  sql = 'select ytid from sql_ytids where ytid in ('
   whereclause = '?,' * len(ytids)
   whereclause = whereclause.rstrip(',')
   sql += whereclause
@@ -63,7 +63,7 @@ def get_100_diffset_from_ytids(ytids, conn):
     return diffset
   except sqlite3.OperationalError as error:
     if 'no such table' in str(error):
-      print('Creating table ytids')
+      print('Creating table sql_ytids')
       create_table_ytids(conn)
       return get_100_diffset_from_ytids(ytids, conn)
   return []
