@@ -28,7 +28,7 @@ import fs.dirfilefs.ytids_functions as ytfs
 import sqlite3
 
 
-class YtidsSqliteMaintainer:
+class YtidsUpDirToSqlite:
 
   def __init__(
         self,
@@ -36,7 +36,9 @@ class YtidsSqliteMaintainer:
         rootdirpath=None,
         txtfilename_if_known=None
     ):
+    self.n_inserts = 0
     self.sql_ytids = []
+    self.updir_ytids = []
     self.sqlite_filename = ds.DEFAULT_DEVICEROOTDIR_SQLFILENAME
     self.prefix_txt_filename = ds.DEFAULT_YTIDS_FILENAME_PREFIX
     self.txt_filename = txtfilename_if_known  # if None, it's still discoverable by its prefix above
@@ -54,8 +56,10 @@ class YtidsSqliteMaintainer:
     if self._sqlite_abspath is None:
       self._sqlite_abspath = os.path.join(self.rootdirpath, self.sqlite_filename)
       if not os.path.isfile(self._sqlite_abspath):
-        error_msg = 'Error: sqlite file (%s) is missing.' % self._sqlite_abspath
-        raise OSError(error_msg)
+        self.sqlitefile_run_create_if_not_exists()
+        if not os.path.isfile(self._sqlite_abspath):
+          error_msg = 'Error: sqlite file (%s) is missing.' % self._sqlite_abspath
+          raise OSError(error_msg)
     return self._sqlite_abspath
 
   @property
@@ -159,6 +163,73 @@ class YtidsSqliteMaintainer:
       _ = self.get_sql_ytids()
     return len(self.sql_ytids)
 
+  def walk_updirtree(self):
+    for ppath, foldernames, filenames in os.walk(self.rootdirpath):
+      print(ppath)
+      collected_ytfs = ytfs.extract_ytids_from_filenames(filenames)
+      self.updir_ytids += collected_ytfs
+      print('collecting', len(self.updir_ytids), collected_ytfs)
+    # removing repeats
+    self.updir_ytids = list(set(self.updir_ytids))
+    print('Uniquing', len(self.updir_ytids))
+
+  def get_connection(self):
+    conn = sqlite3.connect(self.sqlite_abspath)
+    return conn
+
+  def sqlitefile_run_create_if_not_exists(self):
+    scr_msg = 'Do you want to create sqlite table in [%s]? (*Y/n) ([ENTER] means yes) => ' % self.sqlite_abspath
+    ans = input(scr_msg)
+    if ans not in ['Y', 'y', '']:
+      print('Not creating, expecting exception raised next.')
+      return
+    conn = self.get_connection()
+    ytfs.create_table_if_not_exists_ytids(conn)
+    conn.close()
+
+  def find_missing_in_select_first(self, cursor):
+    sql = 'select ytid from ytids;'
+    dbret = cursor.execute(sql)
+    rows = dbret.fetchall()
+    stored_ytids = [row[0] for row in rows]
+    missing_ytids = [ytid for ytid in self.updir_ytids if ytid not in stored_ytids]
+    return missing_ytids
+
+  def insert_ytid_into_sqlite(self, ytid, cursor):
+    sql = 'insert or ignore into ytids (ytid) values (?);'
+    tuplevalues = (ytid,)
+    print(self.n_inserts+1, ytid, sql)
+    cursor.execute(sql, tuplevalues)
+    if cursor.arraysize == 1:
+      self.n_inserts += 1
+    return
+
+  def insert_ytids_into_sqlite(self, cursor):
+    missing_ytids = self.find_missing_in_select_first(cursor)
+    for ytid in missing_ytids:
+      self.insert_ytid_into_sqlite(ytid, cursor)
+
+  def process_inserts(self):
+    conn = self.get_connection()
+    cursor = conn.cursor()
+    missing_ytids = self.find_missing_in_select_first(cursor)
+    print('updir_missing_ytids', len(missing_ytids), missing_ytids)
+    self.n_inserts = 0
+    self.insert_ytids_into_sqlite(cursor)
+    if self.n_inserts > 0:
+      print('Committng', self.n_inserts, 'ytids')
+      conn.commit()
+    else:
+      print('No committng: all ytids (', len(self.updir_ytids), ') are in db')
+    conn.close()
+
+  def process(self):
+    _ = self.sqlite_abspath
+    self.walk_updirtree()
+    scr_ytids = self.updir_ytids if len(self.updir_ytids) < 3 else self.updir_ytids[:3]
+    print('updir ytids', len(self.updir_ytids), scr_ytids, '...')
+    self.process_inserts()
+
   def __str__(self):
     outline = """<YtidsTxtNSqliteMaintainer>
     Sqlite file path = {sqlite_abspath}
@@ -183,14 +254,19 @@ def adhoctest():
   ytids_filename = 'z_ls-R_contents-name1234.txt'
   print('hi')
   # ytids_folderpath, ytids_filename
-  ytid_o = YtidsSqliteMaintainer(False, ytids_basedirpath, ytids_filename)
+  ytid_o = YtidsUpDirToSqlite(False, ytids_basedirpath, ytids_filename)
   # ytid_o.read_ytids()
   print(ytid_o)
 
 
 def process():
+  """
   # insert_difference_in_rootcontentfile()
   adhoctest()
+  """
+  ppath = "/media/friend/Bio EE Sci Soc 2T Orig/Yt vi/BRA Polit yt vi/Plantão Brasil yu"
+  insertor = YtidsUpDirToSqlite(False, ppath)
+  insertor.process()
 
 
 if __name__ == '__main__':

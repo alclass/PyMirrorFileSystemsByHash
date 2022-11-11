@@ -38,19 +38,29 @@ def extract_ytid_from_filename(filename):
   return None
 
 
-def create_table_ytids(conn):
+def extract_ytids_from_filenames(filenames):
+  ytids = []
+  for filename in filenames:
+    ytid = extract_ytid_from_filename(filename)
+    if ytid is None:
+      continue
+    ytids.append(ytid)
+  return ytids
+
+
+def create_table_if_not_exists_ytids(conn):
   cursor = conn.cursor()
   sql = '''
   CREATE TABLE IF NOT EXISTS ytids (
     ytid CHAR(11) NOT NULL UNIQUE
   );
   '''
-  print(sql)
+  # print(sql)
   cursor.execute(sql)
   sql = '''
   CREATE INDEX IF NOT EXISTS ytid ON ytids(ytid);
   '''
-  print(sql)
+  # print(sql)
   cursor.execute(sql)
 
 
