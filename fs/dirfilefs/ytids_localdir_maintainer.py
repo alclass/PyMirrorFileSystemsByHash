@@ -42,8 +42,8 @@ class YtidsUpDirToSqlite:
     self.sqlite_filename = ds.DEFAULT_DEVICEROOTDIR_SQLFILENAME
     self.prefix_txt_filename = ds.DEFAULT_YTIDS_FILENAME_PREFIX
     self.txt_filename = txtfilename_if_known  # if None, it's still discoverable by its prefix above
-    self._sqlite_abspath = None  # for class property sqlite_abspath
-    self._txtfile_abspath = None  # for class property txtfile_abspath
+    self._sqlite_abspath = None  # for class property sqlite_filepath
+    self._txtfile_abspath = None  # for class property ytids_txtfilepath
     self.rootdirpath = rootdirpath
     self.bool_find_root_by_pathdesc = bool_find_root_by_pathdesc
     if self.bool_find_root_by_pathdesc:

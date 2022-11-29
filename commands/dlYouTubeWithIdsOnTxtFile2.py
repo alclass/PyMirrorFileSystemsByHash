@@ -14,8 +14,21 @@ Functionality:
   against a sqlite repo file with ytids.
     Those ytids not db-stored will be queued up for downloading.
     User confirmation will be asked in the terminal prompt.
+
+Detail in where the sqlite repo is found:
+  In "normal" usage, a look-up path descending will search for the sqlite repo file.
+  However, there are instances where this is not desiderable because there is no sqlite repo file available.
+  In this latter case, parameter "--create", passed in as argument (sys.argv), will create a new repo file available
+  in the working (executing or passed) directory.
+
+Example (with parameter --create)
+  $ytids_functions.py 278+249 --create -p="/media/External HD/Science/Bio videos"
+  1) without --create, a path descending lookup will happen
+  2) with --create, either the sqlite repo file is used in locus (working directory or the one passed with -p)
+     or a new one is create there
 """
 import os
+import sqlite3
 import sys
 import fs.dirfilefs.ytids_functions as ytfs
 import fs.dirfilefs.ytids_maintainer as ytmt
@@ -44,11 +57,13 @@ def move_to_working_dir():
 
 class YtidsOnlyDownloader:
 
-  def __init__(self, ppath=None, videocodecomb=None):
+  def __init__(self, ppath=None, videocodecomb=None, create_sqlite_on_workdir=False):
     self.ytids = []
     self.ytids_missing = []
     self.workdir_abspath = ppath
     self.videocodecomb = videocodecomb
+    # create_sqlite_on_workdir is equivalent to "not" bool_find_root_by_pathdesc (and create it if not exists)
+    self.create_sqlite_on_workdir = create_sqlite_on_workdir
     self._ytidsonly_filepath = None
     self.ytidsonly_filename = ds.DEFAULT_YTIDSONLY_FILENAME
     if self.workdir_abspath is None or not os.path.isdir(ppath):
@@ -67,10 +82,26 @@ class YtidsOnlyDownloader:
     print(self.ytids)
     print(scr_msg)
 
+  def verify_create_flag_n_create_sqlitefile_if_needed(self):
+    sqlite_filename = ds.DEFAULT_DEVICEROOTDIR_SQLFILENAME
+    sqlite_filepath = os.path.join(self.workdir_abspath, sqlite_filename)
+    if self.create_sqlite_on_workdir and not os.path.isfile(sqlite_filepath):
+      scr_msg = 'Do you want to create sqlite repo file as [' + sqlite_filepath + \
+                ']? [script cannot continuing without it under parameter --create] (*Y/n)? => '
+      ans = input(scr_msg)
+      if ans in ['Y', 'y', '']:
+        _ = sqlite3.connect(sqlite_filepath)
+        print('Created sqlitefile', sqlite_filepath)
+      else:
+        print('Stopping program, cannot continue for it needs the sqlite file on folder.')
+        sys.exit(1)
+
   def finding_missing_ytids_from_sqlitedb(self):
-    maintainer = ytmt.YtidsSqliteMaintainer(True, self.workdir_abspath)
+    self.verify_create_flag_n_create_sqlitefile_if_needed()
+    bool_find_root_by_pathdesc = not self.create_sqlite_on_workdir
+    maintainer = ytmt.YtidsSqliteMaintainer(bool_find_root_by_pathdesc, self.workdir_abspath)
     self.ytids_missing = maintainer.extract_missing_sqlite_ytids_from(self.ytids)
-    scr_msg = 'Missing %d ytids from [%s]' % (len(self.ytids_missing), maintainer.sqlite_abspath)
+    scr_msg = 'Missing %d ytids from [%s]' % (len(self.ytids_missing), maintainer.sqlite_filepath)
     print(scr_msg)
 
   def verify_current_folder(self):
@@ -79,7 +110,7 @@ class YtidsOnlyDownloader:
     before_n_missing = len(self.ytids_missing)
     self.ytids_missing = [ytid for ytid in self.ytids_missing if ytid not in local_ytids]
     after_n_missing = len(self.ytids_missing)
-    strnumbers = 'diff %d | missing-in-db %d | local %d' %(after_n_missing, before_n_missing, len(local_ytids))
+    strnumbers = 'diff %d | missing-in-db %d | local %d' % (after_n_missing, before_n_missing, len(local_ytids))
     print('Verifying local_ytids', strnumbers, self.ytids_missing)
 
   def prepare_download(self):
@@ -126,15 +157,18 @@ class YtidsOnlyDownloader:
 
 
 def get_ppath_from_args(argv):
+  ppath_n_create_dict = {'ppath': None, 'create': False}
   for arg in argv:
     if arg.startswith('-h') or arg.startswith('--help'):
       print(__doc__)
       sys.exit(0)
+    elif arg.startswith('--create'):
+      ppath_n_create_dict['create'] = True
     elif arg.startswith('-p='):
       ppath = arg[len('-p='):]
       if os.path.isdir(ppath):
-        return ppath
-  return None
+        ppath_n_create_dict['ppath'] = ppath
+  return ppath_n_create_dict
 
 
 def get_videocodecomb_from_args_or_default(argv):
@@ -151,9 +185,11 @@ def process(argv):
   """
   This function aims to transfer executing from a "dispatcher" script outside of this app
   """
-  ppath = get_ppath_from_args(argv)
+  ppath_n_create_dict = get_ppath_from_args(argv)
   videocodecomb = get_videocodecomb_from_args_or_default(argv)
-  downloader = YtidsOnlyDownloader(ppath, videocodecomb)
+  ppath = ppath_n_create_dict['ppath']
+  bool_create = ppath_n_create_dict['create']
+  downloader = YtidsOnlyDownloader(ppath, videocodecomb, bool_create)
   downloader.prepare_download()
   downloader.process()
 

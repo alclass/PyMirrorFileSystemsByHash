@@ -40,40 +40,36 @@ class YtidsSqliteMaintainer:
     self.sqlite_filename = ds.DEFAULT_DEVICEROOTDIR_SQLFILENAME
     self.prefix_txt_filename = ds.DEFAULT_YTIDS_FILENAME_PREFIX
     self.txt_filename = txtfilename_if_known  # if None, it's still discoverable by its prefix above
-    self._sqlite_abspath = None  # for class property sqlite_abspath
-    self._txtfile_abspath = None  # for class property txtfile_abspath
+    self._sqlite_filepath = None  # for class property sqlite_filepath
+    self._ytids_txtfilepath = None  # for class property ytids_txtfilepath
     self.rootdirpath = rootdirpath
     self.bool_find_root_by_pathdesc = bool_find_root_by_pathdesc
     if self.bool_find_root_by_pathdesc:
       self.find_root_by_pathdesc()
     else:
-      self.verify_rootpath_or_raise()
+      self.verify_sqlitefile_on_workdir_or_raise()
 
   @property
-  def sqlite_abspath(self):
-    if self._sqlite_abspath is None:
-      self._sqlite_abspath = os.path.join(self.rootdirpath, self.sqlite_filename)
-      if not os.path.isfile(self._sqlite_abspath):
-        error_msg = 'Error: sqlite file (%s) is missing.' % self._sqlite_abspath
+  def sqlite_filepath(self):
+    if self._sqlite_filepath is None:
+      self._sqlite_filepath = os.path.join(self.rootdirpath, self.sqlite_filename)
+      if not os.path.isfile(self._sqlite_filepath):
+        error_msg = 'Error: sqlite file (%s) is missing.' % self._sqlite_filepath
         raise OSError(error_msg)
-    return self._sqlite_abspath
+    return self._sqlite_filepath
 
   @property
-  def txtfile_abspath(self):
+  def ytids_txtfilepath(self):
     if self.txt_filename is None:
       self.discover_txtfilepath_if_any()
       if self.txt_filename is None:
         return None
-    if self._txtfile_abspath is None:
-      self._txtfile_abspath = os.path.join(self.rootdirpath, self.txt_filename)
-      if not os.path.isfile(self._txtfile_abspath):
-        error_msg = 'Error: sqlite file (%s) is missing.' % self._txtfile_abspath
+    if self._ytids_txtfilepath is None:
+      self._ytids_txtfilepath = os.path.join(self.rootdirpath, self.txt_filename)
+      if not os.path.isfile(self._ytids_txtfilepath):
+        error_msg = 'Error: sqlite file (%s) is missing.' % self._ytids_txtfilepath
         raise OSError(error_msg)
-    return self._txtfile_abspath
-
-  def find_root_by_pathdesc(self):
-    self.find_sqlitebasedir_by_pathdesc()
-    self.discover_txtfilepath_if_any()
+    return self._ytids_txtfilepath
 
   def find_sqlitebasedir_by_pathdesc(self):
     if self.rootdirpath is None:
@@ -101,13 +97,26 @@ class YtidsSqliteMaintainer:
         break
     return self.txt_filename  # may return None
 
-  def verify_rootpath_or_raise(self):
-    if not os.path.isdir(self.rootdirpath):
-      error_msg = 'Error: folderpath for the sqlite file does not exist:' \
+  def find_root_by_pathdesc(self):
+    self.find_sqlitebasedir_by_pathdesc()
+    self.discover_txtfilepath_if_any()
+
+  def verify_sqlitefile_on_workdir_or_raise(self):
+    """
+    This method is run only (from an if in __init__) if path-descending is not chosen
+      ie attribute bool_find_root_by_pathdesc is False
+    """
+    if not os.path.isfile(self.sqlite_filepath):
+      error_msg = 'Error: folderpath (%s) for the sqlite file does not exist:' \
         % self.rootdirpath
       raise OSError(error_msg)
 
   def extract_missing_sqlite_ytids_from(self, o_ytids):
+    """
+    TO-DO: refactor this method to ytfs (yt-functions).
+           There is a similar method in dlYouTubeWithIdsOnTxtFile3.py
+           that uses list-comprehension instead of for-loop
+    """
     missing_ytids = []
     for ytid in o_ytids:
       if ytid not in self.get_sql_ytids():
@@ -120,9 +129,13 @@ class YtidsSqliteMaintainer:
     return other_ytids
 
   def get_sql_ytids(self):
+    """
+    TO-DO: there is a similar version of this method in dlYouTubeWithIdsOnTxtFile2.py
+           that uses a list-comprehension instead of a for-loop
+    """
     if len(self.sql_ytids) > 0:
       return self.sql_ytids
-    conn = sqlite3.connect(self.sqlite_abspath)
+    conn = sqlite3.connect(self.sqlite_filepath)
     sql = 'select ytid from ytids;'
     cursor = conn.cursor()
     try:
@@ -137,9 +150,9 @@ class YtidsSqliteMaintainer:
     conn.close()
     return self.sql_ytids
 
-  def insert_ytids(self, ytids):
+  def ytids_bulk_dbselect(self, ytids):
     outlist = []
-    conn = sqlite3.connect(self.sqlite_abspath)
+    conn = sqlite3.connect(self.sqlite_filepath)
     questionmarks = '?,' * len(ytids)
     questionmarks = questionmarks.rstrip(',')
     sql = 'select ytid from ytids where ytid in (' + questionmarks + ');'
@@ -166,9 +179,9 @@ class YtidsSqliteMaintainer:
     Txt file Path = {txtfilepath}
     N of sql_ytids from txt = {n_txt_ytids}
 """.format(
-      sqlite_abspath=self.sqlite_abspath,
+      sqlite_abspath=self.sqlite_filepath,
       n_sql_ytids=self.n_sql_ytids,
-      txtfilepath=self.txtfile_abspath,
+      txtfilepath=self.ytids_txtfilepath,
       n_txt_ytids=len(self.sql_ytids)
     )
     return outline

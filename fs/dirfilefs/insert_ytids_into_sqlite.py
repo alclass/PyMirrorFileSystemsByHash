@@ -51,8 +51,8 @@ class DirTreeYtidCollector:
 
   def insertor(self):
     ytmt_obj = ytmt.YtidsSqliteMaintainer(True, self.walkstartpath)
-    # n_inserted = ytmt_obj.insert_ytids(self.ytids)
-    n_inserted = ytmt_obj.insert_ytids(self.ytids)
+    # n_inserted = ytmt_obj.ytids_bulk_dbselect(self.ytids)
+    n_inserted = ytmt_obj.ytids_bulk_dbselect(self.ytids)
     print('missing', len(n_inserted))
 
   def show_ytids(self):
