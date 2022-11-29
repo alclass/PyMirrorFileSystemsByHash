@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-delete_files_in_trg_that_exist_in_source_cm
+delete_files_in_trg_that_exist_in_source_cm.py
 
 This script finds files that exist both in source and target and
   enlist the copies in target for deletion upon user confirmation.
@@ -65,8 +65,20 @@ import fs.dirfilefs.dir_n_file_fs_mod as dirf
 
 
 def print_sha1_set(missing_set, dbtree_opposite, mountpath):
+  """
+  TO-DO:
+    1) this function may be, in the future, refactored/reorganized to a function-module
+    2) another point of attention is to study whether or not the loop-inside-loop below is too costy
+       or, thinking of alternatives, whether a prefetching scheme (avoiding double-loops) is possible
+  """
+  n_sha_is_none = 0
   for i, sha1 in enumerate(missing_set):
     print('-' * 70)
+    if sha1 is None:  # this is to treat some old versions of the database where NOT NULL where missing for column sha1
+      # TO-DO thie if may be removed later on because SQL-schema table has already been updated
+      n_sha_is_none += 1
+      print('sha1 is None (', n_sha_is_none, '): missing_set size is ', len(missing_set))
+      continue
     print(i + 1, sha1.hex() + ' in ' + mountpath)
     print('-' * 70)
     sql = 'SELECT * FROM %(tablename)s WHERE sha1=?;'

@@ -35,10 +35,10 @@ class DBDirTree(dbb.DBBase):
     """
     middle_sql = """
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT,
-      parentpath TEXT,
-      sha1 BLOB,
-      bytesize INTEGER,
+      name TEXT NOT NULL,
+      parentpath TEXT NOT NULL,
+      sha1 BLOB NOT NULL,
+      bytesize INTEGER NOT NULL,
       mdatetime TEXT,
       UNIQUE(name, parentpath)
     """
