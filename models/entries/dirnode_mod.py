@@ -242,6 +242,19 @@ class DirNode:
     }
     return _fieldnames_dict
 
+  def update_db_parentpath(self, parentpath, dbtree):
+    if self.db_id is None:
+      return False
+    sql = '''UPDATE %(tablename)s SET
+      parentpath=?
+    WHERE
+      id=?;
+    '''
+    tuplevalues = (parentpath, self.db_id)
+    retobj = dbtree.do_update_with_sql_n_tuplevalues(sql, tuplevalues)
+    self.parentpath = parentpath
+    return retobj
+
   def update_db_name_n_parentpath(self, name, parentpath, dbtree):
     if self.db_id is None:
       return False
@@ -252,7 +265,10 @@ class DirNode:
       id=?;
     '''
     tuplevalues = (name, parentpath, self.db_id)
-    return dbtree.do_update_with_sql_n_tuplevalues(sql, tuplevalues)
+    retobj = dbtree.do_update_with_sql_n_tuplevalues(sql, tuplevalues)
+    self.name = name
+    self.parentpath = parentpath
+    return retobj
 
   def update_db_with_fetched_row(self, fetched_row, dbtree):
     dirnodedict = self.fieldvalue_dict

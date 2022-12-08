@@ -161,7 +161,7 @@ class IntraDirRepeatsDeleter:
     print('total_files_in_os', self.total_files_in_os)
     print('total_dirs_in_os', self.total_dirs_in_os)
     print('total_sha1s_files_in_db', self.total_sha1s_files_in_db)
-    print('n_processed_files', self.n_processed_files)
+    print('n_processed_files_in_trg', self.n_processed_files)
     print('n_processed_dirs', self.n_processed_dirs)
     print('n_processed_deletes', self.n_processed_deletes)
     print('n_trg_os_phys_files_deleted', self.n_os_phys_files_deleted)

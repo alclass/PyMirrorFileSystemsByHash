@@ -205,7 +205,7 @@ class BulkRenamer:
     print('total_files_in_os', self.total_files_in_os)
     print('total_dirs_in_os', self.total_dirs_in_os)
     print('n_renamed', self.n_renamed)
-    print('n_processed_files', self.n_processed_files)
+    print('n_processed_files_in_trg', self.n_processed_files)
     print('n_updated_dbentries', self.n_updated_dbentries)
     print(
       'n_restricted_dirs', defaults.RESTRICTED_DIRNAMES_FOR_WALK,

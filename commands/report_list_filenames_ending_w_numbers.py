@@ -95,7 +95,7 @@ class ReportFilenameEndingWithNumberLister:
       '=_+_+_='*3
     )
     self.print_counters()
-    print('n_processed_files:', self.n_processed_files)
+    print('n_processed_files_in_trg:', self.n_processed_files)
     print('n_number_found:', self.n_number_found)
 
 

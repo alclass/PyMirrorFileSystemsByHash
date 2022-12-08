@@ -113,7 +113,7 @@ class ReportFileRepeat:
     print('total_unique_files_in_db', self.total_unique_files_in_db)
     print('total_files_in_os', self.total_files_in_os)
     print('total_dirs_in_os', self.total_dirs_in_os)
-    print('n_processed_files', self.n_processed_files)
+    print('n_processed_files_in_trg', self.n_processed_files)
     print('n_processed_sha1s', self.n_processed_sha1s)
     print('n_found_files_name_n_parent_in_db', self.n_found_files_name_n_parent_in_db)
     print('n_found_files_size_n_date_in_db', self.n_found_files_size_n_date_in_db)

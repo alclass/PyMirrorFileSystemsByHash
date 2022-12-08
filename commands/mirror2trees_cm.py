@@ -176,7 +176,7 @@ class MirrorDirTree:
     print('n_failed_moves', self.n_failed_moves)
     print('n_copied', self.n_copied)
     print('n_failed_copies', self.n_failed_copies)
-    print('n_processed_files', self.n_processed_files)
+    print('n_processed_files_in_trg', self.n_processed_files)
     print('total_srcfiles_in_db', self.total_srcfiles_in_db)
     print('total_trgfiles_in_db', self.total_trgfiles_in_db)
     print('total_unique_srcfiles', self.total_unique_srcfiles)

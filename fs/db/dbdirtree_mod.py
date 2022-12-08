@@ -58,6 +58,18 @@ class DBDirTree(dbb.DBBase):
     cursor.close()
     conn.close()
 
+  def total_files(self):
+    """
+    total_files = total number of entries
+    """
+    _total_files = 0
+    result_as_tuplelist = self.count_rows()
+    try:
+      _total_files = result_as_tuplelist[0][0]
+    except IndexError:
+      pass
+    return _total_files
+
   def fetch_row_by_id(self, _id):
     sql = 'SELECT * FROM %(tablename)s WHERE id=?;' % {'tablename': self.tablename}
     tuplevalues = (_id, )

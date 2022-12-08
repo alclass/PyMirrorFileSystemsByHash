@@ -192,7 +192,7 @@ class FileRepeatsDeleter:
 
   def show_totals_to_del(self):
     print('total_dirnodes_in_sha1_dict', self.total_dirnodes_in_sha1_dict)
-    print('n_processed_files', self.n_processed_files)
+    print('n_processed_files_in_trg', self.n_processed_files)
     print('len dirnodes_to_del', len(self.dirnodes_to_del))
     print('len dirnodes_to_save', len(self.dirnodes_to_save))
 
@@ -266,7 +266,7 @@ class FileRepeatsDeleter:
     print('total_unique_files_in_db', self.total_unique_files_in_db)
     print('total_files_in_os', self.total_files_in_os)
     print('total_dirs_in_os', self.total_dirs_in_os)
-    print('n_processed_files', self.n_processed_files)
+    print('n_processed_files_in_trg', self.n_processed_files)
     print('n_saved_file_sha1_passed', self.n_saved_file_sha1_passed)
     print('n_processed_deletes', self.n_processed_deletes)
     print('total_deleted_in_db', self.total_deleted_in_db)

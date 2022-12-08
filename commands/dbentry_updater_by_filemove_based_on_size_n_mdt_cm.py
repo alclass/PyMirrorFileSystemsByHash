@@ -185,7 +185,7 @@ class DBEntryUpdater:
     print('total_files_in_os', self.total_files_in_os)
     print('total_dirs_in_os', self.total_dirs_in_os, '(obs: rootdir files do not count.)')
     print('n_processed_dirs', self.n_processed_dirs)
-    print('n_processed_files', self.n_processed_files)
+    print('n_processed_files_in_trg', self.n_processed_files)
     print('n_failed_filestats', self.n_failed_filestats)
     print('n_dbupdates', self.n_dbupdates, "(meaning files that were moved before and got unsync'd, now db-sync'd)")
 
