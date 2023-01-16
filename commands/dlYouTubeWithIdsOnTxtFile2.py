@@ -57,10 +57,17 @@ def move_to_working_dir():
 
 class YtidsOnlyDownloader:
 
-  def __init__(self, ppath=None, videocodecomb=None, create_sqlite_on_workdir=False):
+  def __init__(
+      self,
+      ppath=None,
+      videocodecomb=None,
+      create_sqlite_on_workdir=False,
+      extrarepo_ytids_sqlitedirpath=None
+  ):
     self.ytids = []
     self.ytids_missing = []
     self.workdir_abspath = ppath
+    self.extrarepo_ytids_sqlitedirpath = extrarepo_ytids_sqlitedirpath
     self.videocodecomb = videocodecomb
     # create_sqlite_on_workdir is equivalent to "not" bool_find_root_by_pathdesc (and create it if not exists)
     self.create_sqlite_on_workdir = create_sqlite_on_workdir
@@ -97,10 +104,26 @@ class YtidsOnlyDownloader:
         sys.exit(1)
 
   def finding_missing_ytids_from_sqlitedb(self):
+    """
+    Maintainer class has 4 input parameters
+    Maintainer(
+        bool_find_root_by_pathdesc=True,
+        rootdirpath=None,
+        txtfilename_if_known=None,
+        extrarepo_ytids_sqlitedirpath=None
+    )
+    """
     self.verify_create_flag_n_create_sqlitefile_if_needed()
     bool_find_root_by_pathdesc = not self.create_sqlite_on_workdir
-    maintainer = ytmt.YtidsSqliteMaintainer(bool_find_root_by_pathdesc, self.workdir_abspath)
+    maintainer = ytmt.YtidsSqliteMaintainer(
+      bool_find_root_by_pathdesc,
+      self.workdir_abspath,
+      self.ytidsonly_filepath,
+      self.extrarepo_ytids_sqlitedirpath
+    )
     self.ytids_missing = maintainer.extract_missing_sqlite_ytids_from(self.ytids)
+    if self.extrarepo_ytids_sqlitedirpath and len(self.ytids_missing) > 0:
+      self.ytids_missing = maintainer.extract_ytids_existing_in_extrarepo(self.ytids_missing)
     scr_msg = 'Missing %d ytids from [%s]' % (len(self.ytids_missing), maintainer.sqlite_filepath)
     print(scr_msg)
 
@@ -181,6 +204,17 @@ def get_videocodecomb_from_args_or_default(argv):
   return DEFAULT_VIDEOCODE
 
 
+def get_extrarepo_ytids_sqlitepath_from_args(argv):
+  sqlitepath = None
+  for arg in argv:
+    if arg.startswith('-e='):
+      sqlpath = arg[len('-e='):]
+      if os.path.isdir(sqlpath):
+        sqlitepath = sqlpath
+        break
+  return sqlitepath
+
+
 def process(argv):
   """
   This function aims to transfer executing from a "dispatcher" script outside of this app
@@ -189,7 +223,8 @@ def process(argv):
   videocodecomb = get_videocodecomb_from_args_or_default(argv)
   ppath = ppath_n_create_dict['ppath']
   bool_create = ppath_n_create_dict['create']
-  downloader = YtidsOnlyDownloader(ppath, videocodecomb, bool_create)
+  extrarepo_ytids_sqlitepath = get_extrarepo_ytids_sqlitepath_from_args(argv)
+  downloader = YtidsOnlyDownloader(ppath, videocodecomb, bool_create, extrarepo_ytids_sqlitepath)
   downloader.prepare_download()
   downloader.process()
 

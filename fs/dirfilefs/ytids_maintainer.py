@@ -28,13 +28,113 @@ import fs.dirfilefs.ytids_functions as ytfs
 import sqlite3
 
 
+def subtract_list_from_other_via_set_diff(lista, elems_to_remove):
+  """
+  This method removes the elements in elems_to_remove from lista if they exist in the latter
+  Example:
+    s1= set(['a','b','c'])
+    s2= set(['a','b','d'])
+    s1 = s1 - s2  # or s1.difference(s2)
+  the result is s1 = set(['c']) ie elements 'a' and 'b', existing in s2, are removed from s1
+  the return output will be converted "back" to type 'list'
+    obs: the inputs may be anything convertable to type 'set', even sets themselves)
+
+  Concerning memory size or slowness for this operation:
+    worry 1) the sqlite-dbs may have more than 100k ytids
+    worry 1b) this may turn this operation slow or memory-crashable
+    comment 1) the inputs here are expected to be sized less than 1k ytids,
+      for youtube-id.txt are usually 'playlist sizeable' (ie have average sizes of playlists)
+    conclusion 1) the inputs for this function will be sized as 'playlists' (1k records)
+      not as sqlite-dbs (100k records)
+    * in case growth is in need, this function may be refactored to partition the ytids list into smaller chunks
+       at least avoiding a memory-crash;
+       to avoiding slowness a multithreaded approach might be looked up
+  """
+  s1 = set(lista)
+  s2 = set(elems_to_remove)
+  remains_in_s1 = s1 - s2
+  lista = list(remains_in_s1)
+  return lista
+
+
+def retrieveremove_ytids_existing_in_extra_sqlitefilepath(ytids, sqlitefilepath):
+  if ytids is None or len(ytids) == 0:
+    # notice that if ytids comes in as None it will return as []
+    return []
+  if sqlitefilepath is None or not os.path.isfile(sqlitefilepath):
+    scr_msg = 'Sqlitefile [%s] for an extra ytid look-up not given or does not exist.' % sqlitefilepath
+    print(scr_msg)
+    return ytids
+  ytids_found = []
+  n_ytids = len(ytids)
+  print('n_ytids =', n_ytids, 'Looking up sqlitefile', sqlitefilepath)
+  if n_ytids == 0:
+    return ytids
+  questionmarks_sqlinstr = '?,' * n_ytids
+  questionmarks_sqlinstr = questionmarks_sqlinstr.rstrip(',')
+  questionmarks_list = ['?'] * n_ytids
+  sql = 'SELECT ytid FROM ytids WHERE ytid IN (' + questionmarks_sqlinstr + ');'
+  # print(sql)
+  tuplevalues = tuple(questionmarks_list)
+  conn = sqlite3.connect(sqlitefilepath)
+  cursor = conn.cursor()
+  dbret = cursor.execute(sql, tuplevalues)
+  rows = dbret.fetchall()
+  for row in rows:
+    ytid = row[0]
+    ytids_found.append(ytid)
+  cursor.close()
+  conn.close()
+  if len(ytids_found) > 0:
+    ytids = subtract_list_from_other_via_set_diff(ytids, ytids_found)
+  return ytids
+
+
+def retrieveremove_ytids_existing_in_extra_sqlitefilepaths(ytids, sqlitefilenames=(), sqlitefolderpath=None):
+  if ytids is None or len(ytids) == 0:
+    # notice that if ytids comes in as None it will return as []
+    # the default empty-tuple for the input-parameter is because the IDE complains mutation value with [] (empty-list)
+    return []
+  if sqlitefilenames is None or len(sqlitefilenames) == 0:
+    print('There are no sqlitefilenames for extra ytid look-ups.')
+    return ytids
+  if sqlitefolderpath is None or not os.path.isdir(sqlitefolderpath):
+    print('Sqlite folderpath for extra ytid look-ups not given or does not exist.')
+    print(' =>', sqlitefolderpath)
+    return ytids
+  sqlitefilepaths = list(map(lambda fn: os.path.join(sqlitefolderpath, fn), sqlitefilenames))
+  for sqlitefilepath in sqlitefilepaths:
+    ytids = retrieveremove_ytids_existing_in_extra_sqlitefilepath(ytids, sqlitefilepath)
+    if len(ytids) == 0:
+      return []
+  return ytids
+
+
+def retrieveremove_ytids_existing_in_extra_sqlitedirpath(ytids, sqlitefolderpath=None):
+  if ytids is None or len(ytids) == 0:
+    # notice that if ytids comes in as None it will return as []
+    return []
+  if sqlitefolderpath is None or not os.path.isdir(sqlitefolderpath):
+    print('Sqlite folderpath for extra ytid look-ups not given or does not exist.')
+    print(' =>', sqlitefolderpath)
+    return ytids
+  folderfilenames = os.listdir(sqlitefolderpath)
+  sqlitefilenames = list(filter(lambda fn: fn.endswith('.sqlite'), folderfilenames))
+  if len(sqlitefilenames) == 0:
+    print('There are no sqlite files available for an extra ytid look-up inside the sqlite folderpath.')
+    print('sqlitefolderpath =>', sqlitefolderpath)
+    return ytids
+  return retrieveremove_ytids_existing_in_extra_sqlitefilepaths(ytids, sqlitefilenames, sqlitefolderpath)
+
+
 class YtidsSqliteMaintainer:
 
   def __init__(
         self,
         bool_find_root_by_pathdesc=True,
         rootdirpath=None,
-        txtfilename_if_known=None
+        txtfilename_if_known=None,
+        extrarepo_ytids_sqlitedirpath=None
     ):
     self.sql_ytids = []
     self.sqlite_filename = ds.DEFAULT_DEVICEROOTDIR_SQLFILENAME
@@ -43,6 +143,7 @@ class YtidsSqliteMaintainer:
     self._sqlite_filepath = None  # for class property sqlite_filepath
     self._ytids_txtfilepath = None  # for class property ytids_txtfilepath
     self.rootdirpath = rootdirpath
+    self.extrarepo_ytids_sqlitedirpath = extrarepo_ytids_sqlitedirpath
     self.bool_find_root_by_pathdesc = bool_find_root_by_pathdesc
     if self.bool_find_root_by_pathdesc:
       self.find_root_by_pathdesc()
@@ -123,6 +224,12 @@ class YtidsSqliteMaintainer:
         missing_ytids.append(ytid)
     return missing_ytids
 
+  def extract_ytids_existing_in_extrarepo(self, ytids):
+    print('Looking up possible extrarepos in', self.extrarepo_ytids_sqlitedirpath)
+    if self.extrarepo_ytids_sqlitedirpath is None:
+      return ytids
+    return retrieveremove_ytids_existing_in_extra_sqlitedirpath(ytids, self.extrarepo_ytids_sqlitedirpath)
+
   def find_diffset_from(self, other_ytids_txtfilepath):
     other_ytids = ytfs.read_ytids_from_filenamebased_textfile(other_ytids_txtfilepath)
     other_ytids = ytfs.get_diffset_from_lists(other_ytids, self.sql_ytids)
@@ -136,7 +243,7 @@ class YtidsSqliteMaintainer:
     if len(self.sql_ytids) > 0:
       return self.sql_ytids
     conn = sqlite3.connect(self.sqlite_filepath)
-    sql = 'select ytid from ytids;'
+    sql = 'SELECT ytid FROM ytids;'
     cursor = conn.cursor()
     try:
       dbret = cursor.execute(sql)
@@ -155,7 +262,7 @@ class YtidsSqliteMaintainer:
     conn = sqlite3.connect(self.sqlite_filepath)
     questionmarks = '?,' * len(ytids)
     questionmarks = questionmarks.rstrip(',')
-    sql = 'select ytid from ytids where ytid in (' + questionmarks + ');'
+    sql = 'SELECT ytid FROM ytids WHERE ytid IN (' + questionmarks + ');'
     tuplevalues = tuple(ytids)
     cursor = conn.cursor()
     dbret = cursor.execute(sql, tuplevalues)
