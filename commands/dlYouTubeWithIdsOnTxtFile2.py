@@ -35,7 +35,8 @@ import fs.dirfilefs.ytids_maintainer as ytmt
 import default_settings as ds
 VIDEOCODES = ['278+249', '160+139', '160+140', '18', '392+139']
 DEFAULT_VIDEOCODE = VIDEOCODES[0]
-interpol_ytdlcomm = 'youtube-dl -w -f {videocodecomb} {url}'
+# interpol_ytdlcomm = 'youtube-dl -w -f {videocodecomb} {url}'
+interpol_ytdlcomm = 'yt-dlp -w -f {videocodecomb} {url}'
 interpol_yturl = 'https://www.youtube.com/watch?v={ytid}'
 
 
