@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Usage:
-  $ytids_functions.py [<videocodecom>] [-p=<directory_path>]
+  $ytids_functions.py [<videocodecom>] [-p=<directory_path>] [-e=<extra-repos-path>]
 Where:
   [<videocodecom>] optional, it means the parameter to the -f flag in youtube-dl
   [-p=<directory_path>] optional, it means the target path where download will happen if needed
@@ -197,8 +197,9 @@ def get_ppath_from_args(argv):
 
 def get_videocodecomb_from_args_or_default(argv):
   videocodelist = []
-  for arg in argv:
-    if arg in VIDEOCODES:
+  if len(argv) > 1:  # argv[0] is the abspath of the running script
+    for arg in argv[1:]:
+      # if arg in VIDEOCODES: # TO-DO: make it check somewhere else a consistent videocode combination
       videocodelist.append(arg)
   if len(videocodelist) > 0:
     return videocodelist[0]
