@@ -6,7 +6,7 @@ import datetime
 import os.path
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
-import commands.dbentry_deleter_those_without_corresponding_osentry_cm as dbentry_del
+# import commands.dbentry_deleter_those_without_corresponding_osentry_cm as dbentry_del
 import fs.hashfunctions.hash_mod as hm
 import fs.dirfilefs.dir_n_file_fs_mod as dirf
 import fs.strnlistfs.strfunctions_mod as strf
@@ -18,6 +18,9 @@ class BulkRenamer:
   def __init__(self, mountpath):
     """
     """
+    self._outdict = None
+    self.begin_time = datetime.datetime.now()
+    self.end_time = None
     self.total_dirs_in_os = 0
     self.total_files_in_os = 0
     self.total_files_in_db = 0
@@ -39,6 +42,13 @@ class BulkRenamer:
     self.dbtree = self.dirtree.dbtree  # dbu.DBDirTree(mount_abspath)
     self.ongoingfolder_abspath = None
     self.calc_totals()
+
+
+  @property
+  def runduration(self):
+    if self.end_time is None:
+      return datetime.datetime.now() - self.begin_time
+    return self.end_time - self.begin_time
 
   def calc_totals(self):
     """
@@ -91,7 +101,7 @@ class BulkRenamer:
 
   def get_files_id_in_db(self, filename):
     """
-    middlepath = parentpath.lstrip('./')
+    middlepath = parentpath.lstrip(('./')
     folderpath = os.path.join(self.mountpath, middlepath)
     filepath = os.path.join(folderpath, filename)
     """
@@ -115,7 +125,8 @@ class BulkRenamer:
     The rename attempt is the following:
       1) lstrip(' \t')
       2) rstrip(' \t\r\n')
-      3) replace(':', ';')
+      3) replace ':', ';'
+      # if parentheses are unbalanced above, it's because the IDE strangely complained about it inside a __doc__ string
     """
     newfilename = strf.clean_rename_filename_to(filename)
     if newfilename == filename:
@@ -199,6 +210,48 @@ class BulkRenamer:
         continue
       self.verify_filenames_for_rename(files)
 
+
+  def get_attrs(self):
+    outdict = {
+      name: attr for name, attr in self.__dict__.items()
+      if not name.startswith('__')
+      and not name.startswith('_')
+      and not callable(attr)
+      and not type(attr) is staticmethod
+    }
+    return outdict
+
+  @property
+  def outdict(self):
+    if self._outdict is not None:
+      return self._outdict
+    attrs = self.get_attrs()
+    for attr in attrs:
+      pyline = 'self._outdict[' + fieldname + '] = self.' + fieldname
+      exec(pyline)
+    return self._outdicct
+
+  def mount_report_str(self):
+    """
+    defaults.RESTRICTED_DIRNAMES_FOR_WALK,
+    """
+    outstr = """
+    total_files_in_db'   = {total_files_in_db}
+    total_files_in_os'   = {total_files_in_os}
+    total_dirs_in_os'    = {total_dirs_in_os}
+    n_renamed', self.n_renamed)
+    n_processed_files_in_trg = {n_processed_files)
+    n_updated_dbentries = {n_updated_dbentries)
+    n_restricted_dirs , 
+    'n_files_empty_sha1', self.n_files_empty_sha1)
+    'n_failed_filestat', self.n_failed_filestat)
+    'n_failed_sha1s', self.n_failed_sha1s)
+    'n_dbentries_ins_upd', self.n_dbentries_ins_upd)
+    'n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd)
+
+    """.format(**self.outdict)
+    return outstr
+
   def report(self):
     self.calc_totals()
     print('total_files_in_db', self.total_files_in_db)
@@ -216,30 +269,39 @@ class BulkRenamer:
     print('n_failed_sha1s', self.n_failed_sha1s)
     print('n_dbentries_ins_upd', self.n_dbentries_ins_upd)
     print('n_dbentries_failed_ins_upd', self.n_dbentries_failed_ins_upd)
+  # ------------------
+    print('-'*50)
+    print('Finish Time:', self.end_time)
+    print('Run Duration:', self.runduration)
 
   def process(self):
     self.walkup_dirtree_for_renames()
     if self.confirm_renames():
       self.do_renames()
+    self.end_time = datetime.datetime.now()
     self.report()
 
 
-def process():
+def sweep_dirtree_for_cleanning_forbidden_chars():
+  """
+  Forbidden characters are such as: "?", ":", "\", "/" etc.
+
+  # ------------------
+  print('Running DBEntryWithoutCorrespondingOsEntryDeleter. Please wait.')
+  dbentry_eraser = dbentry_del.DBEntryWithoutCorrespondingOsEntryDeleter(src_mountpath)
+  dbentry_eraser.process()
+  """
   start_time = datetime.datetime.now()
   print('Start Time', start_time)
   # ------------------
   src_mountpath, _ = defaults.get_src_n_trg_mountpath_args_or_default()
   renamer = BulkRenamer(src_mountpath)
   renamer.process()
-  print('Running DBEntryWithoutCorrespondingOsEntryDeleter. Please wait.')
-  dbentry_eraser = dbentry_del.DBEntryWithoutCorrespondingOsEntryDeleter(src_mountpath)
-  dbentry_eraser.process()
-  finish_time = datetime.datetime.now()
-  elapsed_time = finish_time - start_time
-  # ------------------
-  print('-'*50)
-  print('Finish Time:', finish_time)
-  print('Run Time:', elapsed_time)
+
+
+
+def process():
+  sweep_dirtree_for_cleanning_forbidden_chars()
 
 
 if __name__ == '__main__':
