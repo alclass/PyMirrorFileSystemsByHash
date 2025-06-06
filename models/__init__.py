@@ -1,2 +1,3 @@
-import sys
-sys.path.insert(0, '..')
+# Package models in DirTreeMirrorPy_PrdPrj
+# sys.path.insert(0, '..')
+pass

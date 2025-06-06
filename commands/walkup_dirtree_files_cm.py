@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+commands/walkup_dirtree_files_cm.py
+
 This script intends to "walk up" a dirtree and db-inserts file dirnodes.
 After this db-inserting, one application arises which is back-up between two disks
 (or in fact any two dirtrees - a dirtree is a directory with its descendants: subfolders and files).
@@ -44,7 +46,7 @@ It's called transient, because this system is not integrated with the OS's file 
   of files in disk before any copying, moving/renaming or deleting operations.
 """
 import datetime
-import os.path
+import os
 import sys
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
@@ -203,7 +205,7 @@ class FilesUpDirTreeWalker:
     self.n_processed_files += 1
     if self.n_processed_files < self.restart_at_walkloopseq:
       print('Jumping', self.n_processed_files, 'until', self.restart_at_walkloopseq)
-      return
+      return False
     filepath = os.path.join(self.ongoingfolder_abspath, filename)
     name = filename
     try:
@@ -214,7 +216,7 @@ class FilesUpDirTreeWalker:
         self.n_failed_filestat, 'of', self.total_files_in_os,
         'Could not filestat', filename
       )
-      return
+      return False
     bytesize = filestat.st_size
     mdatetime = filestat.st_mtime
     pydt = datetime.datetime.fromtimestamp(mdatetime)
