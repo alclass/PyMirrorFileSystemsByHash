@@ -1,48 +1,34 @@
 #!/usr/bin/env python3
 """
 commands/pyVideoCompressAfterDeleter.py
-  Deletes videos with selected-file-extension
-  (Ideally, these videos were compressed in a former run and may then be removed (deleted).
+  Deletes files with selected-file-extension from up a directory tree
+   The original use case was for videofiles videocompressed to another dirtree
+     in a former run and then available for removal (deletion).)
 
 Usage:
 ======
 
-$pyVideoPostCompressMoverNDeleter.py --input-dir <source_dirtree_abspath>
-   --output-dir <tareget_dirtree_abspath> [--ed] [--mc] [--dc]
+$pyVideoCompressAfterDeleter.py
+   --delfiles_rootdir <rootdir_from_where_deletes_will_happen>
+   --mirrored_rootdir <rootdir_which_contains_the_mirror_copied_or_compressed>
 
 Where:
 
-  --dc => means "delete (those) compressed",
-          ie delete files that have their compressed counterparts in the target dirtree
-           (for this batch deletion, one user confirmation is required)
-  --ed => means "equalize os-dates",
-          copystat() the metadata in the source videofiles to the target previously compressed ones
-  --mc => means "move complement",
-          ie all complementing files (*) are moved to the target dirtree
-            (*) complementing files are all files not having the video file extensions
-
+  --delfiles_rootdir => the root directory from which out-mirrored (copied or compressed) files will be deleted
+  --mirrored_rootdir => the root directory that contains the mirrored (copied or compressed) files
 
 Example Usage
 ==============
 
-  Ex1 $pyVideoPostCompressMoverNDeleter.py --input-dir "/media/user/disk1/Science/Physics"
-   --output-dir "/media/user/disk2/Science/Physics" --ed --mc
-
-  Ex2 $pyVideoPostCompressMoverNDeleter.py --input-dir "/media/user/disk1/Science/Physics"
-   --output-dir "/media/user/disk2/Science/Physics" --dc
-
-  In the first example, os-dates will be equalized and all complementing files
-    will be moved over the target dirtree
-
-  In the second example, larger videofiles that were (previously) compressed
-     will be deleted (a one-time user confirmation is required)
+$pyVideoCompressAfterDeleter.py
+   --delfiles_rootdir "/media/user/SSD EEEngSci D1"
+   --mirrored_rootdir "/media/user/EESci SSD2T orig"
 
 """
 import argparse
 import datetime
 import logging
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -51,12 +37,10 @@ DEFAULT_COMPRESSABLE_DOT_EXTENSIONS = [".mp4", ".mkv", ".avi", ".mov", ".wmv", "
 ACCEPTED_RESOLUTIONS = [(256, 144), (426, 240), (640, 360), (854, 480), (1280, 720)]
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Compress videos to a specified resolution.")
-parser.add_argument("--input_dir", type=str, default="videos/",
-                    help="Directory to process videos from")
-parser.add_argument("--output_dir", type=str, default="compressed_videos/",
-                    help="Directory to save compressed videos")
-parser.add_argument("--resolution", type=str, default="256:144",
-                    help="Target resolution (e.g., 256:144)")
+parser.add_argument("--delfiles_rootdir", type=str, default="videos/",
+                    help="Directory delfiles_rootdir")
+parser.add_argument("--mirrored_rootdir", type=str, default="compressed_videos/",
+                    help="Directory ")
 args = parser.parse_args()
 
 
@@ -82,7 +66,7 @@ class Log:
   """
   users_home_dir = os.path.expanduser("~")
   log_folder = f"{users_home_dir}/bin/logs"
-  log_filename = f"{time.strftime('%Y-%m-%d_%H-%M-%S')} videos deleter errors.log"
+  log_filename = f"{time.strftime('%Y-%m-%d_%H-%M-%S')} file under extensions deleter errors.log"
   log_filepath = os.path.join(log_folder, log_filename)
 
   @classmethod
@@ -143,48 +127,48 @@ def get_actual_video_resolution_of(video_path):
   return None, None
 
 
-class FileMoveNDeleterFromToDirTree:
+class FileDeleterAsMirroredInDirTrees:
 
-  compressable_dot_extensions = DEFAULT_COMPRESSABLE_DOT_EXTENSIONS
+  dot_extensions_for_deletion = DEFAULT_COMPRESSABLE_DOT_EXTENSIONS
 
-  def __init__(
-      self, src_rootdir_abspath, trg_rootdir_abspath,
-      do_move=True, replicate_osdates=False, delete_if_compressed=False,
-  ):
-    self.src_rootdir_abspath = src_rootdir_abspath  # source root directory (or scrdirtree) abspath
-    self.trg_rootdir_abspath = trg_rootdir_abspath  # target root directories (or trgdirtree) abspath
-    self.do_move = do_move
-    self.replicate_osdates = replicate_osdates
-    self.delete_if_compressed = delete_if_compressed
+  def __init__(self, delfiles_rootdir, mirrored_rootdir):
+    self.delfiles_rootdir = delfiles_rootdir  # source root directory (or scrdirtree) abspath
+    self.mirrored_rootdir = mirrored_rootdir  # target root directories (or trgdirtree) abspath
     self.treat_params()
     self.src_currdir_abspath = None  # its trg equivalent is a class property (i.e., dynamically found)
     self.files_deletion_queue = []
-    self.n_file_does_not_exist = 0
-    self.n_videos_yet_to_delete = 0
-    self.n_files_not_deleted = 0
+    self.n_videos_yet_to_delete = 0  # an iter variable ie a variable for displaying progress of how many yet to go
+    self.n_effective_deletes = 0
     self.n_failed_delete = 0
     self.total_files = 0
-    self.n_file_passing = 0  # counts each file coming up via os.walk()
-    self.n_video_passing = 0  # counts each file that has the eligible video extensions (mp4, mkv, etc.)
-    self.n_videos_in_dirtree = 0  # counts each file that has the eligible video extensions (mp4, mkv, etc.)
-    self.n_dir_passing = 0  # counts each directory coming up via os.walk()
+    self.n_files_in_dir_for_deletion = 0
+    self.n_dirs_in_iter = 0
+    self.total_dirs = 0
+    self.n_file_in_iter = 0  # counts each file coming up via os.walk()
+    self.n_deletable_file_in_iter = 0  # counts each file that has the eligible video extensions (mp4, mkv, etc.)
+    self.total_deletable = 0  # counts each file that has the eligible video extensions (mp4, mkv, etc.)
+    self.n_dir_in_iter = 0  # counts each directory coming up via os.walk()
     self.n_dirs_for_reaching = 0
-    self.n_videos_for_deletion = 0
-    self.n_files_moved_over = 0
-    self.n_videos_out_of_files = 0
-    self.n_not_videodeletable = 0
-    self.n_files_metadata_recovered = 0  # originally, the metadata recovery is aimed at videos previously compressed
-    self.n_failed_files_moved_over = 0
+    # self.n_files_in_for_deletion = 0 this is a property as len(files_deletion_queue)
+    # self.n_not_videodeletable = 0 this is also a property as total_files - total_videos
     self.n_failed_file_deletes = 0
-    self.n_files_not_existing_in_src = 0  # counts videofiles that don't exist in the source (were moved out?)
-    self.n_files_not_existing_in_trg = 0  # counts videofiles that don't exist in the source (were moved out?)
+    self.n_files_not_existing_in_src = 0
+    self.n_files_not_existing_in_trg = 0
     self.begin_time = datetime.datetime.now()  # it marks script's begintime
     self.end_time = None  # will mark script's endtime at the report calling time
 
   def treat_params(self):
-    if not os.path.isdir(self.src_rootdir_abspath):
-      errmsg = f"Error: source dirtree path {self.src_rootdir_abspath} does not exist."
+    if not os.path.isdir(self.delfiles_rootdir):
+      errmsg = f"Error: source dirtree path {self.delfiles_rootdir} does not exist."
       raise ValueError(errmsg)
+
+  @property
+  def n_files_in_deletion_queue(self):
+    return len(self.files_deletion_queue)
+
+  @property
+  def n_files_not_deletable(self):
+    return self.total_files - self.total_deletable
 
   @property
   def relative_working_dirpath(self):
@@ -197,7 +181,7 @@ class FileMoveNDeleterFromToDirTree:
       that receives the compressed video
     :return _relative_working_dirpath: the relative path as an object's (dynamical) property
     """
-    _relative_working_dirpath = self.src_currdir_abspath[len(self.src_rootdir_abspath):]
+    _relative_working_dirpath = self.src_currdir_abspath[len(self.delfiles_rootdir):]
     # relative_working_dirpath should not begin with /
     if _relative_working_dirpath.startswith('/'):
       _relative_working_dirpath = _relative_working_dirpath.lstrip('/')
@@ -217,7 +201,7 @@ class FileMoveNDeleterFromToDirTree:
          absolute ongoing dirpath
     """
     try:
-      _trg_currdir_abspath = os.path.join(self.trg_rootdir_abspath, self.relative_working_dirpath)
+      _trg_currdir_abspath = os.path.join(self.mirrored_rootdir, self.relative_working_dirpath)
     except (OSError, ValueError) as e:
       errmsg = f"In the method that derives the relative working path => {e}"
       raise OSError(errmsg)
@@ -266,16 +250,16 @@ class FileMoveNDeleterFromToDirTree:
     scrmsg = f"""=========================================
     Report after videocompressing
     =========================================
-    src_rootdir_abspath = {self.src_rootdir_abspath}
-    trg_rootdir_abspath = {self.trg_rootdir_abspath}
+    src_rootdir_abspath = {self.delfiles_rootdir}
+    trg_rootdir_abspath = {self.mirrored_rootdir}
     error_log_file      = {Log.log_filepath}
     -----------------------------------------
-    total dirs visited = {self.n_dir_passing}
+    total dirs visited = {self.n_dir_in_iter}
     total dirs for processing = {self.n_dirs_for_reaching}
-    total files visited = {self.n_file_passing}
-    total videos visited = {self.n_video_passing}
+    total files visited = {self.n_file_in_iter}
+    total videos visited = {self.n_deletable_file_in_iter}
     total files = {self.total_files}
-    total videos in dirtree = {self.n_videos_in_dirtree}
+    total videos in dirtree = {self.total_deletable}
     -----------------------------------------
     begin_time = {self.begin_time}
     end_time = {self.end_time}
@@ -283,80 +267,17 @@ class FileMoveNDeleterFromToDirTree:
     """
     print(scrmsg)
 
-  def process_command(self, filename):
-    input_file_abspath = self.get_curr_input_file_abspath(filename)
-
   def is_file_by_extension_eligible_to_move(self, filename):
-    if filename.endswith(tuple(self.compressable_dot_extensions)):
+    if filename.endswith(tuple(self.dot_extensions_for_deletion)):
       return False
     return True
-
-  def move_files_from_to_dirtrees(self, filename):
-    """
-    Moves files from the source dirtree to the destination dirtree
-    This method is called if self.do_move is True
-
-    :param filename:
-    :return: bool_moved_occurred: boolean
-    """
-    if not self.is_file_by_extension_eligible_to_move(filename):
-      # the file is not eligible for moving because it's a video looked up for compression
-      return False
-    numbering = (f"passing={self.n_file_passing} | videosprocessed={self.n_video_passing}"
-                 f" | totalvideos={self.n_videos_in_dirtree} | totalfiles={self.total_files}")
-    scrmsg = f"{numbering} | visiting filename = {filename}"
-    print(scrmsg)
-    input_file_abspath = self.get_curr_input_file_abspath(filename)
-    output_file_abspath = self.get_curr_output_file_abspath(filename)
-    if not os.path.isfile(input_file_abspath):
-      self.n_file_does_not_exist += 1
-      numbering = (f"not-copied={self.n_file_does_not_exist} | reached={self.n_file_passing}"
-                   f" | total={self.n_videos_for_deletion}")
-      print(f"{numbering} | video file does not exist (or was moved out) in source.")
-      return False
-    if os.path.isfile(output_file_abspath):
-      self.n_videos_for_deletion += 1
-      numbering = (f"not-copied={self.n_videos_skipped} | reached={self.n_file_passing}"
-                   f" | total={self.n_videos_for_compression}")
-      print(f"{numbering} | video filename already exists in target.")
-      return False
-    try:
-      # shutil.move(input_file_abspath, output_file_abspath)
-      return True
-    except (OSError, IOError) as e:
-      # logging and printing the error context
-      self.n_failed_files_moved_over += 1
-      strline = "-" * 35
-      print(strline)
-      logging.error(strline)
-      numbering = (f"failed_copy={self.n_failed_videos_copied_over} | reached={self.n_file_passing}"
-                   f" | total={self.n_videos_for_compression}")
-      errmsg = f"{numbering} | videopath = {input_file_abspath}) \n\tError = {e}"
-      logging.error(errmsg)
-      print(errmsg)
-      return False
-
-  def was_chosen_complementary_move(self, filename):
-    if not self.do_move:
-      return False
-    return self.move_files_from_to_dirtrees(filename)
-
-  def was_chosen_videofile_metadata_recuperation(self, filename):
-    """
-
-    :param filename:
-    :return:
-    """
-    if not self.do_recuperate_metadata:
-      return False
-    return self.recuperate_metadata(filename)
 
   def delete_files_in_queue(self):
     for seq, to_delete_filepath in enumerate(self.files_deletion_queue):
       try:
         os.remove(to_delete_filepath)
-        self.n_deleted += 1
-        scrmsg = f"\tDeleting {self.n_deleted} | {seq} | file=[{to_delete_filepath}]"
+        self.n_effective_deletes += 1
+        scrmsg = f"\t{seq}/{self.n_effective_deletes} => deleting | file=[{to_delete_filepath}]"
         print(scrmsg)
       except (OSError, IOError) as e:
         # logging and printing the error context
@@ -364,11 +285,26 @@ class FileMoveNDeleterFromToDirTree:
         strline = "-" * 35
         print(strline)
         logging.error(strline)
-        numbering = (f"failed_delete={self.n_failed_delete} | reached={self.n_file_passing}"
+        numbering = (f"failed_delete={self.n_failed_delete} | reached={self.n_file_in_iter}"
                      f" | totalfiles={self.total_files}")
         errmsg = f"{numbering} | file_to_delete = {to_delete_filepath} \n\tError = {e}"
         logging.error(errmsg)
         print(errmsg)
+
+  def check_existence_of_mirrored_file_ifnot_return_false(self, filename):
+    mirrored_file_abspath = self.get_curr_output_file_abspath(filename)
+    if not os.path.isfile(mirrored_file_abspath):
+      self.n_files_not_existing_in_trg += 1
+      numbering = (f"n_files_not_deletable={self.n_files_not_deletable} | n_file_in_iter={self.n_file_in_iter}"
+                   f" | total_deletable={self.total_deletable}")
+      errmsg = f"""Error: mirrored file of its deletable does not exist. Cannot continue. Aborting program.
+      {numbering}
+      filepath = {mirrored_file_abspath}
+      """
+      logging.error(errmsg)
+      print(errmsg)
+      return False
+    return True
 
   def queue_up_target_file_for_later_deletion(self, filename):
     """
@@ -385,63 +321,52 @@ class FileMoveNDeleterFromToDirTree:
     :param filename:
     :return:
     """
-    # input_file_abspath = self.get_curr_input_file_abspath(filename)
-    target_file_abspath = self.get_curr_output_file_abspath(filename)
-    if not os.path.isfile(target_file_abspath):
-      self.n_files_not_deleted += 1
-      numbering = (f"not-deletedd={self.n_files_not_deleted} | reached={self.n_file_passing}"
-                   f" | videos_in_dirtree={self.n_videos_in_dirtree}")
-      print(f"{numbering} | video file does not exist (or was moved out) in source.")
+    if not filename.endswith(tuple(self.dot_extensions_for_deletion)):
       return False
-    try:  # copy this part to the real delete method
-      # os.remove(target_file_abspath)
-      self.files_deletion_queue.append(target_file_abspath)
-      return True
-    except (OSError, IOError) as e:
-      # logging and printing the error context
-      self.n_failed_delete += 1
-      strline = "-"*35
-      print(strline)
-      logging.error(strline)
-      numbering = (f"failed_delete={self.n_failed_delete} | reached={self.n_file_passing}"
-                   f" | totalfiles={self.n_total_files}")
-      errmsg = f"{numbering} | videopath = {target_file_abspath}) \n\tError = {e}"
-      logging.error(errmsg)
-      print(errmsg)
+    deletable_file_abspath = self.get_curr_input_file_abspath(filename)
+    if not os.path.isfile(deletable_file_abspath):
+      self.n_files_not_existing_in_src += 1
+      numbering = (f"n_files_not_deletable={self.n_files_not_deletable} | n_file_in_iter={self.n_file_in_iter}"
+                   f" | total_deletable={self.total_deletable}")
+      errmsg = f"""Error: deletable file does not exist. Cannot continue. Aborting program.
+      {numbering}
+      filepath = {deletable_file_abspath}
+      """
+      raise OSError(errmsg)
+    if not self.check_existence_of_mirrored_file_ifnot_return_false(filename):
       return False
+    self.n_deletable_file_in_iter += 1
+    scrmsg = f"n_deletable_file_in_iter={self.n_deletable_file_in_iter} => queueing file [{filename}]"
+    print(scrmsg)
+    self.files_deletion_queue.append(deletable_file_abspath)
+    return True
 
-  def verify_queuedelete_for_a_previously_processed_videofile(self, filename):
-    if filename.endswith(tuple(self.compressable_dot_extensions)):
-      return self.queue_up_target_file_for_later_deletion(filename)
-    # count file is not delete-queueable
-    self.n_not_videodeletable += 1
-
-  def process_files_in_folder(self, files):
+  def queue_up_deletable_files_for_later_deletion(self, files):
     for filename in files:
-      self.verify_queuedelete_for_a_previously_processed_videofile(filename)
+      self.n_file_in_iter += 1
+      self.queue_up_target_file_for_later_deletion(filename)
 
   def process_in_oswalk(self):
-    self.n_file_passing = 0
-    for self.src_currdir_abspath, _, files in os.walk(self.src_rootdir_abspath):
-      self.n_dir_passing += 1
+    self.n_file_in_iter = 0
+    for self.src_currdir_abspath, _, files in os.walk(self.delfiles_rootdir):
+      self.n_dir_in_iter += 1
       n_files_in_dir = len(files)
-      scrmsg = (f"Visited dirs {self.n_dir_passing} | total dirs {self.n_dirs_for_compression} "
+      scrmsg = (f"n_dir_in_iter={self.n_dir_in_iter} | total dirs {self.total_dirs} "
                 f"| going to check {n_files_in_dir} files in [{self.src_currdir_abspath}]")
       print(scrmsg)
-      self.process_files_in_folder(files)
+      self.queue_up_deletable_files_for_later_deletion(files)
 
   def confirm_videoprocessing_with_the_counting(self):
     scrmsg = f""" =========================
     *** Confirmation needed
     Confirm the videocompressing with the following counts:
       log_filepath    = {Log.log_filepath}
-      source root dir = {self.src_rootdir_abspath}
-      target root dir = {self.trg_rootdir_abspath}
-      target extensions = {self.compressable_dot_extensions}
+      source root dir = {self.delfiles_rootdir}
+      target root dir = {self.mirrored_rootdir}
+      target extensions = {self.dot_extensions_for_deletion}
       total_files       = {self.total_files}
-      n_dirs_to_process = {self.n_dirs_for_compression}
-      n_videos_for_compression = {self.n_videos_for_compression}
-      n_videos_yet_to_compress = {self.n_videos_yet_to_compress}
+      total_dirs        = {self.total_dirs}
+      n_files_for_deletion = {self.n_files_in_deletion_queue}
     -----------------------
     [Y/n] ? [ENTER] means Yes
     """
@@ -450,19 +375,40 @@ class FileMoveNDeleterFromToDirTree:
       return True
     return False
 
+  def do_delete(self):
+    self.n_effective_deletes = 0
+    total_deletable = len(self.files_deletion_queue)
+    for i, filepath in enumerate(self.files_deletion_queue):
+      seq = i + 1
+      numbering = f"{self.n_effective_deletes}/{seq} of {total_deletable} of {self.total_files}"
+      try:
+        os.remove(filepath)
+        self.n_effective_deletes += 1
+        scrmsg = f"{numbering} => deleted [{filepath}]"
+        print(scrmsg)
+      except (OSError, IOError) as e:
+        self.n_failed_delete += 1
+        errmsg = f"{self.n_failed_delete} {numbering} \n => failed delete for {filepath} \n {e}"
+        logging.error(errmsg)
+        print(errmsg)
+
   def confirm_queued_files_deletion(self):
+    for i, filepath in enumerate(self.files_deletion_queue):
+      seq = i + 1
+      scrmsg = f"{seq} to delete [{filepath}]"
+      print(scrmsg)
     scrmsg = f""" =========================
     *** Confirmation needed
-    Confirm deletion of these files:
-      log_filepath    = {Log.log_filepath}
-      source root dir = {self.src_rootdir_abspath}
-      target root dir = {self.trg_rootdir_abspath}
-      target extensions = {self.compressable_dot_extensions}
-      total_files       = {self.total_files}
-      n_dirs_to_process = {self.n_dirs_for_reaching}
-      ! n_files_not_deleted = {self.n_files_not_deleted}
-      n_videos_yet_to_delete = {self.n_videos_yet_to_delete}
     -----------------------
+      log_filepath    = {Log.log_filepath}
+      source root dir = {self.delfiles_rootdir}
+      target root dir = {self.mirrored_rootdir}
+      target extensions = {self.dot_extensions_for_deletion}
+      total_files     = {self.total_files}
+      total_dirs      = {self.total_dirs}
+      n_deletable      = {len(self.files_deletion_queue)}
+    -----------------------
+    Confirm deletion of the files above:
     [Y/n] ? [ENTER] means Yes
     """
     ans = input(scrmsg)
@@ -471,28 +417,28 @@ class FileMoveNDeleterFromToDirTree:
     return False
 
   def count_grouped_files_under_video_extensions(self, files):
-    n_videos_for_compression = 0
+    n_files_in_dir_for_deletion = 0
     for filename in files:
       self.total_files += 1
-      if filename.endswith(tuple(self.compressable_dot_extensions)):
-        n_videos_for_compression += 1
-        scrmsg = f"{n_videos_for_compression} counting, {self.n_videos_for_compression} counted"
+      if filename.endswith(tuple(self.dot_extensions_for_deletion)):
+        n_files_in_dir_for_deletion += 1
+        scrmsg = f"n_files_in_dir_for_deletion={n_files_in_dir_for_deletion} counting, {self.total_deletable} counted"
         print(scrmsg)
         scrmsg = f"{filename} in [{self.src_currdir_abspath}]"
         print(scrmsg)
-    return n_videos_for_compression
+    return n_files_in_dir_for_deletion
 
   def precount_dirs_n_files(self):
     print("Precounting dirs & files for videocompressing")
-    print(f"looking and counting those with extensions: {self.compressable_dot_extensions}")
+    print(f"looking and counting those with extensions: {self.dot_extensions_for_deletion}")
     self.total_files = 0
-    self.n_dirs_for_reaching = 0
-    self.n_videos_out_of_files = 0
-    for self.src_currdir_abspath, _, files in os.walk(self.src_rootdir_abspath):
-      n_videos_out_of_files = self.count_grouped_files_under_video_extensions(files)
-      if n_videos_out_of_files > 0:
-        self.n_dirs_for_reaching += 1
-        self.n_videos_out_of_files += n_videos_out_of_files
+    self.n_dirs_in_iter = 0
+    self.n_files_in_dir_for_deletion = 0
+    for self.src_currdir_abspath, _, files in os.walk(self.delfiles_rootdir):
+      n_files_in_dir_for_deletion = self.count_grouped_files_under_video_extensions(files)
+      if n_files_in_dir_for_deletion > 0:
+        self.n_dirs_in_iter += 1
+        self.n_files_in_dir_for_deletion += n_files_in_dir_for_deletion
 
   def process(self):
     """
@@ -502,6 +448,7 @@ class FileMoveNDeleterFromToDirTree:
     self.process_in_oswalk()
     if not self.confirm_queued_files_deletion():
       return False
+    self.do_delete()
     self.show_final_report()
     return True
 
@@ -522,30 +469,27 @@ def get_cli_args():
       sys.exit(0)
   except AttributeError:
     pass
-  src_rootdir_abspath = args.input_dir
-  trg_rootdir_abspath = args.output_dir
-  resolution_tuple = extract_width_n_height_from_cli_resolution_arg(args)
-  return src_rootdir_abspath, trg_rootdir_abspath, resolution_tuple
+  delfiles_rootdir = args.delfiles_rootdir
+  mirrored_rootdir = args.mirrored_rootdir
+  return delfiles_rootdir, mirrored_rootdir
 
 
 def confirm_cli_args_with_user():
-  src_rootdir_abspath, trg_rootdir_abspath, resolution_tuple = get_cli_args()
-  print(src_rootdir_abspath, trg_rootdir_abspath, resolution_tuple)
-  if not os.path.isdir(src_rootdir_abspath):
+  delfiles_rootdir, mirrored_rootdir = get_cli_args()
+  print(delfiles_rootdir, mirrored_rootdir)
+  if not os.path.isdir(delfiles_rootdir):
     scrmsg = "Source directory [{src_rootdir_abspath}] does not exist. Please, retry."
     print(scrmsg)
     return False
-  if not os.path.isdir(trg_rootdir_abspath):
+  if not os.path.isdir(mirrored_rootdir):
     scrmsg = "Target directory [{trg_rootdir_abspath}] does not exist. Please, retry."
     print(scrmsg)
     return False
   print('Paramters')
   print('='*20)
-  scrmsg = f"Source directory = [{src_rootdir_abspath}]"
+  scrmsg = f"delfiles_rootdir = [{delfiles_rootdir}]"
   print(scrmsg)
-  scrmsg = f"Target directory = [{trg_rootdir_abspath}]"
-  print(scrmsg)
-  scrmsg = f"Resolution = [{resolution_tuple}]"
+  scrmsg = f"mirrored_rootdir = [{mirrored_rootdir}]"
   print(scrmsg)
   scrmsg = f"Error-log file = [{Log.log_filepath}]"
   print(scrmsg)
@@ -556,7 +500,7 @@ def confirm_cli_args_with_user():
   confirmed = False
   if ans in ['Y', 'y', '']:
     confirmed = True
-  return confirmed, src_rootdir_abspath, trg_rootdir_abspath, resolution_tuple
+  return confirmed, delfiles_rootdir, mirrored_rootdir
 
 
 def adhoc_test2():
@@ -583,10 +527,10 @@ def adhoc_test1():
 
 def process():
   Log.start_logging()
-  confirmed, src_rootdir_abspath, trg_rootdir_abspath, resolution_tuple = confirm_cli_args_with_user()
+  confirmed, delfiles_rootdir, mirrored_rootdir = confirm_cli_args_with_user()
   if confirmed:
-    moveretc = FileMoveNDeleterFromToDirTree(src_rootdir_abspath, trg_rootdir_abspath, resolution_tuple)
-    moveretc.process()
+    deleter = FileDeleterAsMirroredInDirTrees(delfiles_rootdir, mirrored_rootdir)
+    deleter.process()
     return True
   logging.shutdown()
   return False

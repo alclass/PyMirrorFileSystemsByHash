@@ -5,16 +5,19 @@ commands/pyVideoCompressPostMoverNMetadataSync.py
   This script has two main functionalities, ie:
     1 it moves files that do not have a certain set of file extensions
       This is useful as a post-action to a previous videocompression run, where videos were compressed
-        to another dirtree
-    2 it copies (or sync) the file metadata of video files that are complementary to the set above
+        to another dirtree, but it can be used for any case where a group of extensions is excluded from move
+    2 it copies (or sync) the file metadata of video files that are complementary to the set above.
       The use case here is motivated by the fact that
         the videocompress process does not copy the metadata to the video files compressed
-          to the target dirtree, so a second run for resync'ing these metadata is needed
+          to the target dirtree, so a second run for resync'ing these metadata is needed.
+          Also, like the first use case above, it can be used for files under a certain group of extensions.
 
     Obs: the former third 'delete' functionality was removed from here and put in another script
          (at this time, this 'deleter' script is pyVideoCompressAfterDeleter.py)
+         This split is because the delete operation cannot be undone, so it made sense separate that delete action.
 
-  In a nutshell, either a file, in the source treedir, will be moved, or it will be copystat'd.
+  In a nutshell, either files, not having a certain group of extension, in the source treedir, will be moved,
+   or, complementary files -- those having a certain group of extensions --, will be copystat'd.
   (One set [movable] complements the other [copystatable] representing all files in the source treedir.)
 
 Usage:
@@ -137,7 +140,7 @@ class FileFromToDirTreeMetadataResyncNMover:
     self.total_dirs = 0  # total of directories in the source dirtree
     self.n_movable_file_in_iter = 0  # counts each file coming up via os.walk() and it's movable
     self.n_sel_ext_videofile_in_iter = 0  # counts each file that has the eligible video extensions (mp4, mkv, etc.)
-    self._n_file_in_iter = None  # [for @property] equals to n_movable_file_in_iter + n_sel_ext_videofile_in_iter
+    # self.n_file_in_iter is a @property [@see below] equals to n_movable_file_in_iter + n_sel_ext_videofile_in_iter
     self.n_allfiles_in_iter = 0  # the same as the one above but this is counted directly
     self.total_files_to_move = 0  # pre-counted total of movable files
     self.total_selected_videofiles = 0  # pre-counted file total that have the eligible video extensions mp4, mkv, etc
@@ -163,11 +166,9 @@ class FileFromToDirTreeMetadataResyncNMover:
   @property
   def n_file_in_iter(self):
     """
-    equals to n_movable_file_in_iter + n_sel_ext_videofile_in_iter
+    This is a dynamic property which is equal to n_movable_file_in_iter + n_sel_ext_videofile_in_iter
     """
-    if self._n_file_in_iter is None:
-      self._n_file_in_iter = self.n_movable_file_in_iter + self.n_sel_ext_videofile_in_iter
-    return self._n_file_in_iter
+    return self.n_movable_file_in_iter + self.n_sel_ext_videofile_in_iter
 
   @property
   def total_files(self):
@@ -292,21 +293,38 @@ class FileFromToDirTreeMetadataResyncNMover:
     This method looks for the complement set of compressable_dot_extensions
       ie the files that do not have the video file extensions
     """
+    # print('is_file_by_its_extension_movable', filename)
+    # print('\t', self.src_currdir_abspath)
     if filename.endswith(tuple(self.nonmovable_file_extensions)):
       # file is a video, not to be moved in-between dirtrees
       return False
     # file is not a video, to be moved over
+    pass
     return True
 
   def is_file_a_video_by_extension(self, filename):
     return not self.is_file_by_its_extension_movable(filename)
 
   def copystat(self, filename):
+    """
+    The shutil.copystat() function in Python copies several metadata attributes from a source file
+      to a destination file. Specifically, it copies:
+
+        Permission bits: These determine who can read, write, and execute the file.
+        Last access time: The timestamp of the last time the file was accessed.
+        Last modification time: The timestamp of the last time the file's content was modified.
+        Flags: System-specific flags associated with the file.
+        Extended attributes (on Linux): Additional metadata associated with the file.
+
+    It's important to note that shutil.copystat() does not copy the file's content, owner, or group information.
+      It only transfers the metadata attributes mentioned above.
+    """
     if not self.is_file_a_video_by_extension(filename):
-      # file is not a video, so it's not the case for sync'ing dates metadata
+      # file is not a video, so it's not the case for sync'ing metadata (ie applying shutil.copystat())
       return False
-    self.n_files_metadata_copiedover += 1
-    numbering = (f"n_file_in_iter={self.n_file_in_iter} | n_movable_file_in_passing={self.n_files_metadata_copiedover}"
+    self.n_sel_ext_videofile_in_iter += 1
+    numbering = (f"n_file_in_iter={self.n_file_in_iter}"
+                 f" | n_sel_ext_videofile_in_iter={self.n_sel_ext_videofile_in_iter}"
                  f" | totalvideos={self.total_selected_videofiles} | totalfiles={self.total_files}")
     scrmsg = f"{numbering} | visiting filename = {filename}"
     print(scrmsg)
@@ -332,6 +350,11 @@ class FileFromToDirTreeMetadataResyncNMover:
       scrmsg = f"\tfrom: {input_file_abspath}"
       print(scrmsg)
       shutil.copystat(input_file_abspath, output_file_abspath)
+      self.n_files_metadata_copiedover += 1
+      numbering = (f"n_files_metadata_copiedover={self.n_files_metadata_copiedover}"
+                   f" | n_sel_ext_videofile_in_iter={self.n_sel_ext_videofile_in_iter}"
+                   f" | total_selected_videofiles={self.total_selected_videofiles} | totalfiles={self.total_files}")
+      print(f"{numbering} \n => copystat's file={output_file_abspath}")
       return True
     except (OSError, IOError) as e:
       # logging and printing the error context
@@ -359,27 +382,29 @@ class FileFromToDirTreeMetadataResyncNMover:
       # file is not eligible for moving because it's a video looked up for compression (in a previous script)
       return False
     self.n_movable_file_in_iter += 1
-    numbering = (f"n_file_in_iter={self.n_file_in_iter} | n_movable_file_in_passing={self.n_movable_file_in_iter}"
+    numbering = (f"n_file_in_iter={self.n_file_in_iter} | n_movable_file_in_iter={self.n_movable_file_in_iter}"
                  f" | totalvideos={self.total_selected_videofiles} | totalfiles={self.total_files}")
     scrmsg = f"{numbering} | visiting filename = {filename}"
     print(scrmsg)
     input_file_abspath = self.get_curr_input_file_abspath(filename)
-    output_file_abspath = self.get_curr_output_file_abspath(filename)
     if not os.path.isfile(input_file_abspath):
       self.n_files_not_existing_in_src += 1
       numbering = (f"not-moved not-exist={self.n_files_not_existing_in_src} | movableiter={self.n_movable_file_in_iter}"
                    f" | totalmovable={self.total_files_to_move} | totalfiles={self.total_files}")
       print(f"{numbering} | file does not exist (or was moved out) in source.")
       return False
+    output_file_abspath = self.get_curr_output_file_abspath(filename)
     if os.path.isfile(output_file_abspath):
       self.n_files_existing_in_trg_when_move += 1
       numbering = (f"n_files_existing_in_trg={self.n_files_existing_in_trg_when_move}"
                    f" | movableiter={self.n_movable_file_in_iter}"
                    f" | movabletotal={self.total_files_to_move} | totalfiles={self.total_files}")
-      print(f"{numbering} | video filename already exists in target.")
+      print(f"{numbering} | file already exists in target, cannot move, returning.")
       return False
     try:
       shutil.move(input_file_abspath, output_file_abspath)
+      self.n_files_moved_over += 1
+      print(self.n_files_moved_over, ' *** Moved to', output_file_abspath)
       return True
     except (OSError, IOError) as e:
       # logging and printing the error context
@@ -500,8 +525,6 @@ class FileFromToDirTreeMetadataResyncNMover:
       return False
     self.precount_dirs_n_files()
     self.process_in_oswalk()
-    if not self.confirm_queued_files_deletion():
-      return False
     self.show_final_report()
     return True
 
