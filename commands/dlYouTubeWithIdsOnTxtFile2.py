@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+commands/dlYouTubeWithIdsOnTxtFile2.py
+
 Usage:
   $ytids_functions.py [<videocodecom>] [-p=<directory_path>] [-e=<extra-repos-path>]
 Where:
@@ -21,15 +23,20 @@ Detail in where the sqlite repo is found:
   In this latter case, parameter "--create", passed in as argument (sys.argv), will create a new repo file available
   in the working (executing or passed) directory.
 
-Example (with parameter --create)
+Example (with parameter --create):
+
   $ytids_functions.py 278+249 --create -p="/media/External HD/Science/Bio videos"
   1) without --create, a path descending lookup will happen
   2) with --create, either the sqlite repo file is used in locus (working directory or the one passed with -p)
-     or a new one is create there
+     or a new one is created there
 """
+# system-wide imports
 import os
 import sqlite3
+import subprocess
+# import time
 import sys
+# local imports
 import fs.dirfilefs.ytids_functions as ytfs
 import fs.dirfilefs.ytids_maintainer as ytmt
 import default_settings as ds
@@ -111,8 +118,7 @@ class YtidsOnlyDownloader:
         bool_find_root_by_pathdesc=True,
         rootdirpath=None,
         txtfilename_if_known=None,
-        extrarepo_ytids_sqlitedirpath=None
-    )
+        extrarepo_ytids_sqlitedirpath=None)
     """
     self.verify_create_flag_n_create_sqlitefile_if_needed()
     bool_find_root_by_pathdesc = not self.create_sqlite_on_workdir
@@ -159,12 +165,37 @@ class YtidsOnlyDownloader:
     return False
 
   def do_download(self):
+    """
+    On 2025-06-12 updated from os.system() to subprocess.run()
+      so that a control-C action might be caught via exception KeyboardInterrupt
+
+    Previously:
+      a control-C interrupted the underlying os.system() command but not the script itself
+    Currently:
+      a control-C will interrupt both the underlying os.system() command and also the script itself
+
+    About timeout
+      a timeout is not defined because a videodownload may take a long time and
+        the underlying wget treats it (at least in part, because possibly some cases may get stuck)
+
+    A next attempt for improvements (asynchronous runs):
+      => asyncio.create_subprocess_shell() for concurrent command handling.
+    """
     for i, ytid in enumerate(self.ytids_missing):
       url = interpol_yturl.format(ytid=ytid)
       comm = interpol_ytdlcomm.format(url=url, videocodecomb=self.videocodecomb)
       seq = i + 1
-      print(seq, comm)
-      os.system(comm)
+      scrmsg = f"{seq} | {ytid} | {comm}"
+      print(scrmsg)
+      try:
+        subprocess.run(comm, shell=True, check=True)  # timeout=5 (how long can a download last?)
+      # except subprocess.TimeoutExpired:
+      #     print(f"Command timed out: {comm}")
+      except subprocess.CalledProcessError as e:
+        print(f"Command failed with return code {e.returncode}: {comm}")
+      except KeyboardInterrupt:
+        print("Interrupted by user. Exiting loop.")
+        break
 
   def process(self):
     self.read_ytids_on_ytidsonly_textfile()
