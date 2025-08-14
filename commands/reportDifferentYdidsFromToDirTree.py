@@ -46,6 +46,10 @@ def get_elems_in_1_not_in_2(list1, list2):
   return list(set(filter(lambda e: e not in list2, list1)))
 
 
+def get_elems_in_both_1_n_2(list1, list2):
+  return list(set(filter(lambda e: e in list2, list1)))
+
+
 def fetch_execute_sql_in_sqlitefile(sql, sqlitefilepath):
   """
   Fetchs all 1-column rows in sqlitefile's ytid-table
@@ -71,6 +75,7 @@ class YtidsComparatorReporter:
     self.treat_attrs()
     self.src_ytids = []
     self.dst_ytids = []
+    self._ytids_in_both = None
     self._ytids_existing_in_src_not_in_dst = None
     self._ytids_existing_in_dst_not_in_src = None
 
@@ -128,6 +133,15 @@ class YtidsComparatorReporter:
     dirtree_name = 'source dirtree' if not destination else 'destination dirtree'
     print('\tdone: fetched', len(fetched), 'records from', dirtree_name)
 
+  @property
+  def ytids_in_both(self):
+    """
+    The union set of src_ytids with dst_ytids
+    """
+    if self._ytids_in_both is None:
+      self._ytids_in_both = get_elems_in_both_1_n_2(self.src_ytids, self.dst_ytids)
+    return self._ytids_in_both
+
   def process(self):
     self.fetch_ytids()  # fetch source dirtree first
     self.fetch_ytids(destination=True)  # then fetch destination dirtree
@@ -148,6 +162,8 @@ class YtidsComparatorReporter:
     number of dst ytids = {len(self.dst_ytids)}
     number of src ytids not in det = {len(self.ytids_existing_in_src_not_in_dst)}
     number of dst ytids not in src = {len(self.ytids_existing_in_dst_not_in_src)}
+    number of ytids in both src & dst = {len(self.ytids_in_both)}
+    union set (ytids in both) => {self.ytids_in_both}
     """
     return outstr
 
