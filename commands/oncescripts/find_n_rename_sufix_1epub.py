@@ -4,8 +4,8 @@ commands/oncescripts/find_n_rename_sufix_1epub.py
 """
 import datetime
 import default_settings as defaults
-import fs.dirfilefs.dir_n_file_fs_mod as dirf
-import fs.db.dbfailed_fileread_mod as freadfail
+import lib.dirfilefs.dir_n_file_fs_mod as dirf
+import lib.db.dbfailed_fileread_mod as freadfail
 import models.entries.dirtree_mod as dt
 import os
 DEFAULT_SUFIX_FOR_FIND_N_RENAME = ' 1.epub'

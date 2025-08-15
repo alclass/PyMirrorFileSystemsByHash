@@ -24,7 +24,7 @@ Obs:
 """
 import os
 import default_settings as ds
-import fs.dirfilefs.ytids_functions as ytfs
+import lib.dirfilefs.ytids_functions as ytfs
 import sqlite3
 
 
@@ -264,7 +264,7 @@ def process():
   # insert_difference_in_rootcontentfile()
   adhoctest()
   """
-  ppath = "/media/friend/Bio EE Sci Soc 2T Orig/Yt vi/BRA Polit yt vi/Plantão Brasil yu"
+  ppath = "/media/user/Bio EE Sci Soc 2T Orig/Yt vi/BRA Polit yt vi/Plantão Brasil yu"
   insertor = YtidsUpDirToSqlite(False, ppath)
   insertor.process()
 

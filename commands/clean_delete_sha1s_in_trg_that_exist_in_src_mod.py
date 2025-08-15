@@ -11,11 +11,11 @@ PLEASE, TAKE CARE WITH THE USE OF THIS SCRIPT.
 """
 import os.path
 
-import fs.db.dbdirtree_mod as dbdt
+import lib.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
-import fs.dirfilefs.dir_n_file_fs_mod as dirfil
-import fs.strnlistfs.strfunctions_mod as strf
+import lib.dirfilefs.dir_n_file_fs_mod as dirfil
+import lib.strnlistfs.strfunctions_mod as strf
 
 
 class TargetSameSha1ForceDeleter:

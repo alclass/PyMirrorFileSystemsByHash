@@ -10,13 +10,13 @@ Usage:
   reportYdidsRepeats.py <directory-path-where-the-sqlite-repo-resides>
 
 Example:
-  reportYdidsRepeats.py "/media/friend/Sci HD 2T"
+  reportYdidsRepeats.py "/media/user/Sci HD 2T"
 """
 import datetime
 import os
 import sys
 
-import fs.dirfilefs.ytids_functions as ytfs
+import lib.dirfilefs.ytids_functions as ytfs
 import models.entries.dirtree_mod as dt
 import default_settings as defaults
 

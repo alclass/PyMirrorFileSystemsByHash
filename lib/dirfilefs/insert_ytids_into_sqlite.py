@@ -6,8 +6,8 @@ Choices made for class YtidsTxtNSqliteMaintainer:
 ---------
 """
 import os
-import fs.dirfilefs.ytids_functions as ytfs
-import fs.dirfilefs.ytids_maintainer as ytmt
+import lib.dirfilefs.ytids_functions as ytfs
+import lib.dirfilefs.ytids_maintainer as ytmt
 import default_settings as ds
 
 
@@ -61,7 +61,7 @@ class DirTreeYtidCollector:
 
 
 def walk_dirtree_for_collecting_ytids():
-  walkstartpath = '/media/friend/Bio EE Sci Soc 2T Orig/Yt vi/BRA Polit yt vi/Meteoro Brasil yu'
+  walkstartpath = '/media/user/Bio EE Sci Soc 2T Orig/Yt vi/BRA Polit yt vi/Meteoro Brasil yu'
   dirtree = DirTreeYtidCollector(walkstartpath)
   dirtree.walk_dirtree_for_collecting_ytids()
   # dirtree.insertor()

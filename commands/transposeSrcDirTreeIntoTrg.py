@@ -22,7 +22,7 @@ Example Usage:
   transposeSrcDirTreeIntoTrg.py "/media/user/Sci-videos/Transient" "/media/user/Sci-videos"
 """
 import sys
-import fs.db.dbdirtree_mod as dbdt
+import lib.db.dbdirtree_mod as dbdt
 import default_settings as defaults
 # import models.entries.dirnode_mod as dn
 # import fs.strnlistfs.listfunctions_mod as listf

@@ -5,7 +5,7 @@ uTubeInsertRemoveYtidUpDirSqlite.py
 import os
 import sqlite3
 import sys
-import fs.dirfilefs.ytids_functions as ytfs
+import lib.dirfilefs.ytids_functions as ytfs
 import default_settings as ds
 
 
@@ -182,6 +182,6 @@ def process(argv=None, stdout_dirpass=None):
 
 if __name__ == '__main__':
   """
-  "/media/friend/Bio EE Sci Soc 2T Orig/Yt vi/BRA Polit yt vi/Meteoro Brasil yu"
+  "/media/user/Bio EE Sci Soc 2T Orig/Yt vi/BRA Polit yt vi/Meteoro Brasil yu"
   """
   process(stdout_dirpass=True)

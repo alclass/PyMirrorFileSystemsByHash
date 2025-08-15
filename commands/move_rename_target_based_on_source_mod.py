@@ -4,7 +4,7 @@ move_rename_target_based_on_source_mod.py
 """
 import os
 import shutil
-import fs.db.dbdirtree_mod as dbdt
+import lib.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
 import commands.dbentry_deleter_those_without_corresponding_osentry_cm as dbentr_del

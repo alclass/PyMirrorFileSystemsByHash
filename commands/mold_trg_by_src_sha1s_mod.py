@@ -11,8 +11,8 @@ import shutil
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
-import fs.dirfilefs.dir_n_file_fs_mod as dirf
-import fs.strnlistfs.strfunctions_mod as strf
+import lib.dirfilefs.dir_n_file_fs_mod as dirf
+import lib.strnlistfs.strfunctions_mod as strf
 
 
 class TrgBasedByrcSha1sMolder:

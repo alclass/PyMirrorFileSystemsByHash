@@ -12,7 +12,7 @@ import datetime
 import os.path
 import shutil
 import models.entries.dirnode_mod as dn
-import fs.db.dbdirtree_mod as dbdt
+import lib.db.dbdirtree_mod as dbdt
 import default_settings as defaults
 
 

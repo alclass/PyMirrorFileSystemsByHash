@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ytids_functions.py
+lib/dirfilefs/ytids_functions.py
 
 Choices made for class YtidsTxtNSqliteMaintainer:
 ---------
@@ -22,7 +22,7 @@ def is_str_a_64enc(str64):
   return True
 
 
-def is_str_an_11hchar__64enc(p_char11_enc64):
+def is_str_an_11hchar_64enc(p_char11_enc64):
   if not p_char11_enc64 or len(p_char11_enc64) != 11:
     return False
   return is_str_a_64enc(p_char11_enc64)

@@ -7,9 +7,9 @@ These rows are probably derived from the action of moving files (*) into the res
 
 (*) script dbentry_updater_by_filemove_based_on_size_n_mdt_cm.py does that (at the moment).
 """
-import fs.db.dbdirtree_mod as dbdt
+import lib.db.dbdirtree_mod as dbdt
 import default_settings as defaults
-import fs.dirfilefs.dir_n_file_fs_mod as dirfil
+import lib.dirfilefs.dir_n_file_fs_mod as dirfil
 
 
 class RowsWithRestrictedPathsCleaner:

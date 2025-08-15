@@ -37,8 +37,8 @@ import subprocess
 # import time
 import sys
 # local imports
-import fs.dirfilefs.ytids_functions as ytfs
-import fs.dirfilefs.ytids_maintainer as ytmt
+import lib.dirfilefs.ytids_functions as ytfs
+import lib.dirfilefs.ytids_maintainer as ytmt
 import default_settings as ds
 VIDEOCODES = ['278+249', '160+139', '160+140', '18', '392+139']
 DEFAULT_VIDEOCODE = VIDEOCODES[0]
@@ -264,6 +264,6 @@ def process(argv):
 
 if __name__ == '__main__':
   """
-  "/media/friend/Bio EE Sci Soc 2T Orig/Yt vi/BRA Polit yt vi/Meteoro Brasil yu"
+  "/media/user/Bio EE Sci Soc 2T Orig/Yt vi/BRA Polit yt vi/Meteoro Brasil yu"
   """
   process(sys.argv)

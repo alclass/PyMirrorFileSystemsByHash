@@ -8,7 +8,7 @@ This script does the following:
 import os.path
 import models.entries.dirtree_mod as dt
 import default_settings as defaults
-import fs.dirfilefs.dir_n_file_fs_mod as dirf
+import lib.dirfilefs.dir_n_file_fs_mod as dirf
 import models.entries.dirnode_mod as dn
 
 

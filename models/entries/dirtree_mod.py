@@ -4,8 +4,8 @@ import datetime
 import hashlib
 import math
 import os.path
-import fs.hashfunctions.hash_mod as hm
-import fs.db.dbdirtree_mod as dbu
+import lib.hashfunctions.hash_mod as hm
+import lib.db.dbdirtree_mod as dbu
 import models.entries.dirnode_mod as dn
 
 LF = '\n'

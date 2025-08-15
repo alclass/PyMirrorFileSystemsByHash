@@ -29,9 +29,11 @@ import sys
 # import fs.dirfilefs.ytids_functions as ytfs
 # import models.entries.dirtree_mod as dt
 # import default_settings as defaults
+import lib.dirfilefs.ytids_functions as ytfs  # .extract_ytid_from_filename
 default_sqlitefilename = ".updirfileentries.sqlite"
 default_dbtablename = "ytids"
 default_dbcolumn_name = "ytid"
+default_filepaths_tablename = 'files_in_tree'
 parser = argparse.ArgumentParser(description="Compare and report ytid differences in-between dirtrees.")
 parser.add_argument("--docstr", action="store_true",
                     help="show docstr help and exit")
@@ -50,7 +52,7 @@ def get_elems_in_both_1_n_2(list1, list2):
   return list(set(filter(lambda e: e in list2, list1)))
 
 
-def fetch_execute_sql_in_sqlitefile(sql, sqlitefilepath):
+def fetch_ytids_in_sqlitefile_wo_params(sql, sqlitefilepath):
   """
   Fetchs all 1-column rows in sqlitefile's ytid-table
   """
@@ -62,7 +64,41 @@ def fetch_execute_sql_in_sqlitefile(sql, sqlitefilepath):
     for row in retcursor.fetchall():
       ytid = row[0]
       ytids.append(ytid)
+  conn.close()
   return ytids
+
+
+def mount_n_get_dict_ytid_n_filepath(sqlitefilepath):
+  """
+  In a Python script we were developing, it creates a very large dict that we're afraid
+  may run into trouble with RAM-memory.
+  So we ask: what is a good way to make a data structure that, if larger than a config amount,
+  writes itself on disk, maybe a sqlite-file or anything that could be managed as a dict?
+  """
+  conn = sqlite3.connect(sqlitefilepath)
+  conn.row_factory = sqlite3.Row
+  cursor = conn.cursor()
+  sql = f"SELECT name, parentpath FROM {default_filepaths_tablename};"
+  retcursor = cursor.execute(sql)
+  odict = {}
+  if retcursor:
+    for row in retcursor.fetchall():
+      name = row['name']
+      ytid = ytfs.extract_ytid_from_filename(name)
+      if ytid is None:
+        continue
+      parentpath = row['parentpath']
+      filepath = os.path.join(parentpath, name)
+      odict[ytid] = filepath
+  conn.close()
+  return odict
+
+
+def get_tuplelist_ytids_filepaths_fr_ytids(ytids, sqlitefilepath):
+  indict = mount_n_get_dict_ytid_n_filepath(sqlitefilepath)
+  # outdict = dict(filter(lambda it: it[0] in ytids, indict.items()))
+  tuplelist = tuple(filter(lambda it: it[0] in ytids, indict.items()))
+  return tuplelist
 
 
 class YtidsComparatorReporter:
@@ -125,10 +161,10 @@ class YtidsComparatorReporter:
     """
     print(scrmsg)
     if not destination:
-      self.src_ytids = fetch_execute_sql_in_sqlitefile(sql, self.src_sqlitefilepath)
+      self.src_ytids = fetch_ytids_in_sqlitefile_wo_params(sql, self.src_sqlitefilepath)
       fetched = self.src_ytids
     else:
-      self.dst_ytids = fetch_execute_sql_in_sqlitefile(sql, self.dst_sqlitefilepath)
+      self.dst_ytids = fetch_ytids_in_sqlitefile_wo_params(sql, self.dst_sqlitefilepath)
       fetched = self.dst_ytids
     dirtree_name = 'source dirtree' if not destination else 'destination dirtree'
     print('\tdone: fetched', len(fetched), 'records from', dirtree_name)
@@ -141,6 +177,36 @@ class YtidsComparatorReporter:
     if self._ytids_in_both is None:
       self._ytids_in_both = get_elems_in_both_1_n_2(self.src_ytids, self.dst_ytids)
     return self._ytids_in_both
+
+  def list_filepaths_src_ytds_not_in_dst(self):
+    scrmsg = 'LIST filepaths_src_ytds_not_in_dst'
+    print(scrmsg)
+    if len(self.ytids_existing_in_src_not_in_dst) == 0:
+      scrmsg = '\tno filepaths_src_ytds_not_in_dst'
+      print(scrmsg)
+      return
+    ytids = self.ytids_existing_in_src_not_in_dst
+    tuplelist = get_tuplelist_ytids_filepaths_fr_ytids(ytids, self.src_sqlitefilepath)
+    for i, tupl in enumerate(tuplelist):
+      seq = i + 1
+      ytid, filepath = tupl
+      line = f"{seq} | {ytid} | [{filepath}]"
+      print(line)
+
+  def list_filepaths_dst_ytds_not_in_src(self):
+    scrmsg = 'LIST filepaths_dst_ytds_not_in_src'
+    print(scrmsg)
+    if len(self.ytids_existing_in_dst_not_in_src) == 0:
+      scrmsg = '\tno filepaths_dst_ytds_not_in_src'
+      print(scrmsg)
+      return
+    ytids = self.ytids_existing_in_dst_not_in_src
+    tuplelist = get_tuplelist_ytids_filepaths_fr_ytids(ytids, self.src_sqlitefilepath)
+    for i, tupl in enumerate(tuplelist):
+      seq = i + 1
+      ytid, filepath = tupl
+      line = f"{seq} | {ytid} | [{filepath}]"
+      print(line)
 
   def process(self):
     self.fetch_ytids()  # fetch source dirtree first
@@ -161,9 +227,16 @@ class YtidsComparatorReporter:
     number of src ytids = {len(self.src_ytids)}
     number of dst ytids = {len(self.dst_ytids)}
     number of src ytids not in det = {len(self.ytids_existing_in_src_not_in_dst)}
+    -------------------------------
+      src ytids not in dst => {self.ytids_existing_in_src_not_in_dst}
+    -------------------------------
     number of dst ytids not in src = {len(self.ytids_existing_in_dst_not_in_src)}
+    -------------------------------
+      dst ytids not in src => {self.ytids_existing_in_dst_not_in_src}
+    -------------------------------
     number of ytids in both src & dst = {len(self.ytids_in_both)}
-    union set (ytids in both) => {self.ytids_in_both}
+    -------------------------------
+      union set (ytids in both) => {self.ytids_in_both}
     """
     return outstr
 
@@ -187,6 +260,8 @@ def process():
   src_abspath, dst_abspath = get_args()
   reporter = YtidsComparatorReporter(src_abspath, dst_abspath)
   reporter.process()
+  reporter.list_filepaths_src_ytds_not_in_dst()
+  reporter.list_filepaths_dst_ytds_not_in_src()
 
 
 if __name__ == '__main__':

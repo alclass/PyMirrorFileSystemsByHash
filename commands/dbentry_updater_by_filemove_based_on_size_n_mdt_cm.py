@@ -16,10 +16,10 @@ This supposition is based on the following reasoning:
 4) the file was not modified (though it could be modified still keeping its original size) seen by its mdatetime.
 """
 import os
-import fs.db.dbdirtree_mod as dbdt
+import lib.db.dbdirtree_mod as dbdt
 import default_settings as defaults
-import fs.dirfilefs.dir_n_file_fs_mod as dirf
-import fs.strnlistfs.strfunctions_mod as strf
+import lib.dirfilefs.dir_n_file_fs_mod as dirf
+import lib.strnlistfs.strfunctions_mod as strf
 import models.entries.dirnode_mod as dn
 
 

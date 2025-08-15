@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import fs.db.dbbase_mod as dbb
+import lib.db.dbbase_mod as dbb
 
 
 class DBFailFileReadReporter(dbb.DBBase):

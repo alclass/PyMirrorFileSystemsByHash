@@ -50,12 +50,12 @@ import os
 import sys
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
-import fs.hashfunctions.hash_mod as hm
+import lib.hashfunctions.hash_mod as hm
 import commands.dbentry_updater_by_filemove_based_on_size_n_mdt_cm as dbentry_upd
 import commands.dbentry_deleter_those_without_corresponding_osentry_cm as dbentry_del
-import fs.db.dbfailed_fileread_mod as freadfail
-import fs.dirfilefs.dir_n_file_fs_mod as dirf
-import fs.strnlistfs.strfunctions_mod as strf
+import lib.db.dbfailed_fileread_mod as freadfail
+import lib.dirfilefs.dir_n_file_fs_mod as dirf
+import lib.strnlistfs.strfunctions_mod as strf
 import default_settings as defaults
 
 

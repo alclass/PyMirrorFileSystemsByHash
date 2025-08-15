@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # import fs.db.dbrepeats_mod as dbr
-import fs.db.dbdirtree_mod as dbt
-import fs.dirfilefs.dir_n_file_fs_mod as dirf
+import lib.db.dbdirtree_mod as dbt
+import lib.dirfilefs.dir_n_file_fs_mod as dirf
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
 

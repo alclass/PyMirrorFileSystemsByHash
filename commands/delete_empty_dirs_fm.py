@@ -16,7 +16,7 @@ Explanation:
 import os
 import sys
 import default_settings as defaults
-import fs.dirfilefs.dir_n_file_fs_mod as df
+import lib.dirfilefs.dir_n_file_fs_mod as df
 
 
 def show_help_cli_msg_if_asked():
