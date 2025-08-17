@@ -37,6 +37,12 @@ default_filepaths_tablename = 'files_in_tree'
 parser = argparse.ArgumentParser(description="Compare and report ytid differences in-between dirtrees.")
 parser.add_argument("--docstr", action="store_true",
                     help="show docstr help and exit")
+parser.add_argument("--diff1_2", action="store_true",
+                    help="Difference set: src minus dst, i.e., ytids in src not in dst")
+parser.add_argument("--diff2_1", action="store_true",
+                    help="Difference set: src minus dst, i.e., ytids in dst not in src")
+parser.add_argument("--inter", action="store_true",
+                    help="Intersection set, i.e., ytids in both src & dst")
 parser.add_argument("--src", type=str,
                     help="source dirtree absolute path")
 parser.add_argument("--dst", type=str,
@@ -97,7 +103,7 @@ def mount_n_get_dict_ytid_n_filepath(sqlitefilepath):
 def get_tuplelist_ytids_filepaths_fr_ytids(ytids, sqlitefilepath):
   indict = mount_n_get_dict_ytid_n_filepath(sqlitefilepath)
   # outdict = dict(filter(lambda it: it[0] in ytids, indict.items()))
-  tuplelist = tuple(filter(lambda it: it[0] in ytids, indict.items()))
+  tuplelist = list(filter(lambda it: it[0] in ytids, indict.items()))
   return tuplelist
 
 
@@ -114,6 +120,9 @@ class YtidsComparatorReporter:
     self._ytids_in_both = None
     self._ytids_existing_in_src_not_in_dst = None
     self._ytids_existing_in_dst_not_in_src = None
+    # load DB data into their lists
+    self.fetch_ytids()  # fetch source dirtree first
+    self.fetch_ytids(destination=True)  # then fetch destination dirtree
 
   def treat_attrs(self):
     if self.src_mountpath and not os.path.isdir(self.src_mountpath):
@@ -132,6 +141,14 @@ class YtidsComparatorReporter:
     if self.end_time is None:
       self.end_time = datetime.datetime.now()
     return self.end_time - self.start_time
+
+  def get_srcfilepath_w_relpath(self, relpath):
+    relpath = relpath.lstrip('/')
+    return os.path.join(self.src_mountpath, relpath)
+
+  def get_dstfilepath_w_relpath(self, relpath):
+    relpath = relpath.lstrip('/')
+    return os.path.join(self.dst_mountpath, relpath)
 
   @property
   def ytids_existing_in_src_not_in_dst(self):
@@ -178,7 +195,37 @@ class YtidsComparatorReporter:
       self._ytids_in_both = get_elems_in_both_1_n_2(self.src_ytids, self.dst_ytids)
     return self._ytids_in_both
 
+  def list_intersection_set(self):
+    """
+    Prints to stdout the intersection set: inter(src, dst)
+    """
+    scrmsg = 'LIST intersection set i.e., ytids present in both src & dst:'
+    print(scrmsg)
+    if len(self.ytids_in_both) == 0:
+      scrmsg = '\tno ytids_in_both'
+      print(scrmsg)
+      return
+    ytids = self.ytids_in_both
+    tuplelist_src = get_tuplelist_ytids_filepaths_fr_ytids(ytids, self.src_sqlitefilepath)
+    tuplelist_src.sort(key=lambda tupl: tupl[0])
+    tuplelist_dst = get_tuplelist_ytids_filepaths_fr_ytids(ytids, self.dst_sqlitefilepath)
+    tuplelist_dst.sort(key=lambda tupl: tupl[0])
+    for i, tupl_scr in enumerate(tuplelist_src):
+      seq = i + 1
+      ytid_scr, filepath_scr = tupl_scr
+      line = f"{seq}:"
+      print(line)
+      line = f"\t{ytid_scr} | [{filepath_scr}]"
+      print(line)
+      ytid_dst, filepath_dst = tuplelist_dst[i]
+      if_notequal_err_marker = '' if ytid_scr == ytid_dst else 'ERR ytids-NOT-equal'
+      line = f"\t{ytid_dst} {if_notequal_err_marker}| [{filepath_dst}]"
+      print(line)
+
   def list_filepaths_src_ytds_not_in_dst(self):
+    """
+    Prints to stdout the difference set: src - dst
+    """
     scrmsg = 'LIST filepaths_src_ytds_not_in_dst'
     print(scrmsg)
     if len(self.ytids_existing_in_src_not_in_dst) == 0:
@@ -194,6 +241,9 @@ class YtidsComparatorReporter:
       print(line)
 
   def list_filepaths_dst_ytds_not_in_src(self):
+    """
+    Prints to stdout the difference set: dst - src
+    """
     scrmsg = 'LIST filepaths_dst_ytds_not_in_src'
     print(scrmsg)
     if len(self.ytids_existing_in_dst_not_in_src) == 0:
@@ -201,7 +251,7 @@ class YtidsComparatorReporter:
       print(scrmsg)
       return
     ytids = self.ytids_existing_in_dst_not_in_src
-    tuplelist = get_tuplelist_ytids_filepaths_fr_ytids(ytids, self.src_sqlitefilepath)
+    tuplelist = get_tuplelist_ytids_filepaths_fr_ytids(ytids, self.dst_sqlitefilepath)
     for i, tupl in enumerate(tuplelist):
       seq = i + 1
       ytid, filepath = tupl
@@ -209,8 +259,13 @@ class YtidsComparatorReporter:
       print(line)
 
   def process(self):
-    self.fetch_ytids()  # fetch source dirtree first
-    self.fetch_ytids(destination=True)  # then fetch destination dirtree
+    """
+    The loading was moved to __init__()
+      self.fetch_ytids()  # fetch source dirtree first
+      self.fetch_ytids(destination=True)  # then fetch destination dirtree
+
+    At this version, process() just calls report()
+    """
     self.report()
 
   def report(self):
@@ -226,43 +281,55 @@ class YtidsComparatorReporter:
     process time = {self.process_time}
     number of src ytids = {len(self.src_ytids)}
     number of dst ytids = {len(self.dst_ytids)}
-    number of src ytids not in det = {len(self.ytids_existing_in_src_not_in_dst)}
+    number of ytids in diff(src - dst) = {len(self.ytids_existing_in_src_not_in_dst)}
+    number of ytids in diff(dst - src) = {len(self.ytids_existing_in_dst_not_in_src)}
+    number of ytids in intersection set = {len(self.ytids_in_both)}
     -------------------------------
-      src ytids not in dst => {self.ytids_existing_in_src_not_in_dst}
-    -------------------------------
-    number of dst ytids not in src = {len(self.ytids_existing_in_dst_not_in_src)}
-    -------------------------------
-      dst ytids not in src => {self.ytids_existing_in_dst_not_in_src}
-    -------------------------------
-    number of ytids in both src & dst = {len(self.ytids_in_both)}
-    -------------------------------
-      union set (ytids in both) => {self.ytids_in_both}
     """
     return outstr
 
 
+def adhoctest():
+  pass
+
+
 def get_args():
   src_abspath, dst_abspath = None, None
+  diff1_2, diff2_1, inter = None, None, None
   try:
     if args.docstr:
       print(__doc__)
       sys.exit(0)
     src_abspath = args.src
     dst_abspath = args.dst
+    diff1_2 = args.diff1_2
+    diff2_1 = args.diff2_1
+    inter = args.inter
   except AttributeError:
     pass
-  return src_abspath, dst_abspath
+  return src_abspath, dst_abspath, diff1_2, diff2_1, inter
+
+
+def process_according_to_switch_param_options():
+  src_abspath, dst_abspath, diff1_2, diff2_1, inter = get_args()
+  reporter = YtidsComparatorReporter(src_abspath, dst_abspath)
+  print(reporter)
+  if diff1_2:
+    reporter.list_filepaths_src_ytds_not_in_dst()
+    return
+  if diff2_1:
+    reporter.list_filepaths_dst_ytds_not_in_src()
+    return
+  if inter:
+    reporter.list_intersection_set()
 
 
 def process():
-  """
-  """
-  src_abspath, dst_abspath = get_args()
-  reporter = YtidsComparatorReporter(src_abspath, dst_abspath)
-  reporter.process()
-  reporter.list_filepaths_src_ytds_not_in_dst()
-  reporter.list_filepaths_dst_ytds_not_in_src()
+  process_according_to_switch_param_options()
 
 
 if __name__ == '__main__':
+  """
+  adhoctest()
+  """
   process()
