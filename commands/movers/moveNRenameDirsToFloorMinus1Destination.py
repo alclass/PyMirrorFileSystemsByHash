@@ -8,33 +8,45 @@ This script was created with the following scenario in mind:
   3) let then move this subfolder to another disk (or dirtree)
   4) place and rename this audio folder to the same "relative level" in destination
 
+That is what this script does, i.e., it moves audio files from the "mp3s_convert"
+  (conventioned) folder to another disk but positioning them, relatively,
+   one folder down
+  (interpreting "folder down" in the sense of "moving to parent directory")
+
 Let us see this in an example:
 
-  1 - suppose the audio extracted is in directory:
+  1 - suppose the audiofiles reside in directory:
     => /media/driveA/videorepo/Science/Physics/Quantum/2025_Talks/mp3_converted
-    (the files there may be mp3's)
+    (the files there may be mp3's [currently, it accepts ['.mp3', '.m4a', '.mpa'])
   2 - suppose the root (or base) folder to the above directory is:
-    => /media/driveA/videorepo
-  (observing the two paths above, one sees that
-    the relative path is "Science/Physics/Quantum/2025_Talks/mp3_converted",
-    i.e., taking "videorepo" as its root folder, the relative path starts from there)
+    => /media/driveA/videorepo (it may be a mounted external disk or any directory)
   3 - suppose that the absolute destination folder is the following:
     => /media/driveB/audiorepo
   4 - so, the destination folder should be the absolute destination root folder
-      plus the relative path, and, under the approach here, minus the "mp3_converted", i.e.:
+      plus the relative path (*), and, under the approach here,
+      minus the "mp3_converted", i.e. the destination folder should be:
     => /media/driveB/audiorepo/Science/Physics/Quantum/2025_Talks
+
+(*)  (observing the two paths above, one sees that
+    the [relative path] is "Science/Physics/Quantum/2025_Talks/mp3_converted",
+    i.e., taking "videorepo" as its root folder, the relative path starts from there)
+
 
   In a nutshell, the bash command for accomplishing the example above would be:
     $mv "/media/driveA/videorepo/Science/Physics/Quantum/2025_Talks/mp3_converted"
        "/media/driveB/audiorepo/Science/Physics/Quantum/2025_Talks"
 
-This script can do it from an os-dir-walk, i.e., doing all the moves from a directory upward
-  (or downward as one see it),
-  moving all directories named "mp3-converted", whereever they are within source,
-  in the same manner of the example above
+This script can do it variously from an os-dir-walk traversal,
+  i.e., doing all the moves from a source directory upwards
+  (or downwards as one see it - we prefer 'upwards' but the idea of 'descending' is also valid),
+  moving all directories named "mp3-converted",
+  whereever they are within the source dirtree,
+  in the same manner of the example above.
 
 -------------------------------------
 Usage:
+-------------------------------------
+
   $moveNRenameDirsToFloorMinus1Destination.py
     --src <source-root-abspath>
     --dst <destination-root-abspath>
@@ -49,9 +61,14 @@ Where:
   optional: --audiofolder is the name of the folder where the audio to be moved resides
          it defaults to the foldername "mp3_converted"
 
-Examples: (the same example as above but now written in command-form)
+-------------------------------------
+Example:
+   the same example as above but now written in command-form
+   using two approaches (one with --relpath, another without it)
+-------------------------------------
 
 1) first formulation (of two)
+   without parameter --relpath
 
 $moveNRenameDirsToFloorMinus1Destination.py
   --src "/media/driveA/videorepo"
@@ -62,7 +79,8 @@ In the (first) example above, the program will search for all folders named "mp3
   upwards (or downwards as one sees it) the source directory tree,
   as the program finds it, it moves its audiofiles to their equivalent places in destination.
 
-2) second formulation (of two) (using parameter --relpath)
+2) second formulation (of two)
+   with parameter --relpath
 
 $moveNRenameDirsToFloorMinus1Destination.py
   --src "/media/driveA/videorepo"
@@ -74,6 +92,7 @@ The second example above does the same as the first
   if one considers the mp3_converted folder just mentioned, but, as a difference,
   this formulation does not traverse the whole source dirtree. It starts its traversal
   from the "mp3_converted" folder just mentioned.
+  It's useful if the user only wants one (mp3s_converted) folder to be moved.
 
 Notice lastly that the parameter --audiofolder with "mp3_converted" is not necessary,
   because this parameter-value is the default if none is given.
@@ -82,7 +101,7 @@ import argparse
 import datetime
 import os
 import shutil
-DEFAULT_AUDIO_FOLDERNAME = "mp3s_converted"
+DEFAULT_TOMOVE_AUDIO_FOLDERNAME = "mp3s_converted"
 parser = argparse.ArgumentParser(description="Move audiofiles from one dirtree to another"
                                              " taking it to one directory below in destination.")
 parser.add_argument("--src", type=str,
@@ -91,7 +110,7 @@ parser.add_argument("--dst", type=str,
                     help="Absolute destination directory path")
 parser.add_argument("--relpath", type=str, default=None,
                     help="Relative path to 'advance' the traversal starting point that searches for the audiofolder")
-parser.add_argument("--audiofolder", type=str, default=DEFAULT_AUDIO_FOLDERNAME,
+parser.add_argument("--audiofolder", type=str, default=DEFAULT_TOMOVE_AUDIO_FOLDERNAME,
                     help="conventioned audio foldername for all folders to be moved")
 args = parser.parse_args()
 AUDIO_DOT_EXTENSIONS = ['.mp3', '.m4a', '.mpa']  # .webm is not included because it's also used for video
@@ -109,7 +128,7 @@ class FloorMinus1MoverRenamer:
     self.dst_rootpath = dst_rootpath
     self.start_relpath = start_relpath
     self.treat_src_dst_folders()
-    self.tomove_foldername = tomove_foldername or DEFAULT_AUDIO_FOLDERNAME
+    self.tomove_foldername = tomove_foldername or DEFAULT_TOMOVE_AUDIO_FOLDERNAME
     self.current_abspath = None
     self.n_files_processed = 0
     self.total_filerepeats = 0
@@ -163,6 +182,24 @@ class FloorMinus1MoverRenamer:
 
   @property
   def relpath(self) -> str:
+    """
+    relpath (relative path) is everything from the source abspath
+      to the current file or folder
+
+    Example:
+       1 - suppose a source root abspath as:
+         "/media/user/diskD/videorepo"
+       2 - suppose also that the current working folder is:
+         "/media/user/diskD/videorepo/Science/Physics/Quantum/Introductory Videos"
+       3 - then, in this example, relpath is:
+         "Science/Physics/Quantum/Introductory Videos"
+    Note also that:
+       current_abspath = os.path.join(src_abspath, relpath)
+         or
+       relpath = self.current_abspath[len(self.src_rootpath):]
+    Important: relpaths should not start with "/",
+      because os.path.join() already adds one
+    """
     relative_path = self.current_abspath[len(self.src_rootpath):]
     relative_path = relative_path.lstrip('/')
     return relative_path
@@ -241,7 +278,7 @@ class FloorMinus1MoverRenamer:
         continue
       # ok, move can happen
       try:
-        # shutil.move(src_fp, dst_fp)
+        shutil.move(src_fp, dst_fp)
         self.n_moved += 1
         local_moved += 1
         scrmsg = f"\t Moved local={local_moved}/uptilnow={self.n_moved}/ongo={self.n_ongoing_audiofile}"
