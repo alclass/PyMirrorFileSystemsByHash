@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+DirTreeMirror_PrdPrjSw:
+  default_settings.py
 
 The method below was removed during a moment of deciding how to get the app's abspath:
 ======================================================================================
