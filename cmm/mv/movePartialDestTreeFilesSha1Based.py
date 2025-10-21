@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
 cmm/mv/movePartialDestTreeFilesSha1Based.py
-This script is useful when files to also exist in a larger dirtree
-  are moved and/or renamed based on their relative dir-positions in source.
+  This script is useful when (duplicated) files, existing both in a dirtree
+    and also in a subset (smaller) dirtree,
+    need, for unication purposes, to be moved and/or renamed
+    based on their relative dir-positions in source.
 
 Example:
   1) suppose file1.ext exists in the larger dirtree and also in the smaller dirtree
@@ -11,7 +13,6 @@ Example:
   3) this script can move this file to 'equalize'
     its relative dir-position as it has in the larger dirtree
 
-
 """
 import os
 import shutil
@@ -19,6 +20,7 @@ import lib.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
 import cmm.clean.dbclean.dbentry_deleter_those_without_corresponding_osentry_cm as dbentr_del
+
 
 class MoveRename:
 
