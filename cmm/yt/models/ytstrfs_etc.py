@@ -274,9 +274,6 @@ def trans_str_sfx_n_2letlng_map_to_dict_or_raise(pdict):
   return outdict
 
 
-
-
-
 def fetch_langdict_w_videoformatoutput(videoformatoutput):
   """
   vfo = videoformatoutput
@@ -400,4 +397,3 @@ if __name__ == '__main__':
   adhoc_test3()
   """
   adhoctest4()
-  adhoctest6()

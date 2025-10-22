@@ -79,6 +79,7 @@ class YTVFTextExtractor:
                 twoletter = mo.group('twoletlngcod')
                 print('found 2letter', twoletter)
               if twoletter in INTEREST_LANGUAGES:
+                print('entering language', i, twoletter)
                 self.langdict[i] = twoletter
 
   def find_audio_formats_or_the_smaller_video(self):

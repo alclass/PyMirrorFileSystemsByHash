@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-~/bin/dlYouTubeRecupFSufixLeftovers.py
+cmm/yt/dlYouTubeRecupFSufixLeftovers.py
 
 This script looks up incomplete downloaded files in a folder,
   fetches their video-format-lists and then outputs videoids that are
@@ -22,18 +22,13 @@ Notice this script does not continue the downloads, just prepare the output text
   for the two options above. The user needs to run the follow-up scripts mentioned.
 
 """
-import os.path
+import os
 import re
 import shutil
-# from sympy import expand
-# import shutil
 # import subprocess
 # import sys
-# import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
-import localuserpylib.ytfunctions.yt_videoformat_fs as ytvf  # ytvf.YTVFTextExtractor
-# import localuserpylib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
-import localuserpylib.ytfunctions.osentry_class as ose  # ose.OSEntry
-# import localuserpylib.ytfunctions.cliparams_for_utubewhendub as clip  # clip.CliParam
+import cmm.yt.models.ytvideoformatextractor_cls as ytextr  # ytextr.YTVFTextExtractor
+import cmm.yt.models.osentry_class as ose  # ose.OSEntry
 # DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
 # OSEntry = ose.OSEntry
 # default_videodld_tmpdir = ose.default_videodld_tmpdir
@@ -75,7 +70,7 @@ class VideoNameAttr:
   def set_lang_dict(self):
     self.load_videoformatoutput()
     if not self.cannot_read_format_file:
-      self.ytvf_o = ytvf.YTVFTextExtractor(self.videoformatoutput)
+      self.ytvf_o = ytextr.YTVFTextExtractor(self.videoformatoutput)
 
   @property
   def langdict(self):
@@ -161,7 +156,7 @@ class VideoNameAttr:
     """
     try:
       # the idea is to instropect read filetext so that autodubbed codes are found or not
-      self.ytvf_o = ytvf.YTVFTextExtractor(self.videoformatoutput)
+      self.ytvf_o = ytextr.YTVFTextExtractor(self.videoformatoutput)
       self.ytvf_o.find_audio_formats_or_the_smaller_video()
       # self.known_2lett_langs = self.ytvf_o.find_languages_knowing_audiocode()
       if len(self.twolettlangs_iffound):
@@ -190,6 +185,8 @@ class AutodubbedFinder:
   def __init__(self, dirpath=None):
     self.dirpath = dirpath
     self.incompl_vfilenames = []
+    self.attrib_ytids = []
+    self.langdict = {}
     self.autodubbed_ytids = []
     self.nonautodubbed_ytids = []
     if self.dirpath is None:
@@ -218,13 +215,20 @@ class AutodubbedFinder:
 
   def onlinefetch_video_formats(self):
     for i, fn in enumerate(self.incompl_vfilenames):
+      seq = i + 1
       attr_o = VideoNameAttr(fn)
       # is_complete() assures filename has name, ext and ytid (fsufix is not checked)
       if not attr_o.is_complete():
         continue
-      comm = f"yt-dlp -F {attr_o.ytid} > {attr_o.filename_w_ext_txt}"
-      print(comm)
-      os.system(comm)
+      if not os.path.isfile(attr_o.filename_w_ext_txt):
+        comm = f'yt-dlp -F {attr_o.ytid} > "{attr_o.filename_w_ext_txt}"'
+        scrmsg = f"\t {seq} => Fetching videoformats for {attr_o.ytid}"
+        print(scrmsg)
+        print(comm)
+        os.system(comm)
+      else:
+        scrmsg = f"\t {seq} => Already fetched {attr_o.ytid}"
+        print(scrmsg)
       if attr_o.is_ytid_autodubbed_by_formatfile():
         self.copy_fsufix_file_to_canonical(attr_o)
         self.autodubbed_ytids.append(attr_o.ytid)
@@ -233,10 +237,12 @@ class AutodubbedFinder:
         self.attrib_ytids.append(attr_o)
       self.scrape_videoformat_output(attr_o)
 
-  def scrape_videoformat_output(self):
-    videoformatsoutput = open(self.attr_o.filename_w_ext_txt).read()
-    extractor = ytvf.YTVFTextExtractor(videoformatsoutput)
-
+  def scrape_videoformat_output(self, attr_o):
+    print('\t => \t scrape_videoformat_output()')
+    videoformatsoutput = open(attr_o.filename_w_ext_txt).read()
+    extractor = ytextr.YTVFTextExtractor(videoformatsoutput)
+    self.langdict = extractor.langdict
+    print(self.langdict)
 
   def save_autodubbed_ytids(self):
     """
@@ -255,7 +261,13 @@ class AutodubbedFinder:
   def process(self):
     self.fetch_videofiles_in_dir()
     self.onlinefetch_video_formats()
-    self.save_ytids_textfiles()
+    # self.save_ytids_textfiles()
+
+  def __str__(self):
+    outstr = ""
+    for attr_o in self.attrib_ytids:
+      outstr += str(attr_o) + "\n"
+    return outstr
 
 
 def adhoctest2():
@@ -289,14 +301,18 @@ def adhoctest1():
 def process():
   """
   """
-  finder = AutodubbedFinder()
-  finder.listfiles()
+  dirpath = "/media/friend/BRAPol SSD2T ori/BRA Pol et-al vi/BRA Pol vi/Plantão Bra ytvi/videodld_tmpdir/f160"
+  os.chdir(dirpath)
+  finder = AutodubbedFinder(dirpath)
+  # finder.listfiles()
+  # print('finder.langdict', finder.langdict)
+  finder.process()
+  print(finder)
 
 
 if __name__ == '__main__':
   """
+  # adhoctest1()
   adhoctest2()
   """
-  # process()
-  adhoctest2()
-  # adhoctest1()
+  process()
