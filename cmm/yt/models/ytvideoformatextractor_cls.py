@@ -2,7 +2,7 @@
 """
 classes
 cmm/yt/models/ytvideoformatextractor_cls.py
-  Contains, at the time of writing, class that extract YouTube's video formats information.
+  Contains, at the time of writing, class YTVFTextExtractor that extracts YouTube's video formats information.
 """
 # import os
 import re
@@ -22,16 +22,17 @@ class YTVFTextExtractor:
   """
   YTVFTextExtractor = YouTube Video Format Text Extractor
 
-  Models video's audiovideocodes and its related characterists,
+  This class models video's audio-video-codes and its related characterists,
     the two main ones are:
-    a) whether video is a+v-merged or not,
-    b) whether it has autodubbed languages or not
+      a) whether video is a+v-merged or not
+      b) whether it has autodubbed languages or not
 
   Once these attributes are known, the appropriate enveloppable download
   yt-dlp command may be formed.
 
   The main application of this class is in the script for recuperating
-  left-overs that are incomplete downloads (in general, they are video-only files).
+    incomplete-download left-overs that are in-wait for recuperation
+    (in general, these incomplete files are video-only files that need their audio counterpart).
   """
 
   def __init__(self, videoformatouput: str):

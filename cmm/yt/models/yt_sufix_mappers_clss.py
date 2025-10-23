@@ -11,6 +11,11 @@ TWOLETTER_N_LANGUAGENAME_DICTMAP = ytfs.TWOLETTER_N_LANGUAGENAME_DICTMAP
 
 
 class SufixLanguageMapper:
+  """
+
+  The second class following up is an equivalent older class than this.
+    Please refer to its docstr for general info.
+  """
 
   def __init__(self, pdict: dict[int, str] | str, audiomainnumber=249):
     self.no_dubs = False
@@ -404,9 +409,9 @@ class SufixLanguageMapFinder:
     return outstr
 
 
-def adhoctest5():
+def adhoctest2():
   scrmsg = """
-  adhoctest5()
+  SufixLanguageMapper | adhoctest2()
   ============
   """
   print(scrmsg)
@@ -451,10 +456,10 @@ def adhoctest5():
   print(langmapper.audioonlycodes)
 
 
-def adhoctest6():
+def adhoctest1():
   # testing strdict having 'unordered keys'
   scrmsg = """
-  adhoctest6()
+  SufixLanguageMapper | adhoctest1()
   # testing strdict having 'unordered keys'
   ============
   """
@@ -472,10 +477,6 @@ def adhoctest6():
     print(f'\n\ti={i} langer => ', scrmsg)
 
 
-def adhoctest1():
-  pass
-
-
 def process():
   pass
 
@@ -485,5 +486,5 @@ if __name__ == '__main__':
   process()
   adhoctest1()
   """
-  adhoctest5()
-  adhoctest6()
+  adhoctest1()
+  adhoctest2()
