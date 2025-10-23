@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-classes
-cmm/yt/models/ytvideoformatextractor_cls.py
-  Contains, at the time of writing, class YTVFTextExtractor that extracts YouTube's video formats information.
+cmm/yt/uTubeGenVideoFormatsAndExtractThem.py
+  Extracts YouTube's video formats information
+    based on an already downloaded videofile.
+
 """
 # import os
+import os.path
 import re
+import sys
 import cmm.yt.models.ytstrfs_etc as ytfs
 TWOLETTER_N_LANGUAGENAME_DICTMAP = ytfs.TWOLETTER_N_LANGUAGENAME_DICTMAP
 # import sys
@@ -184,6 +187,50 @@ class YTVFTextExtractor:
     return outstr
 
 
+class YTVFFileExtractor:
+
+  DEFAULT_FILENAME = 'ytvideoformatoutput.txt'
+
+  def __init__(self, input_filename_or_path: str = None):
+    self.input_filepath = None
+    self.treat_filename_or_path(input_filename_or_path)
+
+  def treat_filename_or_path(self, input_filename_or_path: str = None):
+    exec_fopath = os.path.abspath('.')
+    if input_filename_or_path is None:
+      input_filename_or_path = os.path.join(exec_fopath, self.DEFAULT_FILENAME)
+    elif input_filename_or_path.find('/'):
+      pass
+    else:
+      input_filename_or_path = os.path.join(exec_fopath, input_filename_or_path)
+    # now check if input_filepath exists
+    if not os.path.isfile(input_filename_or_path):
+      errmsg = f"Input file [{input_filename_or_path}] does not exist."
+      raise OSError(errmsg)
+    # input filepath exists, set it to the instance
+    self.input_filepath = input_filename_or_path
+
+  @property
+  def input_folderpath(self):
+    return os.path.split(self.input_filepath)[0]
+
+  @property
+  def input_filename(self):
+    return os.path.split(self.input_filepath)[1]
+
+  def get_ytextractor(self):
+    text = open(self.input_filepath).read()
+    ytextractor = YTVFTextExtractor(text)
+    return ytextractor
+
+
+def output_langdict_of(input_filepath):
+  fiextractor = YTVFFileExtractor(input_filepath)
+  txextractor = fiextractor.get_ytextractor()
+  txextractor.extract_code_n_lang()
+  print(txextractor)
+
+
 def adhoctest1():
   """
   """
@@ -199,12 +246,15 @@ def adhoctest1():
 
 
 def process():
-  pass
+  scrmsg = f"Executing [{__file__}]"
+  print(scrmsg)
+  input_filepath = sys.argv[1]
+  return output_langdict_of(input_filepath)
 
 
 if __name__ == '__main__':
   """
-  process()
   adhoctest1()
   """
   adhoctest1()
+  process()

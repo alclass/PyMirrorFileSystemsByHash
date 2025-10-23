@@ -6,7 +6,7 @@ cmm/yt/models/langattr_cls.py
 import os
 import re
 import cmm.yt.models.ytstrfs_etc as ytfs
-import cmm.yt.models.ytvideoformatextractor_cls as ytextr  # ytextr.YTVFTextExtractor
+import cmm.yt.uTubeVideoFormatsExtractor as ytextr  # ytextr.YTVFTextExtractor
 TWOLETTER_N_LANGUAGENAME_DICTMAP = ytfs.TWOLETTER_N_LANGUAGENAME_DICTMAP
 restr_fsufix_n_dotext = r"^(?P<name>.*?)(?P<dotfsufix>\.f[0-9]+)(?P<dot_ext>\.[A-Za-z0-9]+)$"
 recmp_fsufix_n_dotext = re.compile(restr_fsufix_n_dotext)
