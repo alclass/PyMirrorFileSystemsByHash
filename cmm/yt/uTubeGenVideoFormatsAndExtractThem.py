@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 cmm/yt/uTubeGenVideoFormatsAndExtractThem.py
+str(trgscript_relpath)
   Extracts YouTube's video formats information
     based on an already downloaded videofile.
-
 """
 # import os
 import os.path

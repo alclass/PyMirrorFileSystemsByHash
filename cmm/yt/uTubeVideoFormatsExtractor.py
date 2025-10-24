@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-cmm/yt/uTubeVideoFormatsExtractor.py
+cmm/yt/uTubeGenVideoFormatsAndExtractThem.py
   Extracts YouTube's video formats information.
 
   As a library, it contains, at the time of writing:
