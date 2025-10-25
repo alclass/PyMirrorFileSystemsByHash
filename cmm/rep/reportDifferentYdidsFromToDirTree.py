@@ -29,7 +29,7 @@ import sys
 # import fs.dirfilefs.ytids_functions as ytfs
 # import models.entries.dirtree_mod as dt
 # import default_settings as defaults
-import lib.dirfilefs.ytids_functions as ytfs  # .extract_ytid_from_filename
+import llib.dirfilefs.ytids_functions as ytfs  # .extract_ytid_from_filename
 default_sqlitefilename = ".updirfileentries.sqlite"
 default_dbtablename = "ytids"
 default_dbcolumn_name = "ytid"

@@ -4,7 +4,7 @@ cmm/maintainSqliteRootFolderYtidsRepo.py
 lib/dirfilefs/ytids_functions.py
 """
 # import lib.dirfilefs.ytids_maintainer as ytmt
-import lib.dirfilefs.ytids_functions as ytfs
+import llib.dirfilefs.ytids_functions as ytfs
 import default_settings as ds
 DEFAULT_YTDIS_TABLENAME = 'sql_ytids'
 

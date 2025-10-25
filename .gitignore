@@ -1,9 +1,9 @@
-bin_local_settings.py
 config.py
 pyvenv.cfg
 .idea/
 dados/
 venv/
+*settings.py
 *.log
 */*.log
 *.pyc

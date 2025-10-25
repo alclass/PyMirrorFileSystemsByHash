@@ -6,7 +6,7 @@ cmm/yt/models/adhoctest_ytvideoformatextractor_cls.py
 """
 import os
 import re
-import cmm.yt.models.ytstrfs_etc as ytfs
+import cmm.yt.ytids.ytstrfs_etc as ytfs
 import cmm.yt.uTubeVideoFormatsExtractor as ytex
 YTVFTextExtractor = ytex.YTVFTextExtractor
 TWOLETTER_N_LANGUAGENAME_DICTMAP = ytfs.TWOLETTER_N_LANGUAGENAME_DICTMAP

@@ -4,8 +4,8 @@ cmm/yt/models/ytfinders_clss.py
   Contains functions related YouTube names, id's, languages and their codes.
 """
 from typing import Generator, Any
-import cmm.yt.models.ytstrfs_etc as ytfs
-import cmm.yt.models.langattr_cls as lac
+import cmm.yt.ytids.ytstrfs_etc as ytfs
+import cmm.yt.ytids.file_n_formats_clss as lac  # .LangAttr
 LangAttr = lac.LangAttr
 TWOLETTER_N_LANGUAGENAME_DICTMAP = ytfs.TWOLETTER_N_LANGUAGENAME_DICTMAP
 

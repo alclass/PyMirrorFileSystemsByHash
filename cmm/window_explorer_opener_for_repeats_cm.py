@@ -14,11 +14,11 @@ TO-DO: one thing that may be implemented in the future is a window-manager GUI i
 """
 import datetime
 import os.path
-import lib.db.dbdirtree_mod as dbt
-import lib.db.dbrepeats_mod as dbr
+import llib.db.dbdirtree_mod as dbt
+import llib.db.dbrepeats_mod as dbr
 import default_settings as defaults
 import models.entries.dirnode_mod as dn
-import lib.hashfunctions.hash_mod as hm
+import llib.hashfunctions.hash_mod as hm
 
 
 class RepeatVerifier:

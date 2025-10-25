@@ -11,7 +11,7 @@ cmm/yt/uTubeGenVideoFormatsAndExtractThem.py
 import os.path
 import re
 import sys
-import cmm.yt.models.ytstrfs_etc as ytfs
+import cmm.yt.ytids.ytstrfs_etc as ytfs
 TWOLETTER_N_LANGUAGENAME_DICTMAP = ytfs.TWOLETTER_N_LANGUAGENAME_DICTMAP
 # import sys
 INTEREST_LANGUAGES = ['de', 'fr', 'en', 'es', 'it', 'ru']

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-cmm/yt/models/ytstrfs_etc.py
+cmm/yt/ytids/ytstrfs_etc.py
   Contains functions related YouTube names, id's, languages and their codes.
 """
 # from collections.abc import Iterable
@@ -62,6 +62,25 @@ def get_match_ytid_af_equalsign_or_itself(line):
   """
   match = cmpld_ytid_instr_af_equalsign_pattern.search(line)
   return line if match is None else match.group(1)
+
+
+def extract_ytid_after_equalsign_at_end_or_itself(line):
+  """
+  extract_ytid_after_equalsign_at_end_or_itself
+  prefer function below: extract_ytid_from_yturl_or_itself_or_none()
+  """
+  if line is None or len(line) < YTID_CHARSIZE:
+    return None
+  ytid = get_match_ytid_af_equalsign_or_itself(line)
+  if ytid is not None:
+    return ytid
+  try:
+    ytid = line[-11:]
+    if is_str_a_ytid(ytid):
+      return ytid
+  except IndexError:
+    pass
+  return None
 
 
 def extract_ytid_from_yturl_or_itself_or_none(p_supposed_ytid: str | None) -> str | None:

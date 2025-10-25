@@ -13,9 +13,9 @@ import os.path
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
 # import cmm.dbentry_deleter_those_without_corresponding_osentry_cm as dbentry_del
-import lib.hashfunctions.hash_mod as hm
-import lib.dirfilefs.dir_n_file_fs_mod as dirf
-import lib.strnlistfs.strfunctions_mod as strf
+import llib.hashfunctions.hash_mod as hm
+import llib.dirfilefs.dir_n_file_fs_mod as dirf
+import llib.strnlistfs.strfunctions_mod as strf
 import default_settings as defaults
 
 

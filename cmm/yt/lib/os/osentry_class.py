@@ -9,8 +9,8 @@ This class is used by dlYouTubeWhenThereAreDubbed.py that, at the time of writin
 """
 import os
 import sys
-import lib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
-import cmm.yt.models.ytstrfs_etc as ytstrfs
+import llib.os.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
+import cmm.yt.ytids.ytstrfs_etc as ytstrfs
 DEFAULT_YTIDS_FILENAME = 'youtube-ids.txt'
 DEFAULT_AUDIOVIDEO_CODE = 160  # previously it was 602, both are 256x144 but 602 has become "more available..."
 DEFAULT_AUDIOVIDEO_DOT_EXT = '.mp4'
@@ -45,7 +45,7 @@ class OSEntry:
 
   def treat_workdir_abspath(self):
     if self.workdir_abspath is None or self.workdir_abspath == '.':
-      self.workdir_abspath = os.path.abspath('.')
+      self.workdir_abspath = os.path.abspath('../../ytids')
       return
     if not os.path.isdir(self.workdir_abspath):
       # this directory is set at client Class Downloader and passed on here

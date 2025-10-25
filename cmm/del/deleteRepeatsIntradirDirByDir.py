@@ -14,12 +14,12 @@ This script does the following:
 """
 import os
 import sys
-import lib.db.dbdirtree_mod as dbdt
+import llib.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
-import lib.strnlistfs.strfunctions_mod as strf
-import lib.strnlistfs.listfunctions_mod as listf
-import lib.dirfilefs.dir_n_file_fs_mod as dirf
+import llib.strnlistfs.strfunctions_mod as strf
+import llib.strnlistfs.listfunctions_mod as listf
+import llib.dirfilefs.dir_n_file_fs_mod as dirf
 
 
 class IntraDirRepeatsDeleter:

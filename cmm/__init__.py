@@ -13,3 +13,9 @@ This package organizes subpackages such as:
    cmm/trans: transformational scripts
 """
 pass
+
+
+class Test:
+  @staticmethod
+  def test():
+    return 'test'

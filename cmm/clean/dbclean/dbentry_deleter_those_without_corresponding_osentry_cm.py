@@ -30,9 +30,9 @@ import datetime
 import os.path
 # import cmm.dbentry_deleter_via_ppath_those_without_corresponding_mod as dbdelviapath
 import default_settings as defaults
-import lib.db.dbdirtree_mod as dbt
-import lib.dirfilefs.dir_n_file_fs_mod as dirfil
-import lib.strnlistfs.strfunctions_mod as strf
+import llib.db.dbdirtree_mod as dbt
+import llib.dirfilefs.dir_n_file_fs_mod as dirfil
+import llib.strnlistfs.strfunctions_mod as strf
 import models.entries.dirnode_mod as dn
 SQL_SELECT_LIMIT_DEFAULT = 50
 

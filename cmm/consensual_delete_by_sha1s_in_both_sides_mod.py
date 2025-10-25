@@ -9,8 +9,8 @@ This script does the following:
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dirn
 import default_settings as defaults
-import lib.dirfilefs.dir_n_file_fs_mod as dirf
-import lib.strnlistfs.strfunctions_mod as strf
+import llib.dirfilefs.dir_n_file_fs_mod as dirf
+import llib.strnlistfs.strfunctions_mod as strf
 
 
 class ConsensualBothSidesSha1Deleter:

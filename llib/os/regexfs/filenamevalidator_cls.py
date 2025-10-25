@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-~/bin/localuserpylib/regexfs/filenamevalidator_cls.py
+lib/os/regexfs/filenamevalidator_cls.py
+  Contains functions and regexp's that validade filenames et-al.
 """
-import os.path
+import os
 import re
 # from uTubeRetrieveSubtitles import pass_ytvideoid_thru_probable_filter
 

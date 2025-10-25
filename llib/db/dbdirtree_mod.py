@@ -9,9 +9,9 @@ This class models db-table files_in_tree and inherits from class DBBase
 import datetime
 import hashlib
 import os
-import lib.hashfunctions.hash_mod as hm
-import lib.db.dbbase_mod as dbb
-import lib.db.dbutil as dbu
+import llib.hashfunctions.hash_mod as hm
+import llib.db.dbbase_mod as dbb
+import llib.db.dbutil as dbu
 import models.entries.dirnode_mod as dn
 
 

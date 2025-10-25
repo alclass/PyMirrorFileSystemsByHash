@@ -57,20 +57,17 @@ class Paths:
   _datafolder_abspath = None
 
   @classmethod
-  def get_app_abspath(cls):
+  def get_apps_abspath(cls):
     if cls._app_abspath is not None:
       return cls._app_abspath
-    fpath = Path(__file__).parent
-    fpath = os.path.abspath(fpath)
-    # fpath = cls.normalize_to_appspath(fpath)
-    cls._app_abspath = fpath
+    cls._app_abspath = Path(__file__).parent
     return cls._app_abspath
 
   @classmethod
   def get_datafolder_abspath(cls):
     if cls._datafolder_abspath is not None:
       return cls._datafolder_abspath
-    app_abspath = cls.get_app_abspath()
+    app_abspath = cls.get_apps_abspath()
     cls._datafolder_abspath = os.path.join(app_abspath, DATA_FOLDERNAME)
     return cls._datafolder_abspath
 
@@ -125,7 +122,7 @@ def get_src_n_trg_mountpath_args_or_default():
 
 
 def adhoc_test1():
-  ap = Paths.get_app_abspath()
+  ap = Paths.get_apps_abspath()
   dfo = Paths.get_datafolder_abspath()
   src, trg = Paths.get_default_args_for_src_n_trg_mountpaths()
   print("app's path =", ap)

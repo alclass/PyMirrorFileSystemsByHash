@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-~/bin/localuserpylib/ytfunctions/cliparams_for_utubewhendub.py
-
-This module contain class CliParam which helps collect, verify
-  and confirm the CLI input parameters for script
-  ~/bin/dlYouTubeWhenThereAreDubbed.py.
+cmm/yt/lib/os/cliparams_for_utubewhendub.py
+  This module contain class CliParam which helps collect, verify
+    and confirm the CLI input parameters for script
 """
 import argparse
 import os
-import localuserpylib.ytfunctions.osentry_class as ose  # ose.OSEntry
-import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
+# import localuserpylib.ytfunctions.osentry_class as ose  # ose.OSEntry
+import cmm.yt.lib.os.osentry_class as ose  # ose.OSEntry
+# import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
+# import cmm.yt.lib.yt_sufix_mappers_clss as ytstrfs
+import cmm.yt.ytids.ytstrfs_etc as ytstrfs
 DEFAULT_YTIDS_FILENAME = ose.DEFAULT_YTIDS_FILENAME
 DEFAULT_AUDIOVIDEO_CODE = ose.DEFAULT_AUDIOVIDEO_CODE
 DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
@@ -130,7 +131,7 @@ class CliParam:
     self.b_useinputfile = args.useinputfile
     self.goahead_nouserconfirm = args.y or False
     # default to the current working directory if none is given
-    self.dirpath = args.dirpath or os.path.abspath(".")
+    self.dirpath = args.dirpath or os.path.abspath("../../ytids")
     self.videoonlycode = args.voc or None
     # if audiomainnumber is None, it will get -1 meaning the formatcode in voc is already a+v
     # i.e., the video comes whole, no merging of a+v (audio with video)

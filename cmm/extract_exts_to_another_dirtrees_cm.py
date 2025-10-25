@@ -8,10 +8,10 @@ import os.path
 import shutil
 import sys
 import models.entries.dirnode_mod as dn
-import lib.db.dbdirtree_mod as dbdt
-import lib.db.dbfailed_filecopy_mod as dbfailedcopy
-import lib.hashfunctions.hash_mod as hm
-import lib.strnlistfs.strfunctions_mod as strf
+import llib.db.dbdirtree_mod as dbdt
+import llib.db.dbfailed_filecopy_mod as dbfailedcopy
+import llib.hashfunctions.hash_mod as hm
+import llib.strnlistfs.strfunctions_mod as strf
 import default_settings as defaults
 import cmm.mv.move_rename_target_based_on_source_mod as moverename
 

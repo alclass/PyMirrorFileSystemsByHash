@@ -24,7 +24,7 @@ Obs:
 """
 import os
 import default_settings as ds
-import lib.dirfilefs.ytids_functions as ytfs
+import llib.dirfilefs.ytids_functions as ytfs
 import sqlite3
 
 

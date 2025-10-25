@@ -2,8 +2,8 @@
 import datetime
 import hashlib
 import os
-import lib.hashfunctions.hash_mod as hm
-import lib.db.dbbase_mod as dbb
+import llib.hashfunctions.hash_mod as hm
+import llib.db.dbbase_mod as dbb
 
 
 class DBRepeat(dbb.DBBase):

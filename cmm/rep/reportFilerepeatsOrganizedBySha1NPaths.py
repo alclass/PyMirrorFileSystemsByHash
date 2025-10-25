@@ -15,8 +15,8 @@ Explanation:
 """
 
 # import fs.db.dbrepeats_mod as dbr
-import lib.db.dbdirtree_mod as dbt
-import lib.dirfilefs.dir_n_file_fs_mod as dirf
+import llib.db.dbdirtree_mod as dbt
+import llib.dirfilefs.dir_n_file_fs_mod as dirf
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
 

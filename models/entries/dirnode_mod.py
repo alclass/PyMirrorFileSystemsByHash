@@ -2,8 +2,8 @@
 import datetime
 import hashlib
 import os
-import lib.hashfunctions.hash_mod as hm
-import lib.dirfilefs.dir_n_file_fs_mod as dirf
+import llib.hashfunctions.hash_mod as hm
+import llib.dirfilefs.dir_n_file_fs_mod as dirf
 LF = '\n'
 PREFIX_FOR_FILES_LINEPATH = 'F '
 

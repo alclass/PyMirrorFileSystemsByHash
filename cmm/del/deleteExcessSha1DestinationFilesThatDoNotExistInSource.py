@@ -29,7 +29,7 @@ import sys
 import models.entries.dirtree_mod as dt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
-import lib.dirfilefs.dir_n_file_fs_mod as dirf
+import llib.dirfilefs.dir_n_file_fs_mod as dirf
 
 
 def print_sha1_set(missing_set, dbtree_opposite, mountpath):

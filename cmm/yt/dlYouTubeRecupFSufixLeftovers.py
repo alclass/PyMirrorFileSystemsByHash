@@ -28,7 +28,7 @@ import shutil
 # import subprocess
 # import sys
 import cmm.yt.uTubeVideoFormatsExtractor as ytextr  # ytextr.YTVFTextExtractor
-import cmm.yt.models.osentry_class as ose  # ose.OSEntry
+import cmm.yt.lib.os.osentry_class as ose  # ose.OSEntry
 # DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
 # OSEntry = ose.OSEntry
 # default_videodld_tmpdir = ose.default_videodld_tmpdir

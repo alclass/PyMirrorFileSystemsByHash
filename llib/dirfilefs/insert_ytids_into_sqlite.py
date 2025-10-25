@@ -6,8 +6,8 @@ Choices made for class YtidsTxtNSqliteMaintainer:
 ---------
 """
 import os
-import lib.dirfilefs.ytids_functions as ytfs
-import lib.dirfilefs.ytids_maintainer as ytmt
+import llib.dirfilefs.ytids_functions as ytfs
+import llib.dirfilefs.ytids_maintainer as ytmt
 import default_settings as ds
 
 

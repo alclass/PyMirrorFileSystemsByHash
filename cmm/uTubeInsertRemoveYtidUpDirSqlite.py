@@ -5,7 +5,7 @@ uTubeInsertRemoveYtidUpDirSqlite.py
 import os
 import sqlite3
 import sys
-import lib.dirfilefs.ytids_functions as ytfs
+import llib.dirfilefs.ytids_functions as ytfs
 import default_settings as ds
 
 

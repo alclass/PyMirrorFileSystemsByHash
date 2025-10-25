@@ -16,7 +16,7 @@ Example:
 """
 import os
 import shutil
-import lib.db.dbdirtree_mod as dbdt
+import llib.db.dbdirtree_mod as dbdt
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
 import cmm.clean.dbclean.dbentry_deleter_those_without_corresponding_osentry_cm as dbentr_del

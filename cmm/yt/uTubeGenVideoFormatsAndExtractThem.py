@@ -5,11 +5,48 @@ str(trgscript_relpath)
   Extracts YouTube's video formats information
     based on an already downloaded videofile.
 """
-# import os
-import os.path
+import argparse
+import os
 import re
 import sys
-import cmm.yt.models.ytstrfs_etc as ytfs
+from pathlib import Path
+
+from debian.debian_support import download_file
+
+DEFAUT_VIDEOFORMAT_FILENAME = 'yt_videoformat_output.txt'
+parser = argparse.ArgumentParser(description="Compress videos to a specified resolution.")
+parser.add_argument("--docstr", action="store_true",
+                    help="show docstr help and exit")
+parser.add_argument("--ytid", type=str, default=None,
+                    help="the video id")
+parser.add_argument("--file", type=str, default=None,
+                    help="Directory recipient of the download")
+parser.add_argument("-y", action='store_true',
+                    help="represents 'yes', making the user confirmation phase to be skipped off")
+args = parser.parse_args()
+
+
+def insert_rootpath_into_pythonpath_for_non_venv_run():
+  """
+  This script has a client dispatcher outside its venv (virtual environment)
+  Because of that -- and also because os.system() or subprocess.run() cannot activate venv --
+  this function was thought out to insert the app's root folder into the search path,
+  so that local imports (as the next one that follows) may work.
+
+  Notice also that this solution is a bit manual because the script itself does not know
+    where its app's root folder (it's known when venv is active), though some convention
+    (for example, a specific filename on root) might help find it. But it would perhaps be
+    a bit wordy and clunky file by file.
+
+  # print(sys.path)
+  """
+  this_scr_ap = Path(__file__)
+  projroot_ap = this_scr_ap.parent.parent.parent
+  sys.path.insert(0, str(projroot_ap))
+
+
+insert_rootpath_into_pythonpath_for_non_venv_run()
+import cmm.yt.ytids.ytstrfs_etc as ytfs
 TWOLETTER_N_LANGUAGENAME_DICTMAP = ytfs.TWOLETTER_N_LANGUAGENAME_DICTMAP
 # import sys
 INTEREST_LANGUAGES = ['de', 'fr', 'en', 'es', 'it', 'ru']
@@ -144,21 +181,24 @@ class YTVFTextExtractor:
 
   def extract_code_n_lang(self):
     for line in self.lines:
-      vfcode = None
-      line = line.lstrip(' \t').rstrip(' \t\r\n')
-      pp = line.split(' ')
-      should_be_number_or_dashed = pp[0]
-      if not self.video_is_dubbed:
-        vfcode = int(should_be_number_or_dashed)
-      else:
-        pp = should_be_number_or_dashed.split('-')
-        print(pp)
-      if vfcode is None:
+      try:
+        vfcode = None
+        line = line.lstrip(' \t').rstrip(' \t\r\n')
+        pp = line.split(' ')
+        should_be_number_or_dashed = pp[0]
+        if not self.video_is_dubbed:
+          vfcode = int(should_be_number_or_dashed)
+        else:
+          pp = should_be_number_or_dashed.split('-')
+          print(pp)
+        if vfcode is None:
+          continue
+        match_o = recmp_2lttcds.match(line)
+        if match_o:
+          twoletter = match_o.group(1)
+          print(twoletter)
+      except (AttributeError, ValueError):
         continue
-      match_o = recmp_2lttcds.match(line)
-      if match_o:
-        twoletter = match_o.group(1)
-        print(twoletter)
 
   def mount_comm(self):
     if self.video_is_dubbed:
@@ -191,32 +231,39 @@ class YTVFFileExtractor:
 
   DEFAULT_FILENAME = 'ytvideoformatoutput.txt'
 
-  def __init__(self, input_filename_or_path: str = None):
+  def __init__(self, input_filename_or_path: str | Path = None):
     self.input_filepath = None
     self.treat_filename_or_path(input_filename_or_path)
 
-  def treat_filename_or_path(self, input_filename_or_path: str = None):
+  def treat_filename_or_path(self, input_filename_or_path: str | Path = None):
+
     exec_fopath = os.path.abspath('.')
     if input_filename_or_path is None:
-      input_filename_or_path = os.path.join(exec_fopath, self.DEFAULT_FILENAME)
-    elif input_filename_or_path.find('/'):
-      pass
+      input_filename_or_path = Path(os.path.join(exec_fopath, self.DEFAULT_FILENAME))
     else:
-      input_filename_or_path = os.path.join(exec_fopath, input_filename_or_path)
-    # now check if input_filepath exists
-    if not os.path.isfile(input_filename_or_path):
-      errmsg = f"Input file [{input_filename_or_path}] does not exist."
+      input_filename_or_path = Path(input_filename_or_path)
+    if not input_filename_or_path.is_file():
+      if_ap = input_filename_or_path.absolute()
+      errmsg = f"Input file [{if_ap}] does not exist."
       raise OSError(errmsg)
     # input filepath exists, set it to the instance
     self.input_filepath = input_filename_or_path
 
   @property
-  def input_folderpath(self):
-    return os.path.split(self.input_filepath)[0]
+  def input_folderpath(self) -> Path:
+    """
+    Formerly returning as str => os.path.split(self.input_filepath)[0]
+    At this version, returning as Path (or pathlib.PosixPath)
+    """
+    return self.input_filepath.parent
 
   @property
-  def input_filename(self):
-    return os.path.split(self.input_filepath)[1]
+  def input_filename(self) -> str:
+    """
+    Formerly returning as str => os.path.split(self.input_filepath)[1]
+    At this version, returning as Path (or pathlib.PosixPath)
+    """
+    return self.input_filepath.name
 
   def get_ytextractor(self):
     text = open(self.input_filepath).read()
@@ -224,8 +271,8 @@ class YTVFFileExtractor:
     return ytextractor
 
 
-def output_langdict_of(input_filepath):
-  fiextractor = YTVFFileExtractor(input_filepath)
+def output_langdict_of(inputfile):
+  fiextractor = YTVFFileExtractor(inputfile)
   txextractor = fiextractor.get_ytextractor()
   txextractor.extract_code_n_lang()
   print(txextractor)
@@ -245,16 +292,54 @@ def adhoctest1():
     print('2 letter', mo.group(1))
 
 
+def download_videoformatsoutput_n_extract_them(ytid):
+  if not ytfs.is_str_a_ytid(ytid):
+    errmsg = f"ytid {ytid} is not valid"
+    raise ValueError(errmsg)
+  videoformats_fn = f"{ytid}.txt"
+  comm = f'yt-dlp -F {ytid} > {videoformats_fn}'
+  print(f'Downloading: comm => {comm}')
+  os.system(comm)
+  videoformats_fp = Path(videoformats_fn)
+  if not videoformats_fp.exists():
+    errmsg = f"File {videoformats_fp} is not present in folder {videoformats_fp.parent.absolute()}"
+    raise OSError(errmsg)
+  return videoformats_fp
+
+
+def get_args():
+  print('@get_args', sys.argv)
+  inputfile = args.file
+  ytid = args.ytid
+  if ytid and inputfile:
+    scrmsg = f"Please, send only one parameters (ytid {ytid} and file {inputfile} were given). Please, chose one."
+    print(scrmsg)
+    return None, None
+  return inputfile, ytid
+
+
 def process():
-  scrmsg = f"Executing [{__file__}]"
+  # scrmsg = f"Executing: [{__file__}]"
+  # print(scrmsg)
+  inputfile, ytid = get_args()
+  # scrmsg = f"inputfile {inputfile} | ytid = {ytid} | {sys.argv}"
+  # print(scrmsg)
+  if (inputfile, ytid) == (None, None):
+    scrmsg = f"Not running, please retry."
+    print(scrmsg)
+    return
+  yitd = ytfs.extract_ytid_from_yturl_or_itself_or_none(ytid)
+  if ytid:
+    inputfile = download_videoformatsoutput_n_extract_them(ytid)
+  if inputfile is None:
+    inputfile = Path('.') / DEFAUT_VIDEOFORMAT_FILENAME
+  scrmsg = f"inputfile: [{inputfile}]"
   print(scrmsg)
-  input_filepath = sys.argv[1]
-  return output_langdict_of(input_filepath)
+  output_langdict_of(inputfile)
 
 
 if __name__ == '__main__':
   """
   adhoctest1()
   """
-  adhoctest1()
   process()

@@ -25,8 +25,8 @@ import datetime
 import os.path
 import sys
 
-import lib.db.dbdirtree_mod as dbt
-import lib.dirfilefs.dir_n_file_fs_mod as dirfil
+import llib.db.dbdirtree_mod as dbt
+import llib.dirfilefs.dir_n_file_fs_mod as dirfil
 # import fs.strnlistfs.strfunctions_mod as strf
 import default_settings as defaults
 # import models.entries.dirnode_mod as dn

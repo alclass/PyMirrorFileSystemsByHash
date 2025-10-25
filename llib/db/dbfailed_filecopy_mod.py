@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import lib.db.dbbase_mod as dbb
+import llib.db.dbbase_mod as dbb
 
 
 class DBFailFileCopyReporter(dbb.DBBase):

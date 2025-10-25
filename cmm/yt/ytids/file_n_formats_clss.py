@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-cmm/yt/models/langattr_cls.py
-  Contains, at the time of writing, class LangAttr related YouTube autodubs and connected info.
+cmm/yt/ytids/file_n_formats_clss.py
+  Contains, at the time of writing, classes:
+   1 - FilenameNFormatsVideo which videoformats to a YouTube video
+   2 - LangAttr which gives related YouTube autodubs and connected info
 """
 import os
 import re
-import cmm.yt.models.ytstrfs_etc as ytfs
+import cmm.yt.ytids.ytstrfs_etc as ytfs
 import cmm.yt.uTubeVideoFormatsExtractor as ytextr  # ytextr.YTVFTextExtractor
 TWOLETTER_N_LANGUAGENAME_DICTMAP = ytfs.TWOLETTER_N_LANGUAGENAME_DICTMAP
 restr_fsufix_n_dotext = r"^(?P<name>.*?)(?P<dotfsufix>\.f[0-9]+)(?P<dot_ext>\.[A-Za-z0-9]+)$"

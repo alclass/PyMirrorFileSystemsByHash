@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-~/bin/dlYouTubeWhenThereAreDubbed.py
+cmm/yt/dlYouTubeWhenThereAreDubbed.py
 
 Obs:
   a) this script is currently located in the 'bin' repo
@@ -236,17 +236,40 @@ Justification:
     but it may also grow in the future
       (for example: Russian appeared -- we haven't seen it before -- in some original-English videos)
 """
-import os.path
+from pathlib import Path
+import os
 import shutil
 import subprocess
 import sys
-import localuserpylib.ytfunctions.yt_str_fs_vids_sufix_lang_map_etc as ytstrfs
-import localuserpylib.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
-import localuserpylib.ytfunctions.osentry_class as ose  # ose.OSEntry
-import localuserpylib.ytfunctions.cliparams_for_utubewhendub as clip  # clip.CliParam
-OSEntry = ose.OSEntry
+
+
+def insert_rootpath_into_pythonpath_for_non_venv_run():
+  """
+  This script has a client dispatcher outside its venv (virtual environment)
+  Because of that -- and also because os.system() or subprocess.run() cannot activate venv --
+  this function was thought out to insert the app's root folder into the search path,
+  so that local imports (as the next one that follows) may work.
+
+  Notice also that this solution is a bit manual because the script itself does not know
+    where its app's root folder (it's known when venv is active), though some convention
+    (for example, a specific filename on root) might help find it. But it would perhaps be
+    a bit wordy and clunky file by file.
+
+  # print(sys.path)
+  """
+  this_scr_ap = Path(__file__)
+  projroot_ap = this_scr_ap.parent.parent.parent
+  sys.path.insert(0, str(projroot_ap))
+
+
+insert_rootpath_into_pythonpath_for_non_venv_run()
+import cmm.yt.lib.yt_sufix_mappers_clss as ytstrfs # .SufixLanguageMapper
+import cmm.yt.lib.os.osentry_class as ose  # ose.OSEntry
+import llib.os.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
+import cmm.yt.lib.os.cliparams_for_utubewhendub as clip  # ose.OSEntry
 # DEFAULT_AUDIOVIDEO_CODE = ose.DEFAULT_AUDIOVIDEO_CODE
 # DEFAULT_AUDIOVIDEO_DOT_EXT = ose.DEFAULT_AUDIOVIDEO_DOT_EXT
+OSEntry = ose.OSEntry
 DEFAULT_YTIDS_FILENAME = ose.DEFAULT_YTIDS_FILENAME
 DEFAULT_AUDIO_MAIN_NUMBER = ose.DEFAULT_AUDIO_MAIN_NUMBER  # may be -1 meaning no audio separate
 DEFAULT_SFX_W_2LETLNG_MAPDCT = ose.DEFAULT_SFX_W_2LETLNG_MAPDCT

@@ -22,11 +22,11 @@ Example:
 """
 # import fs.db.dbrepeats_mod as dbr
 import os.path
-import lib.db.dbdirtree_mod as dbt
-import lib.dirfilefs.dir_n_file_fs_mod as dirf
+import llib.db.dbdirtree_mod as dbt
+import llib.dirfilefs.dir_n_file_fs_mod as dirf
 import models.entries.dirnode_mod as dn
 import default_settings as defaults
-import lib.hashfunctions.hash_mod as hm
+import llib.hashfunctions.hash_mod as hm
 
 
 class FileRepeatsDeleter:
