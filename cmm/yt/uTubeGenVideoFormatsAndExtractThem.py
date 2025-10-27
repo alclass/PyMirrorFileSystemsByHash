@@ -10,9 +10,10 @@ import os
 import re
 import sys
 from pathlib import Path
-
-from debian.debian_support import download_file
-
+restr_beginswithnumber = r"^(?P<beginningnumber>\d{1,3}).*$"
+recmp_beginswithnumber = re.compile(restr_beginswithnumber)
+restr_beginsdashednumber = r"^(?P<dashednumber>\d{1,3}\-\d{1,2})[ ].*$"
+recmp_beginsdashednumber = re.compile(restr_beginsdashednumber)
 DEFAUT_VIDEOFORMAT_FILENAME = 'yt_videoformat_output.txt'
 parser = argparse.ArgumentParser(description="Compress videos to a specified resolution.")
 parser.add_argument("--docstr", action="store_true",
@@ -21,6 +22,9 @@ parser.add_argument("--ytid", type=str, default=None,
                     help="the video id")
 parser.add_argument("--file", type=str, default=None,
                     help="Directory recipient of the download")
+# dirpath is not a formal parameter here, dirpath is in fact derived from parameter --file
+parser.add_argument("--dirpath", type=str, default=None,
+                    help="This param is not passed in here being a requirement from the dispatcher scripts")
 parser.add_argument("-y", action='store_true',
                     help="represents 'yes', making the user confirmation phase to be skipped off")
 args = parser.parse_args()
@@ -107,21 +111,31 @@ class YTVFTextExtractor:
     """
     if self.video_is_dubbed:
       if self.video_is_avmerged:
-        for i in range(30):  # 30 is estimated the max number of languages
-          lines = self.videoformatouput.split('\n')
-          for line in lines:
-            strdashed = f"{self.audiocode}-{i}"  # check if this dashed exists
-            pos = line.find(strdashed)
-            if pos > -1:
-              print(strdashed, 'found at pos', pos)
-              mo = recmp_2lttcds.match(line)
-              twoletter = None
-              if mo:
-                twoletter = mo.group('twoletlngcod')
-                print('found 2letter', twoletter)
-              if twoletter in INTEREST_LANGUAGES:
-                print('entering language', i, twoletter)
-                self.langdict[i] = twoletter
+        lines = self.videoformatouput.split('\n')
+        for i, line in enumerate(lines):
+          seq = i + 1
+          print(seq, line)
+          dashednumber, twoletter = None, None
+          match_o = recmp_beginswithnumber.match(line)
+          if match_o:
+            strcode = match_o.group('beginningnumber')
+            match_o = recmp_beginsdashednumber.match(line)
+            if match_o:
+              dashednumber = match_o.group('dashednumber')
+            mo = recmp_2lttcds.match(line)
+            if mo:
+              twoletter = mo.group('twoletlngcod')
+              # print('found 2letter', twoletter)
+              if dashednumber and twoletter in INTEREST_LANGUAGES:
+                try:
+                  nsufix = int(dashednumber.split('-')[1])
+                  strcode = f"{strcode}-{nsufix}"
+                except (IndexError, ValueError):
+                  nsufix = -1
+                # print('entering language', nsufix, twoletter)
+                self.langdict[nsufix] = twoletter
+              scrmsg = f"{strcode} => {twoletter}"
+              print(scrmsg)
 
   def find_audio_formats_or_the_smaller_video(self):
     """
@@ -280,7 +294,6 @@ def output_langdict_of(inputfile):
 
 def adhoctest1():
   """
-  """
   print(twoletterlangcodes)
   print(barred_twoletterlangcodes)
   print(restr_2lttcds)
@@ -290,6 +303,25 @@ def adhoctest1():
   print(mo)
   if mo:
     print('2 letter', mo.group(1))
+  """
+  line = '249-10 bla'
+  print(line)
+  # restr_beginsdashednumber = r"^(?P<dashednumber>\d{1-3}\-\d{1-2})[ ].*$"
+  mo = recmp_beginsdashednumber.match(line)
+  if mo:
+    print('dashednumber', mo.group('dashednumber'))
+  else:
+    print('not matched')
+  restr2 = r"^(?P<dashednumber>\d{1,3}\-\d{1,2})[ ].*$"
+  # restr2 = r"^(?P<dashednumber>\d{1,3}).*$"
+  recmp2 = re.compile(restr2)
+  mo = recmp2.match(line)
+  if mo:
+    scrmsg = f"recmp2 dashednumber [{mo.group('dashednumber')}]"
+    print(scrmsg)
+  else:
+    print('not matched')
+
 
 
 def download_videoformatsoutput_n_extract_them(ytid):
@@ -328,7 +360,7 @@ def process():
     scrmsg = f"Not running, please retry."
     print(scrmsg)
     return
-  yitd = ytfs.extract_ytid_from_yturl_or_itself_or_none(ytid)
+  ytid = ytfs.extract_ytid_from_yturl_or_itself_or_none(ytid)
   if ytid:
     inputfile = download_videoformatsoutput_n_extract_them(ytid)
   if inputfile is None:
@@ -340,6 +372,7 @@ def process():
 
 if __name__ == '__main__':
   """
+  adhoctest1()
   adhoctest1()
   """
   process()

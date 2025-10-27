@@ -263,7 +263,8 @@ def insert_rootpath_into_pythonpath_for_non_venv_run():
 
 
 insert_rootpath_into_pythonpath_for_non_venv_run()
-import cmm.yt.lib.yt_sufix_mappers_clss as ytstrfs # .SufixLanguageMapper
+import cmm.yt.ytids.yt_sufix_mappers_clss as ytstrfs # .SufixLanguageMapper
+import cmm.yt.ytids.ytstrfs_etc as ytfs  # ytfs.get_validated_ytid_or_raise
 import cmm.yt.lib.os.osentry_class as ose  # ose.OSEntry
 import llib.os.regexfs.filenamevalidator_cls as fnval  # .FilenameValidator
 import cmm.yt.lib.os.cliparams_for_utubewhendub as clip  # ose.OSEntry
@@ -303,7 +304,7 @@ class Downloader:
       nvdseq: int = None,
       sfx_n_2letlng_dict: dict | str = None,
     ):
-    self.ytid = ytstrfs.get_validated_ytid_or_raise(ytid)
+    self.ytid = ytfs.get_validated_ytid_or_raise(ytid)
     self.dlddir_abspath = dlddir_abspath
     self.treat_dlddir_abspath()
     self.videoonlycode = videoonlycode or DEFAULT_VIDEO_ONLY_CODE
@@ -311,7 +312,7 @@ class Downloader:
     # i.e., the video comes whole, no merging of a+v (audio with video)
     self.audiomainnumber = audiomainnumber or DEFAULT_AUDIO_MAIN_NUMBER  # example: 233, 234, 249 etc
     self.nvdseq = nvdseq or 1
-    sfx_n_2letlng_dict = ytstrfs.trans_str_sfx_n_2letlng_map_to_dict_or_raise(sfx_n_2letlng_dict)
+    sfx_n_2letlng_dict = ytfs.trans_str_sfx_n_2letlng_map_to_dict_or_raise(sfx_n_2letlng_dict)
     # the langmapper object contains the attributes that help form the audioonlycodes and the filename-rename-tokens
     self.langmapper = ytstrfs.SufixLanguageMapper(sfx_n_2letlng_dict, self.audiomainnumber)
     self.cur_lng_obj = None  # each language is abstracted to a "language object" as each download happens

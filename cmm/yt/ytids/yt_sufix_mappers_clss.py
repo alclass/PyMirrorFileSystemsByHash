@@ -5,7 +5,7 @@ cmm/yt/models/ytfinders_clss.py
 """
 from typing import Generator, Any
 import cmm.yt.ytids.ytstrfs_etc as ytfs
-import cmm.yt.ytids.file_n_formats_clss as lac  # .LangAttr
+import cmm.yt.lib.os.file_n_formats_clss as lac  # .LangAttr
 LangAttr = lac.LangAttr
 TWOLETTER_N_LANGUAGENAME_DICTMAP = ytfs.TWOLETTER_N_LANGUAGENAME_DICTMAP
 

@@ -20,7 +20,7 @@ class FilenameNFormatsVideo:
 
   def __init__(self, filename, folderpath=None, vf_txt_fn=None):
     self.filename = filename
-    self.folderpath = folderpath or os.path.abspath('.')
+    self.folderpath = folderpath or os.path.abspath('../../ytids')
     self._vformats_txtfn = vf_txt_fn
     self.videoformatoutput = None
     self.cannot_read_format_file = None
