@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """
 DirTreeMirror_PrdPrjSw:
-  cmm/mir/moldDestinationWithSourceViaSha1s.py
+  cmm/mir/correctPathsToSourceSmallerFromDestLargerViaSha1s.py
+
 Description below.
 
 This script does the following:
 
-  1) it looks up both sqlite-db dirtree contents
-  2) determine what exists in source and is missing in destination
-  3) proceeds to copy or move these contents from source to destination
-
-These operations simulate a dirtree mirroring excepting that it doesn't do 'deleting',
-  operation that is done by another script in this system.
+  1) it looks up, relative to source files in a dir, where it resides in destination
+  2) if it finds one, it moves it to the relative path in destination,
+     if this relative is already the same, do nothing and continue
+  3) once a directory is moved or renamed, it cannot be moved or renamed again
+     and a warning is given so that one or some files are wrongly dir-placed
+  4) at the end, a report shows how many folders were corrected
+     and how many misplaced files exist (because a dir cannot be renamed twice or more)
 """
 import copy
 import os.path
@@ -47,6 +49,8 @@ class TrgBasedByrcSha1sMolder:
     self.failed_renames = 0
     self.n_empty_dirs_removed = 0
     self.n_empty_dirs_fail_rm = 0
+    self.files_not_moved_they_not_in_scr = []
+    self.files_not_moved_due_to_error = []
     self.calc_totals()
 
   def calc_totals(self):
@@ -238,9 +242,44 @@ class TrgBasedByrcSha1sMolder:
         continue
       self.treat_unique_src_dirnode_with_copy_move_or_none(src_dirnode)
 
+  def move_file_to_trgfolder_of_its_relative_src_position(self, filepath, shoudbe_folderpath):
+    relpath = self.get_relative_position_of_src(shoudbe_folderpath)
+    to_folderpath = self.current_abspath / relpath
+    if new_abspath in self.paths_moved:
+      # register file that had its dir could not move it
+      self.files_not_moved_they_not_in_scr.append(filepath)
+    try:
+      shutil.move(filepath, to_folderpath)
+    except (IOError, OSError):
+      self.files_not_moved_due_to_error.append(filepath)
+
+
+
+
+  def dirpath_in_which_file_resides_in_trg(self, filepath):
+
+
+
+  def parcourt_src_n_move_rename_if_needed(self, filenames):
+    for filename in filenames:
+      filepath = self.current_abspath / filename
+      trg_folderpath = self.dirpath_in_which_file_resides_in_trg(filepath)
+      if self.current_abspath == trg_folderpath:
+        return
+      # either:
+      # 1) move directory or
+      # 2) if it's been moved before, register message for report
+      self.move_file_to_trgfolder_in_its_relative_src_position(trg_folderpath)
+
+
+  def walk_thru_src_dirtree(self):
+    for self.current_abspath, _, filenames in os.walk(self.ori_dt.mountpath):
+      self.current_abspath = Path(self.current_abspath)
+      self.parcourt_src_n_move_rename_if_needed(files)
+
   def process(self):
-    self.fetch_n_process_unique_sha1s_in_scr()
-    self.prune_empty_folders()
+    # self.fetch_n_process_unique_sha1s_in_scr()
+    self.walk_thru_src_dirtree()
     self.report()
 
   def prune_empty_folders(self):
