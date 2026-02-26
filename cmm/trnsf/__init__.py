@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 DirTreeMirror_PrdPrjSw:
-  cmm/trans/__init__.py
-This package-name (trans) stands for "transformation".
+  cmm/trnsf/__init__.py
+This package-name (trnsf) stands for "transformation".
 
 Here are organized the scripts
   related to changing or transforming filenames (or perhaps even file contents)

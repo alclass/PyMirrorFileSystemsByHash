@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-  cmm/trans/pyVideoCompressAfterDeleter.py
+  cmm/trnsf/pyVideoCompressAfterDeleter.py
 Deletes files with selected-file-extension from up a directory tree
  The original use case was for videofiles videocompressed to another dirtree
    in a former run and then available for removal (deletion).)

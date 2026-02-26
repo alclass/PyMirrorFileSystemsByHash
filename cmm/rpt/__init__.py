@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 DirTreeMirror_PrdPrjSw:
-  cmm/rep/__init__.py
-This package-name (rep) stands for "reporting".
+  cmm/rpt/__init__.py
+This package-name (rpt) stands for "reporting".
 
 Here are organized the scripts
   related to showing information about source and destination dirtrees.

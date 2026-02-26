@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 DirTreeMirror_PrdPrjSw:
-  cmm/trans/fromCalcExceltoPlainText.py
+  cmm/trnsf/fromCalcExceltoPlainText.py
 Description below.
 
   (script-writing is ongoing!)

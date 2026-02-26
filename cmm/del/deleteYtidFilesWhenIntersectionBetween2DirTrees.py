@@ -18,7 +18,7 @@ import lib.strnlistfs.strfunctions_mod as strf
 import lib.dirfilefs.dir_n_file_fs_mod as dirf
 """
 import os
-import cmm.rep.reportDifferentYdidsFromToDirTree as modEquals  # .YtidsComparatorReporter
+import cmm.rpt.yt.reportDifferentYdidsFromToDirTree as modEquals  # .YtidsComparatorReporter
 rule40dashsigns = '-'*40
 rule40equalsigns = '='*40
 

@@ -9,8 +9,8 @@ This package organizes subpackages such as:
    cmm/del: scripts that delete files
    cmm/mirr: mirroring or backing-up scripts
    cmm/mv: adhoc file moving scripts
-   cmm/rep: reporting scripts
-   cmm/trans: transformational scripts
+   cmm/rpt: reporting scripts
+   cmm/trnsf: transformational scripts
 """
 pass
 

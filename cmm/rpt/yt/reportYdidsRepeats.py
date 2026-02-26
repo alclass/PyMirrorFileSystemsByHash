@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 DirTreeMirror_PrdPrjSw:
-  cmm/rep/reportYdidsRepeats.py
+  cmm/rpt/reportYdidsRepeats.py
 Description below.
 
 

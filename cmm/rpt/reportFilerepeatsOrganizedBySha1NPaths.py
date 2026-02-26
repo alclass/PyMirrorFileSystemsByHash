@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 DirTreeMirror_PrdPrjSw:
-  cmm/rep/reportFilerepeatsOrganizedBySha1NPaths.py
+  cmm/rpt/reportFilerepeatsOrganizedBySha1NPaths.py
 Reports file repeats showing list organized by sha1 and paths.
 
 Usage:

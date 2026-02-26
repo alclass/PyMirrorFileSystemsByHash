@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 DirTreeMirror_PrdPrjSw:
-  cmm/rep/reportRelpathsNotExistingInCentralrepo.py
+  cmm/rpt/reportRelpathsNotExistingInCentralrepo.py
 Description below.
 
 Prints (to stdout) relative paths in a dirtree *
